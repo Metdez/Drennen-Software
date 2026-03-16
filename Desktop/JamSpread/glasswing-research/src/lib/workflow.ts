@@ -392,6 +392,10 @@ export async function runResearchWorkflow(companyUrl: string): Promise<WorkflowR
     // On failure: silently continue with empty arrays
   }
 
+  let competitorAiSummary = '';
+  let competitorResults: { title: string; description: string }[] = [];
+  let moatAiSummary = '';
+
   // ============================================
   // NODE 9: Competitor Discovery (requires NIMBLE_API_KEY + APOLLO_API_KEY)
   // ============================================
@@ -510,6 +514,68 @@ export async function runResearchWorkflow(companyUrl: string): Promise<WorkflowR
   }
 
   // ============================================
+  // NODE 9.5: NimbleWay Moat/Competitive Intelligence (parallel, optional)
+  // ============================================
+  if (process.env.NIMBLE_API_KEY) {
+    const nimbleHeaders = {
+      'Authorization': `Bearer ${process.env.NIMBLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    const [competitorSearchResult, moatSearchResult] = await Promise.allSettled([
+      httpExecutor(
+        {
+          url: 'https://sdk.nimbleway.com/v1/search',
+          method: 'POST',
+          headers: nimbleHeaders,
+          body: {
+            query: `${companyNameForSearch} competitors alternatives market landscape`,
+            focus: 'general',
+            max_results: 5,
+            deep_search: true,
+            include_answer: true,
+          },
+          timeout: 30000,
+        },
+        ctx.toNodeContext('user', 'research-wf')
+      ),
+      httpExecutor(
+        {
+          url: 'https://sdk.nimbleway.com/v1/search',
+          method: 'POST',
+          headers: nimbleHeaders,
+          body: {
+            query: `why can't big companies replicate ${companyNameForSearch} moat defensibility`,
+            focus: 'general',
+            max_results: 5,
+            deep_search: false,
+            include_answer: true,
+          },
+          timeout: 30000,
+        },
+        ctx.toNodeContext('user', 'research-wf')
+      ),
+    ]);
+
+    if (competitorSearchResult.status === 'fulfilled' && competitorSearchResult.value.success) {
+      ctx.storeNodeOutput('competitorSearch', competitorSearchResult.value.output);
+      const cb = competitorSearchResult.value.output as any;
+      competitorAiSummary = cb?.body?.answer ?? '';
+      const rawCompResults: any[] = cb?.body?.results ?? [];
+      competitorResults = rawCompResults.map((r: any) => ({
+        title: r.title ?? '',
+        description: r.description ?? '',
+      }));
+    }
+
+    if (moatSearchResult.status === 'fulfilled' && moatSearchResult.value.success) {
+      ctx.storeNodeOutput('moatSearch', moatSearchResult.value.output);
+      const mb = moatSearchResult.value.output as any;
+      moatAiSummary = mb?.body?.answer ?? '';
+    }
+  }
+
+  // ============================================
   // NODE 10: Analyze with Claude via Anthropic API
   // ============================================
   const analysisResult = await httpExecutor(
@@ -528,7 +594,7 @@ export async function runResearchWorkflow(companyUrl: string): Promise<WorkflowR
         messages: [
           {
             role: 'user',
-            content: buildUserPrompt(markdown, companyUrl, googleSerpMarkdown, chatgptSays, perplexitySays, apolloNewsArticles, orgEnrichment, jobPostings, jobPostings.length, newsAiSummary, newsResults, companyLeadership, companyAlumni, competitorData),
+            content: buildUserPrompt(markdown, companyUrl, googleSerpMarkdown, chatgptSays, perplexitySays, apolloNewsArticles, orgEnrichment, jobPostings, jobPostings.length, newsAiSummary, newsResults, companyLeadership, companyAlumni, competitorData, competitorAiSummary, competitorResults, moatAiSummary),
           },
         ],
       },
@@ -596,6 +662,8 @@ export async function runResearchWorkflow(companyUrl: string): Promise<WorkflowR
       companyAlumni,
       orgEnrichment,
       competitorData,
+      competitors: Array.isArray(parsed.competitors) ? parsed.competitors : undefined,
+      moatAiSummary: moatAiSummary || undefined,
     };
 
     return { success: true, brief };
