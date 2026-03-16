@@ -30,7 +30,19 @@ export async function POST(request: Request): Promise<NextResponse<MemoResponse>
     return NextResponse.json({ success: false, error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
   }
 
-  const userContent = `Write an investment memo for ${companyName} based on this research data: ${JSON.stringify(brief)}.
+  // Build a bounded research summary instead of serializing the full brief object.
+  // Raw brief objects can exceed 50k chars once Apollo articles and AI responses are included.
+  const researchSummary = JSON.stringify({
+    companyName: brief.companyName,
+    companyUrl: brief.companyUrl,
+    sections: brief.sections,
+    orgEnrichment: brief.orgEnrichment,
+    apolloNewsArticles: (brief.apolloNewsArticles ?? []).slice(0, 10),
+    chatgptSays: brief.chatgptSays?.slice(0, 1500),
+    perplexitySays: brief.perplexitySays?.slice(0, 1500),
+  });
+
+  const userContent = `Write an investment memo for ${companyName} based on this research data: ${researchSummary}.
 
 Format the memo with these sections:
 1. EXECUTIVE SUMMARY (2-3 sentences — what they do and why it matters)

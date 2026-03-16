@@ -5,7 +5,7 @@ import LoadingState from '@/components/LoadingState';
 import ResearchBriefComponent from '@/components/ResearchBrief';
 import BriefChat from '@/components/BriefChat';
 import InvestmentMemo from '@/components/InvestmentMemo';
-import type { ResearchBrief, ResearchResponse } from '@/lib/types';
+import type { ResearchBrief, ResearchResponse, MemoResponse } from '@/lib/types';
 
 type PageState = 'idle' | 'loading' | 'done' | 'memo';
 
@@ -28,7 +28,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brief }),
       });
-      const data = await res.json() as { success: boolean; memo?: string; error?: string };
+      const data = await res.json() as MemoResponse;
       if (!data.success || !data.memo) {
         setMemoError(data.error ?? 'Failed to generate memo');
         return;
@@ -47,6 +47,7 @@ export default function Home() {
     setState('loading');
     setActiveUrl(url);
     setError(null);
+    setMemoError(null);
     setBrief(null);
 
     try {

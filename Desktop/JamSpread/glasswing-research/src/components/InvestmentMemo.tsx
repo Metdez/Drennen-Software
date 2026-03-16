@@ -9,6 +9,7 @@ interface InvestmentMemoProps {
 
 export default function InvestmentMemo({ memo, onBack }: InvestmentMemoProps) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const handleCopy = async () => {
     try {
@@ -16,7 +17,8 @@ export default function InvestmentMemo({ memo, onBack }: InvestmentMemoProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard unavailable (e.g. non-HTTPS) — fail silently
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 3000);
     }
   };
 
@@ -45,7 +47,7 @@ export default function InvestmentMemo({ memo, onBack }: InvestmentMemoProps) {
             fontFamily: 'var(--font-jetbrains)',
           }}
         >
-          {copied ? '✓ Copied' : 'Copy to Clipboard'}
+          {copied ? '✓ Copied' : copyFailed ? 'Copy failed — use Ctrl+C' : 'Copy to Clipboard'}
         </button>
       </div>
 
