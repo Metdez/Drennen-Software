@@ -1,6 +1,68 @@
 import { ResearchBrief as ResearchBriefType } from '@/lib/types';
 import BriefSection from './BriefSection';
 
+function CompetitorCard({
+  name,
+  url,
+  description,
+}: {
+  name: string;
+  url: string;
+  description: string;
+}) {
+  return (
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        padding: '12px 14px',
+        flex: '1 1 180px',
+        minWidth: '160px',
+        maxWidth: '240px',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--font-jetbrains)',
+          fontSize: '11px',
+          fontWeight: 700,
+          letterSpacing: '0.05em',
+          color: 'var(--text-primary)',
+          marginBottom: '4px',
+          textTransform: 'uppercase' as const,
+        }}
+      >
+        {name}
+      </div>
+      {url && (
+        <div
+          style={{
+            fontSize: '11px',
+            color: 'var(--accent)',
+            marginBottom: '6px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap' as const,
+          }}
+        >
+          {url}
+        </div>
+      )}
+      <div
+        style={{
+          fontSize: '12px',
+          color: 'var(--text-secondary)',
+          lineHeight: '1.5',
+          fontFamily: 'var(--font-ibm-sans)',
+        }}
+      >
+        {description}
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   brief: ResearchBriefType;
   onGenerateMemo: () => void;
@@ -50,6 +112,38 @@ export default function ResearchBrief({ brief, onGenerateMemo }: Props) {
         <BriefSection title="Competitive Landscape" content={brief.sections.competitiveLandscape} icon="◈" />
         <BriefSection title="Search Presence" content={brief.sections.searchPresence} icon="◈" />
         <BriefSection title="Red Flags" content={brief.sections.redFlags} icon="⚠" variant="warning" />
+
+        {brief.sections.competitiveMoat && brief.sections.competitiveMoat !== 'Not available' && (
+          <div>
+            {brief.competitors && brief.competitors.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <div
+                  className="text-[10px] uppercase tracking-widest mb-2"
+                  style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-jetbrains)' }}
+                >
+                  Direct Competitors
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {brief.competitors.map((c) => (
+                    <CompetitorCard
+                      key={c.name}
+                      name={c.name}
+                      url={c.url}
+                      description={c.description}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            <BriefSection
+              title="Competitive Moat"
+              content={brief.sections.competitiveMoat}
+              icon="⬡"
+              variant="warning"
+            />
+          </div>
+        )}
+
         <BriefSection title="Glasswing Relevance" content={brief.sections.glasswingRelevance} icon="◆" variant="positive" />
         <BriefSection title="AI Platform Consensus" content={brief.sections.aiConsensus} icon="◈" variant="positive" />
 
