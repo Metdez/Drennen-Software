@@ -50,6 +50,7 @@ export interface ResearchBriefSections {
   techStackAnalysis: string;
   networkOpportunity: string;
   competitorComparison: string;
+  competitiveMoat: string;
 }
 
 export interface FundingRound {
