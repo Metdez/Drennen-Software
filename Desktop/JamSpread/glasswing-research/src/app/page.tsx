@@ -3,6 +3,7 @@ import { useState } from 'react';
 import SearchForm from '@/components/SearchForm';
 import LoadingState from '@/components/LoadingState';
 import ResearchBriefComponent from '@/components/ResearchBrief';
+import BriefChat from '@/components/BriefChat';
 import type { ResearchBrief, ResearchResponse } from '@/lib/types';
 
 type PageState = 'idle' | 'loading' | 'done';
@@ -12,6 +13,11 @@ export default function Home() {
   const [brief, setBrief] = useState<ResearchBrief | null>(null);
   const [activeUrl, setActiveUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  function handleGenerateMemo() {
+    // TODO: Implement memo generation logic
+    console.log('Generate memo for:', brief?.companyName);
+  }
 
   async function handleSubmit(url: string) {
     setState('loading');
@@ -95,7 +101,12 @@ export default function Home() {
         {state === 'loading' && <LoadingState url={activeUrl} />}
 
         {/* Brief */}
-        {state === 'done' && brief && <ResearchBriefComponent brief={brief} />}
+        {state === 'done' && brief && (
+          <>
+            <ResearchBriefComponent brief={brief} onGenerateMemo={handleGenerateMemo} />
+            <BriefChat brief={brief} />
+          </>
+        )}
       </div>
     </main>
   );
