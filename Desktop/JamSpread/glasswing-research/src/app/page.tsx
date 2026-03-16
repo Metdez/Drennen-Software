@@ -34,6 +34,7 @@ export default function Home() {
         return;
       }
       setMemo(data.memo);
+      setMemoError(null);
       setState('memo');
     } catch (err) {
       setMemoError(err instanceof Error ? err.message : 'Failed to generate memo');
