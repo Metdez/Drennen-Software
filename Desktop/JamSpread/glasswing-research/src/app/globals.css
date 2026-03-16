@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131a;
+  --border: rgba(255, 255, 255, 0.06);
+  --accent: #4f8cff;
+  --accent-red: #ff4f4f;
+  --accent-green: #4fff8c;
+  --text-primary: #e8e8ed;
+  --text-secondary: #6b6b80;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+  min-height: 100vh;
+}
