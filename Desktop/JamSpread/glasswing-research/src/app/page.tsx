@@ -4,20 +4,43 @@ import SearchForm from '@/components/SearchForm';
 import LoadingState from '@/components/LoadingState';
 import ResearchBriefComponent from '@/components/ResearchBrief';
 import BriefChat from '@/components/BriefChat';
+import InvestmentMemo from '@/components/InvestmentMemo';
 import type { ResearchBrief, ResearchResponse } from '@/lib/types';
 
-type PageState = 'idle' | 'loading' | 'done';
+type PageState = 'idle' | 'loading' | 'done' | 'memo';
 
 export default function Home() {
   const [state, setState] = useState<PageState>('idle');
   const [brief, setBrief] = useState<ResearchBrief | null>(null);
   const [activeUrl, setActiveUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [memo, setMemo] = useState<string | null>(null);
+  const [memoLoading, setMemoLoading] = useState(false);
+  const [memoError, setMemoError] = useState<string | null>(null);
 
-  function handleGenerateMemo() {
-    // TODO: Implement memo generation logic
-    console.log('Generate memo for:', brief?.companyName);
-  }
+  const handleGenerateMemo = async () => {
+    if (!brief) return;
+    setMemoLoading(true);
+    setMemoError(null);
+    try {
+      const res = await fetch('/api/memo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief }),
+      });
+      const data = await res.json() as { success: boolean; memo?: string; error?: string };
+      if (!data.success || !data.memo) {
+        setMemoError(data.error ?? 'Failed to generate memo');
+        return;
+      }
+      setMemo(data.memo);
+      setState('memo');
+    } catch (err) {
+      setMemoError(err instanceof Error ? err.message : 'Failed to generate memo');
+    } finally {
+      setMemoLoading(false);
+    }
+  };
 
   async function handleSubmit(url: string) {
     setState('loading');
@@ -106,6 +129,41 @@ export default function Home() {
             <ResearchBriefComponent brief={brief} onGenerateMemo={handleGenerateMemo} />
             <BriefChat brief={brief} />
           </>
+        )}
+
+        {/* Memo loading overlay — shown while generating memo (state stays 'done') */}
+        {memoLoading && (
+          <div
+            className="fixed inset-0 flex items-center justify-center z-50"
+            style={{ background: 'rgba(10,10,14,0.85)', backdropFilter: 'blur(4px)' }}
+          >
+            <p
+              className="text-sm animate-pulse"
+              style={{ color: 'var(--accent)', fontFamily: 'var(--font-jetbrains)' }}
+            >
+              Drafting memo...
+            </p>
+          </div>
+        )}
+
+        {/* Memo error — shown on failure, brief stays visible */}
+        {memoError && state === 'done' && (
+          <div
+            className="mt-4 rounded-lg px-4 py-3 text-sm"
+            style={{
+              background: 'rgba(255,79,79,0.08)',
+              border: '1px solid rgba(255,79,79,0.2)',
+              color: 'var(--accent-red)',
+              fontFamily: 'var(--font-ibm-sans)',
+            }}
+          >
+            Memo generation failed: {memoError}
+          </div>
+        )}
+
+        {/* Memo view */}
+        {state === 'memo' && memo && (
+          <InvestmentMemo memo={memo} onBack={() => setState('done')} />
         )}
       </div>
     </main>
