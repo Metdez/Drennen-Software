@@ -11,9 +11,13 @@ export default function InvestmentMemo({ memo, onBack }: InvestmentMemoProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(memo);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(memo);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable (e.g. non-HTTPS) — fail silently
+    }
   };
 
   const lines = memo.split('\n');
@@ -61,7 +65,7 @@ export default function InvestmentMemo({ memo, onBack }: InvestmentMemoProps) {
         </h1>
         <p
           className="text-xs"
-          style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ibm-mono)' }}
+          style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ibm-sans)' }}
         >
           First draft ·{' '}
           {new Date().toLocaleDateString('en-US', {
@@ -83,8 +87,8 @@ export default function InvestmentMemo({ memo, onBack }: InvestmentMemoProps) {
 
           // Strip markdown bold markers and trailing punctuation to normalize for header detection
           const normalized = trimmed
-            .replace(/^\*\*|\*\*$/g, '')   // remove leading/trailing **
-            .replace(/[:\s]+$/, '')          // remove trailing colon or whitespace
+            .replace(/\*\*/g, '')    // strip all markdown bold markers
+            .replace(/[:\s]+$/, '')  // remove trailing colon or whitespace
             .trim();
 
           // Section headers: "1. EXECUTIVE SUMMARY" or bare "EXECUTIVE SUMMARY"
