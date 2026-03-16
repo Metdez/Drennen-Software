@@ -50,6 +50,7 @@ export interface ResearchBriefSections {
   techStackAnalysis: string;
   networkOpportunity: string;
   competitorComparison: string;
+  competitiveMoat: string;
 }
 
 export interface FundingRound {
@@ -115,6 +116,8 @@ export interface ResearchBrief {
   competitorData?: CompetitorComparison[];
   companyLeadership?: NetworkPerson[];
   companyAlumni?: NetworkPerson[];
+  competitors?: { name: string; url: string; description: string }[];
+  moatAiSummary?: string;
 }
 
 export interface WorkflowResult {
