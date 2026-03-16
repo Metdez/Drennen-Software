@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { MemoResponse, ResearchBrief } from '@/lib/types';
 
-const requestSchema = z.object({
-  brief: z.object({}).passthrough(),
-});
-
 export const maxDuration = 60;
+
+// Brief is intentionally permissive — full ResearchBrief validation would duplicate the schema
+const requestSchema = z.object({
+  brief: z.record(z.string(), z.unknown()),
+});
 
 export async function POST(request: Request): Promise<NextResponse<MemoResponse>> {
   let body: unknown;
