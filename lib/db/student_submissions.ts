@@ -1,6 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
 import type { StudentSummary, StudentDetail, SessionWithSubmission } from '@/types'
 
+export async function getSubmissionsBySession(
+  sessionId: string
+): Promise<Array<{ student_name: string; submission_text: string; filename: string }>> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('student_submissions')
+    .select('student_name, submission_text, filename')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw new Error(`Failed to fetch submissions for session: ${error.message}`)
+  return (data ?? []).map((row) => ({
+    student_name: row.student_name ?? '',
+    submission_text: row.submission_text ?? '',
+    filename: row.filename ?? '',
+  }))
+}
+
 export async function getStudentsWithParticipation(): Promise<StudentSummary[]> {
   const supabase = createClient()
 
