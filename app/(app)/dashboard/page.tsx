@@ -55,6 +55,7 @@ export default function DashboardPage() {
       }
 
       sessionStorage.setItem(`session_${data.sessionId}`, data.output as string)
+      sessionStorage.setItem(`overlap_${data.sessionId}`, JSON.stringify(data.overlappingThemes ?? []))
       pendingSessionIdRef.current = data.sessionId as string
       setDone(true)
     } catch (err: unknown) {

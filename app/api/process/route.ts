@@ -3,8 +3,9 @@ import { getCurrentUser } from '@/lib/db/users'
 import { buildSubmissionsText } from '@/lib/parse/builder'
 import { generateQuestionSheet } from '@/lib/ai/client'
 import { insertSession, insertStudentSubmissions, insertSessionThemes } from '@/lib/db/sessions'
-import { downloadTempZip, deleteTempZip } from '@/lib/supabase/storage'
-import { parseThemesFromOutput } from '@/lib/parse/parseThemes'
+import { downloadTempZip, deleteTempZip } from '@/lib/supabase/storage.server'
+import { parseThemesFromOutput, themesOverlap } from '@/lib/parse/parseThemes'
+import { getRecentThemeTitles } from '@/lib/db/themes'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,19 +45,35 @@ export async function POST(request: Request) {
     })
 
     // Persist per-student and per-theme data for analytics queries (non-blocking failures)
+    const parsedThemes = parseThemesFromOutput(output)
+    let overlappingThemes: string[] = []
+
     await Promise.all([
       insertStudentSubmissions(session.id, submissions).catch((e) =>
         console.error('[/api/process] insertStudentSubmissions failed:', e)
       ),
-      insertSessionThemes(session.id, parseThemesFromOutput(output)).catch((e) =>
+      insertSessionThemes(session.id, parsedThemes).catch((e) =>
         console.error('[/api/process] insertSessionThemes failed:', e)
       ),
     ])
+
+    // Compute overlap against recent sessions (non-fatal)
+    try {
+      if (parsedThemes.length > 0) {
+        const recentTitles = await getRecentThemeTitles(user.id, session.id, 5)
+        overlappingThemes = parsedThemes
+          .filter(t => recentTitles.some(r => themesOverlap(t.themeTitle, r)))
+          .map(t => t.themeTitle)
+      }
+    } catch (e) {
+      console.error('[/api/process] overlap detection failed (non-fatal):', e)
+    }
 
     return NextResponse.json({
       sessionId: session.id,
       output: session.output,
       fileCount: session.fileCount,
+      overlappingThemes,
     })
 
   } catch (err) {

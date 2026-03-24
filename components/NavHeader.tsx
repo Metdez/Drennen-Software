@@ -8,6 +8,8 @@ import { useEffect, useState } from 'react'
 const NAV_LINKS = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'History', href: '/history' },
+  { label: 'Roster', href: '/roster' },
+  { label: 'Analytics', href: '/analytics' },
 ]
 
 export function NavHeader() {

@@ -4,6 +4,7 @@ export interface ProcessResponse {
   sessionId: string
   output: string
   fileCount: number
+  overlappingThemes?: string[]
 }
 
 export interface GetSessionsResponse {

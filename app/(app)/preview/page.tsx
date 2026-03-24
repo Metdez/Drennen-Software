@@ -14,6 +14,7 @@ function PreviewContent() {
 
   const [session, setSession] = useState<Session | null>(null)
   const [output, setOutput] = useState<string | null>(null)
+  const [overlappingThemes, setOverlappingThemes] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -27,6 +28,15 @@ function PreviewContent() {
     const storedOutput = sessionStorage.getItem(`session_${sessionId}`)
     if (storedOutput) {
       setOutput(storedOutput)
+    }
+
+    const storedOverlap = sessionStorage.getItem(`overlap_${sessionId}`)
+    if (storedOverlap) {
+      try {
+        setOverlappingThemes(JSON.parse(storedOverlap))
+      } catch {
+        // ignore malformed data
+      }
     }
 
     async function fetchSession() {
@@ -97,6 +107,27 @@ function PreviewContent() {
             {new Date(session.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             <span className="mx-2 opacity-40">·</span>
             {session.fileCount} {session.fileCount === 1 ? 'file' : 'files'} processed
+          </p>
+        </div>
+      )}
+
+      {/* Overlap warning */}
+      {overlappingThemes.length > 0 && (
+        <div
+          className="animate-fade-up rounded-xl px-5 py-4 border font-[family-name:var(--font-dm-sans)]"
+          style={{ borderColor: '#f36f21', background: 'rgba(243,111,33,0.07)' }}
+        >
+          <p className="text-sm font-semibold text-[#f36f21] mb-1">
+            ⚠ {overlappingThemes.length} {overlappingThemes.length === 1 ? 'theme' : 'themes'} appeared in recent sessions
+          </p>
+          <p className="text-sm text-[var(--text-secondary)]">
+            {overlappingThemes.map((t, i) => (
+              <span key={t}>
+                {i > 0 && ', '}
+                &ldquo;{t}&rdquo;
+              </span>
+            ))}
+            {' '}— consider freshening the angle before the next session.
           </p>
         </div>
       )}

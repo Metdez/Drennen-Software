@@ -54,6 +54,7 @@ export async function insertStudentSubmissions(
   const rows = submissions.map((s) => ({
     session_id: sessionId,
     student_name: s.studentName,
+    filename: s.filename,
     submission_text: s.text,
   }))
   const { error } = await supabase.from('student_submissions').insert(rows)

@@ -3,6 +3,8 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   PREVIEW: '/preview',
   HISTORY: '/history',
+  ROSTER: '/roster',
+  ANALYTICS: '/analytics',
   API_PROCESS: '/api/process',
   API_SESSIONS: '/api/sessions',
   API_AUTH_CALLBACK: '/api/auth/callback',
