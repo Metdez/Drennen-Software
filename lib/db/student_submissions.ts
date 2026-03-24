@@ -4,34 +4,26 @@ import type { StudentSummary, StudentDetail, SessionWithSubmission } from '@/typ
 export async function getStudentsWithParticipation(): Promise<StudentSummary[]> {
   const supabase = createClient()
 
-  // Total sessions owned by the current user (RLS-scoped)
-  const { count: totalSessions, error: countError } = await supabase
-    .from('sessions')
-    .select('*', { count: 'exact', head: true })
+  const [submissionsResult, sessionsResult] = await Promise.all([
+    supabase.from('student_submissions').select('student_name, session_id'),
+    supabase.from('sessions').select('id', { count: 'exact', head: true }),
+  ])
 
-  if (countError) throw new Error(`Failed to count sessions: ${countError.message}`)
+  if (submissionsResult.error) throw new Error(`Failed to fetch submissions: ${submissionsResult.error.message}`)
 
-  // All submissions visible to this user (RLS policy joins through sessions.user_id)
-  const { data, error } = await supabase
-    .from('student_submissions')
-    .select('student_name, session_id')
+  const totalSessions = sessionsResult.count ?? 0
 
-  if (error) throw new Error(`Failed to fetch student submissions: ${error.message}`)
-
-  // Aggregate: group by student_name, count unique session_ids
-  const studentMap = new Map<string, Set<string>>()
-  for (const row of data ?? []) {
-    if (!studentMap.has(row.student_name)) {
-      studentMap.set(row.student_name, new Set())
-    }
-    studentMap.get(row.student_name)!.add(row.session_id)
+  const map = new Map<string, Set<string>>()
+  for (const row of submissionsResult.data ?? []) {
+    if (!map.has(row.student_name)) map.set(row.student_name, new Set())
+    map.get(row.student_name)!.add(row.session_id)
   }
 
-  return Array.from(studentMap.entries())
-    .map(([studentName, sessionIds]) => ({
+  return Array.from(map.entries())
+    .map(([studentName, sessionSet]) => ({
       studentName,
-      sessionCount: sessionIds.size,
-      totalSessions: totalSessions ?? 0,
+      sessionCount: sessionSet.size,
+      totalSessions,
     }))
     .sort((a, b) => a.studentName.localeCompare(b.studentName))
 }
@@ -39,42 +31,32 @@ export async function getStudentsWithParticipation(): Promise<StudentSummary[]> 
 export async function getStudentDetail(studentName: string): Promise<StudentDetail | null> {
   const supabase = createClient()
 
-  // Total sessions for this professor (RLS-scoped)
-  const { count: totalSessions, error: countError } = await supabase
-    .from('sessions')
-    .select('*', { count: 'exact', head: true })
+  const [submissionsResult, sessionsResult] = await Promise.all([
+    supabase
+      .from('student_submissions')
+      .select('session_id, submission_text, filename, sessions(speaker_name, created_at)')
+      .eq('student_name', studentName),
+    supabase.from('sessions').select('id', { count: 'exact', head: true }),
+  ])
 
-  if (countError) throw new Error(`Failed to count sessions: ${countError.message}`)
+  if (submissionsResult.error) throw new Error(`Failed to fetch student detail: ${submissionsResult.error.message}`)
+  if (!submissionsResult.data?.length) return null
 
-  // All submissions for this student (RLS policy scopes to current user's sessions)
-  const { data, error } = await supabase
-    .from('student_submissions')
-    .select('session_id, filename, submission_text, sessions!inner(id, speaker_name, created_at)')
-    .eq('student_name', studentName)
-
-  if (error) throw new Error(`Failed to fetch student detail: ${error.message}`)
-
-  if (!data || data.length === 0) return null
-
-  const sessions: SessionWithSubmission[] = (data as unknown as Array<{
-    session_id: string
-    filename: string
-    submission_text: string
-    sessions: { id: string; speaker_name: string; created_at: string }
-  }>)
-    .map((row) => ({
+  const sessions: SessionWithSubmission[] = submissionsResult.data.map((row) => {
+    const session = (Array.isArray(row.sessions) ? row.sessions[0] : row.sessions) as { speaker_name: string; created_at: string } | null
+    return {
       sessionId: row.session_id,
-      speakerName: row.sessions.speaker_name,
-      createdAt: row.sessions.created_at,
+      speakerName: session?.speaker_name ?? '',
+      createdAt: session?.created_at ?? '',
       submissionText: row.submission_text,
-      filename: row.filename,
-    }))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      filename: row.filename ?? '',
+    }
+  })
 
   return {
     studentName,
     sessions,
     sessionCount: sessions.length,
-    totalSessions: totalSessions ?? 0,
+    totalSessions: sessionsResult.count ?? 0,
   }
 }

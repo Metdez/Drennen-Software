@@ -6,9 +6,10 @@
 CREATE TABLE IF NOT EXISTS student_submissions (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id    UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  student_name  TEXT NOT NULL,
-  raw_text      TEXT NOT NULL,
-  created_at    TIMESTAMPTZ DEFAULT NOW() NOT NULL
+  student_name    TEXT NOT NULL,
+  submission_text TEXT NOT NULL,
+  filename        TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS student_submissions_session_id_idx ON student_submissions(session_id);
