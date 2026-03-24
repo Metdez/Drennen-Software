@@ -8,6 +8,11 @@ export interface ParsedSubmission {
   text: string
 }
 
+// Canvas filenames sometimes include a numeric student ID as the second underscore-segment
+// (e.g. cuttingvictor_12345_file.pdf) which makes the "last initial" a digit like "1".
+// This maps common digit/letter confusions to their letter equivalents.
+const DIGIT_TO_LETTER: Record<string, string> = { '1': 'L', '0': 'O', '5': 'S', '8': 'B' }
+
 function extractStudentName(filename: string): string {
   // Get just the base filename without path
   const base = filename.split('/').pop() ?? filename
@@ -16,7 +21,8 @@ function extractStudentName(filename: string): string {
   if (parts.length < 2) return 'Unknown Student'
 
   const firstName = parts[0]
-  const lastInitial = parts[1].charAt(0).toUpperCase()
+  const rawInitial = parts[1].charAt(0).toUpperCase()
+  const lastInitial = DIGIT_TO_LETTER[rawInitial] ?? rawInitial
 
   return `${firstName} ${lastInitial}.`
 }

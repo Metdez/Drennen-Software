@@ -27,6 +27,9 @@ SUPABASE_SERVICE_ROLE_KEY=
 XAI_API_KEY=
 XAI_BASE_URL=          # defaults to https://api.x.ai/v1
 XAI_MODEL=             # defaults to grok-4-1-fast-reasoning
+GOOGLE_API_KEY=        # (or GEMINI_API_KEY) — used by the analytics SQL agent
+GEMINI_MODEL=          # defaults to gemini-3-flash-preview
+DATABASE_URL=          # Postgres connection string — used by the analytics SQL agent
 ```
 
 ## Architecture
@@ -38,7 +41,7 @@ This is a **Next.js 14 App Router** app for a university professor tool. Profess
 1. Professor uploads `speakerName` + `.zip` to `POST /api/process`
 2. `lib/parse/`: ZIP is extracted → each `.pdf`/`.docx` file parsed to text → assembled into a single structured string (student name derived from filename format `FirstName_LastName...`)
 3. `lib/ai/`: xAI (Grok) is called via the OpenAI SDK interface with `baseURL` overridden. The system prompt in `lib/ai/prompt.ts` has a strict 10-section output format with tier rankings for question quality.
-4. The generated output + metadata is saved to Supabase `sessions` table
+4. The generated output + metadata is saved to Supabase `sessions` table; individual student submissions are saved to `student_submissions`; parsed themes are saved to `session_themes`
 5. The API returns `sessionId` + `output`; the client stashes `output` in `sessionStorage` keyed by `session_${sessionId}` to avoid a round-trip on the preview page
 6. `/preview` renders the markdown output; professors can download as PDF (`lib/export/pdf.ts` via `@react-pdf/renderer`) or DOCX (`lib/export/docx.ts` via `docx`)
 
@@ -53,28 +56,57 @@ app/
     dashboard/                 → upload form
     preview/                   → output display + download
     history/                   → past sessions list
+    analytics/                 → submission trend charts, leaderboard, drop-off analysis
+    roster/                    → all students list with participation rates
+    roster/[studentName]/      → per-student submission history
   api/
     auth/callback/             → Supabase PKCE callback
     process/                   → main ZIP → AI pipeline (POST)
     sessions/                  → list sessions (GET)
     sessions/[id]/             → fetch single session (GET)
     sessions/[id]/download/    → export as PDF or DOCX (?format=pdf|docx)
+    analytics/                 → aggregated analytics data (GET)
+    analytics/themes/          → theme frequency across sessions (GET)
+    analytics/insights/        → saved Gemini class analysis (GET)
+    analytics/query/           → natural-language → SQL → answer via Gemini (POST)
 ```
 
 ### Library layout
 
-- `lib/supabase/server.ts` — `createClient()` (cookie-based, for authenticated requests) and `createAdminClient()` (service role, bypasses RLS)
+- `lib/supabase/server.ts` — `createClient()` (cookie-based) and `createAdminClient()` (service role, bypasses RLS)
 - `lib/supabase/client.ts` — browser Supabase client
-- `lib/db/` — `users.ts` (`getCurrentUser`) and `sessions.ts` (CRUD wrappers)
+- `lib/db/users.ts` — `getCurrentUser()`
+- `lib/db/sessions.ts` — `insertSession()`, `getSessionById()`, `listSessions()`
+- `lib/db/analytics.ts` — `getAnalytics()`: session trend, leaderboard, drop-off
+- `lib/db/classInsights.ts` — `getClassInsights()`, `upsertClassInsights()`, `fetchInsightsInput()`
+- `lib/db/student_submissions.ts` — `getStudentsWithParticipation()`, `getStudentDetail()`
+- `lib/db/themes.ts` — `getThemeFrequency()`, `getRecentThemeTitles()`
 - `lib/parse/` — `unzip.ts`, `pdf.ts`, `docx.ts`, `builder.ts` (orchestrates them all)
-- `lib/ai/` — `client.ts` (lazy OpenAI-SDK client pointing at xAI), `prompt.ts` (system prompt template with `{{SPEAKER_NAME}}` placeholder)
+- `lib/ai/client.ts` — lazy OpenAI SDK client pointed at XAI_BASE_URL (used for session generation)
+- `lib/ai/prompt.ts` — system prompt template with `{{SPEAKER_NAME}}` placeholder
+- `lib/ai/classInsights.ts` — `generateClassInsights(userId)`: Gemini-powered class analysis, called fire-and-forget from `/api/process` after each session save; results stored in `class_insights` table
+- `lib/ai/sqlAgent.ts` — Gemini-powered NL→SQL→answer agent for analytics queries; calls the `execute_analytics_query` Supabase RPC
 - `lib/export/` — `pdf.ts` and `docx.ts` for download generation
 - `lib/utils/transforms.ts` — `rowToSession` / `rowToSessionSummary` (snake_case DB rows → camelCase types)
 - `lib/constants.ts` — `ROUTES`, `BRAND` colors, `APP_NAME`, `AI_CONFIG`, accepted file types
 
 ### Database
 
-Single `sessions` table with RLS. Sessions are **immutable** — no UPDATE or DELETE policies exist by design. New professor accounts are created via the Supabase dashboard only; self-signup is disabled at the project level.
+Three core tables with RLS. Sessions are **immutable** — no UPDATE or DELETE policies exist by design. New professor accounts are created via the Supabase dashboard only; self-signup is disabled.
+
+| Table | Purpose |
+|---|---|
+| `sessions` | One row per processed ZIP — speaker name, AI output, file count |
+| `student_submissions` | One row per student per session — raw submission text, student name, filename |
+| `session_themes` | One row per theme per session — theme number (1–10) and title extracted from AI output |
+| `class_insights` | One row per professor — Gemini-generated class analysis JSON, upserted after each session |
+
+The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL agent to run read-only SELECT queries bypassing RLS. It validates queries server-side before executing them.
+
+### Dual AI systems
+
+- **xAI Grok** (via OpenAI SDK + `baseURL` override): session generation — turns student submissions into the 10-section interview sheet
+- **Google Gemini** (via `@google/genai`): analytics SQL agent — converts natural-language professor questions into SQL, executes them, then summarises results in plain English
 
 ### Key conventions
 
@@ -83,3 +115,5 @@ Single `sessions` table with RLS. Sessions are **immutable** — no UPDATE or DE
 - The `(app)` layout also sets `force-dynamic` so auth checks run per-request
 - Brand colors live in `lib/constants.ts` (`BRAND.ORANGE`, `BRAND.PURPLE`, `BRAND.GREEN`) — use these instead of hardcoded hex values
 - Student name is parsed from filename: `FirstName_LastName...` → displayed as `"FirstName L."`
+- PDF/DOCX parse failures return empty string — processing continues for other files in the ZIP
+- `sessionStorage` cache: after generation, output is stored as `session_${sessionId}` to skip a round-trip on `/preview`

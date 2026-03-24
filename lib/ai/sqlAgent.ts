@@ -1,28 +1,8 @@
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
-import { HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { Pool } from 'pg'
+import { GoogleGenAI } from '@google/genai'
+import { createAdminClient } from '@/lib/supabase/server'
 
 // ---------------------------------------------------------------------------
-// Database connection pool (singleton)
-// ---------------------------------------------------------------------------
-
-let pool: Pool | null = null
-
-function getPool(): Pool {
-  if (!pool) {
-    const url = process.env.DATABASE_URL
-    if (!url) throw new Error('DATABASE_URL env var is not set')
-    pool = new Pool({
-      connectionString: url,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 5,
-    })
-  }
-  return pool
-}
-
-// ---------------------------------------------------------------------------
-// Read-only SQL guard
+// Read-only SQL guard (client-side; DB fn also validates)
 // ---------------------------------------------------------------------------
 
 const WRITE_KEYWORDS = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE|COPY)\b/i
@@ -34,7 +14,7 @@ function assertReadOnly(sql: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Schema context injected into every prompt
+// Schema context
 // ---------------------------------------------------------------------------
 
 const SCHEMA_CONTEXT = `
@@ -76,10 +56,6 @@ Rules:
 - session_themes.theme_number is 1-based ordering within a session.
 `.trim()
 
-// ---------------------------------------------------------------------------
-// SQL generation prompt
-// ---------------------------------------------------------------------------
-
 function buildSqlPrompt(question: string): string {
   return `${SCHEMA_CONTEXT}
 
@@ -88,10 +64,6 @@ Generate a single, read-only SQL SELECT query that answers this question:
 
 Respond with ONLY the raw SQL query — no markdown fences, no explanation, no trailing semicolon.`
 }
-
-// ---------------------------------------------------------------------------
-// Answer formatting prompt
-// ---------------------------------------------------------------------------
 
 function buildAnswerPrompt(question: string, sql: string, rows: unknown[]): string {
   return `A professor asked: "${question}"
@@ -115,22 +87,20 @@ export interface AnalyticsResult {
 }
 
 export async function runAnalyticsQuery(question: string): Promise<AnalyticsResult> {
-  const apiKey = process.env.GOOGLE_API_KEY
-  if (!apiKey) throw new Error('GOOGLE_API_KEY env var is not set')
+  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
 
-  const llm = new ChatGoogleGenerativeAI({
-    model: 'gemini-3-flash-preview',
-    apiKey,
-    temperature: 0,
-  })
+  const ai = new GoogleGenAI({ apiKey })
+  const model = process.env.GEMINI_MODEL ?? 'gemini-3-flash-preview'
 
   // Step 1: generate SQL
-  const sqlResponse = await llm.invoke([
-    new SystemMessage('You are an expert PostgreSQL query writer. Output only raw SQL.'),
-    new HumanMessage(buildSqlPrompt(question)),
-  ])
+  const sqlResponse = await ai.models.generateContent({
+    model,
+    contents: buildSqlPrompt(question),
+    config: { systemInstruction: 'You are an expert PostgreSQL query writer. Output only raw SQL.' },
+  })
 
-  const sql = (sqlResponse.content as string).trim()
+  const sql = (sqlResponse.text ?? '').trim()
     .replace(/^```(?:sql)?\s*/i, '')
     .replace(/\s*```$/, '')
     .replace(/;$/, '')
@@ -139,18 +109,21 @@ export async function runAnalyticsQuery(question: string): Promise<AnalyticsResu
   // Step 2: validate read-only
   assertReadOnly(sql)
 
-  // Step 3: execute
-  const db = getPool()
-  const result = await db.query(sql)
-  const rows = result.rows
+  // Step 3: execute via Supabase RPC (SECURITY DEFINER, DB also validates)
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('execute_analytics_query', { query_text: sql })
+  if (error) throw new Error(`Query failed: ${error.message}`)
+
+  const rows: unknown[] = Array.isArray(data) ? data : (data ? [data] : [])
 
   // Step 4: format natural language answer
-  const answerResponse = await llm.invoke([
-    new SystemMessage('You are a helpful assistant summarising database query results for a professor.'),
-    new HumanMessage(buildAnswerPrompt(question, sql, rows)),
-  ])
+  const answerResponse = await ai.models.generateContent({
+    model,
+    contents: buildAnswerPrompt(question, sql, rows),
+    config: { systemInstruction: 'You are a helpful assistant summarising database query results for a professor.' },
+  })
 
-  const answer = (answerResponse.content as string).trim()
+  const answer = (answerResponse.text ?? '').trim()
 
   return { answer, sql }
 }

@@ -6,6 +6,7 @@ import { insertSession, insertStudentSubmissions, insertSessionThemes } from '@/
 import { downloadTempZip, deleteTempZip } from '@/lib/supabase/storage.server'
 import { parseThemesFromOutput, themesOverlap } from '@/lib/parse/parseThemes'
 import { getRecentThemeTitles } from '@/lib/db/themes'
+import { generateClassInsights } from '@/lib/ai/classInsights'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,6 +69,11 @@ export async function POST(request: Request) {
     } catch (e) {
       console.error('[/api/process] overlap detection failed (non-fatal):', e)
     }
+
+    // Fire-and-forget: regenerate class insights after each session (non-blocking)
+    generateClassInsights(user.id).catch(e =>
+      console.error('[/api/process] generateClassInsights failed (non-fatal):', e)
+    )
 
     return NextResponse.json({
       sessionId: session.id,

@@ -10,10 +10,13 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^1.46.0",
+    "@google/generative-ai": "^0.24.1",
     "@langchain/google-genai": "^2.1.26",
     "@react-pdf/renderer": "^3.x",
     "@supabase/ssr": "^0.x",
     "@supabase/supabase-js": "^2.x",
+    "@vercel/functions": "^3.4.3",
     "docx": "^8.x",
     "mammoth": "^1.7.x",
     "next": "14.2.x",
@@ -22,6 +25,7 @@
     "pg": "^8.20.0",
     "react": "^18.x",
     "react-dom": "^18.x",
+    "recharts": "^3.8.0",
     "unzipper": "^0.12.x"
   },
   "devDependencies": {

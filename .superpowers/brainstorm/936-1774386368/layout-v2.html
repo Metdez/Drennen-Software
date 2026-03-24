@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview Page — Analysis Panels v2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0a; color: #ccc; font-family: 'Inter', -apple-system, sans-serif; font-size: 13px; }
+
+  .nav { background: #111; border-bottom: 1px solid #1e1e1e; padding: 0.6rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+  .nav-brand { color: #f36f21; font-weight: 700; font-size: 0.9rem; }
+  .nav-links { color: #666; font-size: 0.75rem; }
+
+  .layout { display: grid; grid-template-columns: 230px 1fr 230px; min-height: calc(100vh - 40px); }
+
+  /* PANELS */
+  .panel { padding: 1.2rem 1rem; display: flex; flex-direction: column; gap: 0.9rem; }
+  .panel-left { border-right: 1px solid #1a1a1a; }
+  .panel-right { border-left: 1px solid #1a1a1a; }
+  .panel-label { color: #555; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .card { background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 0.85rem; }
+  .card-title { color: #999; font-size: 0.68rem; font-weight: 600; margin-bottom: 0.55rem; }
+
+  /* THEME CLUSTERS */
+  .theme-item {
+    background: #0f0f0f;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 5px 8px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .theme-item:hover { border-color: #f36f21; background: #1a1208; }
+  .theme-item.active { border-color: #f36f21; background: #1a1208; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; }
+  .theme-row { display: flex; justify-content: space-between; align-items: center; }
+  .theme-name { font-size: 0.65rem; color: #ccc; }
+  .theme-count { font-size: 0.62rem; font-weight: 700; color: #f36f21; background: rgba(243,111,33,0.12); padding: 1px 5px; border-radius: 10px; }
+  .theme-bar-wrap { margin-top: 4px; background: #1e1e1e; border-radius: 3px; height: 3px; }
+  .theme-bar { height: 100%; border-radius: 3px; background: linear-gradient(90deg,#f36f21,#542785); }
+
+  .theme-questions {
+    display: none;
+    background: #0d0d0d;
+    border: 1px solid #f36f21;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding: 6px 8px 8px;
+    margin-bottom: 5px;
+  }
+  .theme-questions.open { display: block; }
+  .theme-q { font-size: 0.6rem; color: #888; padding: 3px 0; border-bottom: 1px solid #1a1a1a; display: flex; gap: 4px; }
+  .theme-q:last-child { border-bottom: none; }
+  .theme-q-dot { color: #f36f21; flex-shrink: 0; }
+  .theme-q-student { color: #555; font-style: italic; }
+
+  /* BLIND SPOTS */
+  .blind-item { padding: 5px 7px; background: #0f0f0f; border: 1px solid #1e2a1e; border-radius: 5px; margin-bottom: 4px; }
+  .blind-title { font-size: 0.63rem; color: #5e9e6e; font-weight: 600; }
+  .blind-desc { font-size: 0.6rem; color: #666; margin-top: 2px; line-height: 1.4; }
+
+  /* SENTIMENT */
+  .sentiment-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid #181818; }
+  .sentiment-row:last-child { border-bottom: none; }
+  .sentiment-label { font-size: 0.63rem; color: #888; }
+  .sentiment-pill { font-size: 0.6rem; font-weight: 600; padding: 1px 7px; border-radius: 10px; }
+  .pill-aspirational { background: rgba(95,158,110,0.15); color: #5e9e6e; }
+  .pill-critical { background: rgba(243,111,33,0.12); color: #c47a3a; }
+  .pill-curious { background: rgba(84,39,133,0.2); color: #a78bda; }
+  .pill-personal { background: rgba(100,100,100,0.15); color: #888; }
+
+  /* GEMINI SUGGESTS */
+  .suggest-item { background: #0d1818; border: 1px solid #1a3030; border-radius: 5px; padding: 5px 8px; margin-bottom: 5px; }
+  .suggest-text { font-size: 0.62rem; color: #7dd4d4; line-height: 1.45; }
+  .suggest-why { font-size: 0.58rem; color: #4a8080; margin-top: 2px; }
+
+  /* TENSION MAP */
+  .tension-item { display: flex; gap: 7px; align-items: flex-start; padding: 4px 0; border-bottom: 1px solid #181818; }
+  .tension-item:last-child { border-bottom: none; }
+  .tension-icon { color: #542785; font-size: 0.7rem; flex-shrink: 0; }
+  .tension-text { font-size: 0.62rem; color: #888; line-height: 1.4; }
+  .tension-highlight { color: #a78bda; }
+
+  /* CENTER */
+  .center { padding: 1.4rem 2rem; }
+  .back-link { color: #666; font-size: 0.72rem; margin-bottom: 0.9rem; display: block; }
+  .speaker-name { color: #fff; font-size: 1.7rem; font-weight: 700; font-family: Georgia, serif; line-height: 1.1; }
+  .speaker-bar { width: 40px; height: 2px; background: #f36f21; margin: 0.35rem 0 0.5rem; }
+  .session-meta { color: #666; font-size: 0.72rem; margin-bottom: 1rem; }
+
+  .overlap-warn { border: 1px solid #f36f21; background: rgba(243,111,33,0.07); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 1rem; }
+  .overlap-title { color: #f36f21; font-size: 0.7rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .overlap-body { color: #888; font-size: 0.65rem; }
+
+  .output-block { background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 0.9rem; }
+  .output-label { color: #555; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.7rem; }
+  .section-item { border-left: 2px solid #f36f21; padding-left: 0.7rem; margin-bottom: 0.8rem; }
+  .section-item:nth-child(even) { border-left-color: #542785; }
+  .section-title { color: #bbb; font-size: 0.72rem; font-weight: 600; }
+  .section-q { color: #666; font-size: 0.65rem; margin-top: 0.2rem; }
+  .section-student { color: #555; font-style: italic; }
+
+  .gemini-badge { display: flex; align-items: center; gap: 5px; margin-top: 0.5rem; }
+  .gemini-dot { width: 5px; height: 5px; background: #7dd4d4; border-radius: 50%; animation: pulse 2s infinite; }
+  .gemini-label { color: #444; font-size: 0.58rem; }
+  @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+
+  .tab-row { display: flex; gap: 4px; margin-bottom: 0.6rem; }
+  .tab { font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; border: 1px solid #1e1e1e; color: #666; cursor: pointer; background: transparent; }
+  .tab.active { background: rgba(243,111,33,0.12); border-color: #f36f21; color: #f36f21; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <span class="nav-brand">MGMT <span>305</span></span>
+  <span class="nav-links">Dashboard &nbsp;&nbsp; History &nbsp;&nbsp; Roster &nbsp;&nbsp; Analytics</span>
+</div>
+
+<div class="layout">
+
+  <!-- ===== LEFT PANEL ===== -->
+  <div class="panel panel-left">
+    <span class="panel-label">Question Analysis</span>
+
+    <!-- Theme Clusters (clickable) -->
+    <div class="card">
+      <div class="card-title">Theme Clusters &nbsp;<span style="color:#555;font-weight:400;font-size:0.6rem">click to expand</span></div>
+
+      <!-- Theme 1 — expanded by default -->
+      <div class="theme-item active" onclick="toggleTheme(this)">
+        <div class="theme-row">
+          <span class="theme-name">Career Pivots</span>
+          <span class="theme-count">9</span>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:90%"></div></div>
+      </div>
+      <div class="theme-questions open">
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"How did you know it was the right time to leave law?" <span class="theme-q-student">(Cayden H.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"What was the biggest risk you took?" <span class="theme-q-student">(Noah F.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"Did anyone try to talk you out of it?" <span class="theme-q-student">(Maya S.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span style="color:#555">+ 6 more questions</span></div>
+      </div>
+
+      <!-- Theme 2 -->
+      <div class="theme-item" onclick="toggleTheme(this)">
+        <div class="theme-row">
+          <span class="theme-name">Leadership Style</span>
+          <span class="theme-count">7</span>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:70%;background:linear-gradient(90deg,#542785,#7b3fad)"></div></div>
+      </div>
+      <div class="theme-questions">
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"How do you build trust across a large org?" <span class="theme-q-student">(Jaylen R.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"What's your decision-making framework?" <span class="theme-q-student">(Sofia B.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span style="color:#555">+ 5 more questions</span></div>
+      </div>
+
+      <!-- Theme 3 -->
+      <div class="theme-item" onclick="toggleTheme(this)">
+        <div class="theme-row">
+          <span class="theme-name">Industry Disruption</span>
+          <span class="theme-count">5</span>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:50%;background:linear-gradient(90deg,#333,#555)"></div></div>
+      </div>
+      <div class="theme-questions">
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"Is streaming killing ESPN's brand identity?" <span class="theme-q-student">(Priya M.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"How do you plan 5 years ahead in media?" <span class="theme-q-student">(Tyler K.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span style="color:#555">+ 3 more questions</span></div>
+      </div>
+
+      <!-- Theme 4 -->
+      <div class="theme-item" onclick="toggleTheme(this)">
+        <div class="theme-row">
+          <span class="theme-name">Risk vs Stability</span>
+          <span class="theme-count">4</span>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:40%;background:linear-gradient(90deg,#333,#444)"></div></div>
+      </div>
+      <div class="theme-questions">
+        <div class="theme-q"><span class="theme-q-dot">›</span><span>"When do you play it safe vs bet big?" <span class="theme-q-student">(Dani W.)</span></span></div>
+        <div class="theme-q"><span class="theme-q-dot">›</span><span style="color:#555">+ 3 more questions</span></div>
+      </div>
+    </div>
+
+    <!-- Tension Map -->
+    <div class="card">
+      <div class="card-title">⚡ Underlying Tensions</div>
+      <div class="tension-item">
+        <span class="tension-icon">↔</span>
+        <span class="tension-text"><span class="tension-highlight">Passion vs pragmatism</span> — students split on whether following passion or financial stability drives better outcomes</span>
+      </div>
+      <div class="tension-item">
+        <span class="tension-icon">↔</span>
+        <span class="tension-text"><span class="tension-highlight">Individual vs institution</span> — several questions probe whether he changed ESPN or ESPN changed him</span>
+      </div>
+      <div class="tension-item">
+        <span class="tension-icon">↔</span>
+        <span class="tension-text"><span class="tension-highlight">Short-term vs legacy</span> — students want both tactical advice and long-horizon thinking</span>
+      </div>
+    </div>
+
+    <div class="gemini-badge">
+      <div class="gemini-dot"></div>
+      <span class="gemini-label">Powered by Gemini</span>
+    </div>
+  </div>
+
+  <!-- ===== CENTER ===== -->
+  <div class="center">
+    <a class="back-link">← New Session</a>
+    <div class="speaker-name">Pitaro</div>
+    <div class="speaker-bar"></div>
+    <p class="session-meta">March 24, 2026 · 25 files processed</p>
+
+    <div class="overlap-warn">
+      <p class="overlap-title">⚠ 8 themes appeared in recent sessions</p>
+      <p class="overlap-body">"Law Career Pivot", "Athlete Mindset", "ESPN's Future Vision"... — consider freshening the angle.</p>
+    </div>
+
+    <div class="output-block">
+      <p class="output-label">Top Student Questions</p>
+      <div class="section-item">
+        <p class="section-title">1. Law Career Pivot</p>
+        <p class="section-q"><strong style="color:#999">Primary:</strong> "How did you know it was the right time to leave a stable law career?" <span class="section-student">(Cayden H.)</span></p>
+      </div>
+      <div class="section-item">
+        <p class="section-title">2. Athlete Mindset in Leadership</p>
+        <p class="section-q"><strong style="color:#999">Primary:</strong> "How do you apply athlete discipline to running a media org?" <span class="section-student">(Maya S.)</span></p>
+      </div>
+      <div class="section-item">
+        <p class="section-title">3. Decisions Amid Uncertainty</p>
+        <p class="section-q"><strong style="color:#999">Primary:</strong> "How do you make big calls when the data is inconclusive?" <span class="section-student">(Noah F.)</span></p>
+      </div>
+      <div class="section-item">
+        <p class="section-title">4. Balancing Streaming & Cable</p>
+        <p class="section-q"><strong style="color:#999">Primary:</strong> "Will ESPN ever go fully direct-to-consumer?" <span class="section-student">(Priya M.)</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT PANEL ===== -->
+  <div class="panel panel-right">
+    <span class="panel-label">Class Insights</span>
+
+    <!-- Gemini Suggests -->
+    <div class="card">
+      <div class="card-title">✦ Gemini Suggests</div>
+      <div class="suggest-item">
+        <div class="suggest-text">Press on the emotional cost of leaving law — students keep circling it from multiple angles</div>
+        <div class="suggest-why">→ 9 questions in Career Pivots cluster</div>
+      </div>
+      <div class="suggest-item">
+        <div class="suggest-text">Bridge streaming & leadership — students treat them as separate but they're deeply connected</div>
+        <div class="suggest-why">→ spans 3 theme clusters</div>
+      </div>
+      <div class="suggest-item">
+        <div class="suggest-text">Ask a failure question early — students are too cautious to ask it themselves</div>
+        <div class="suggest-why">→ only 1 direct failure question submitted</div>
+      </div>
+    </div>
+
+    <!-- Blind Spots -->
+    <div class="card">
+      <div class="card-title">🔍 Blind Spots</div>
+      <div class="blind-item">
+        <div class="blind-title">Diversity & inclusion at ESPN</div>
+        <div class="blind-desc">No students asked about it — but it's been a significant public focus during his tenure</div>
+      </div>
+      <div class="blind-item">
+        <div class="blind-title">The Disney relationship</div>
+        <div class="blind-desc">ESPN is a Disney subsidiary — students overlooked the parent-company dynamic entirely</div>
+      </div>
+      <div class="blind-item">
+        <div class="blind-title">AI & sports media</div>
+        <div class="blind-desc">Zero questions on how AI is reshaping sports broadcasting — a major industry shift</div>
+      </div>
+    </div>
+
+    <!-- Student Sentiment -->
+    <div class="card">
+      <div class="card-title">Student Sentiment</div>
+      <div class="sentiment-row">
+        <span class="sentiment-label">Aspirational</span>
+        <span class="sentiment-pill pill-aspirational">44%</span>
+      </div>
+      <div class="sentiment-row">
+        <span class="sentiment-label">Curious / analytical</span>
+        <span class="sentiment-pill pill-curious">31%</span>
+      </div>
+      <div class="sentiment-row">
+        <span class="sentiment-label">Personal / life advice</span>
+        <span class="sentiment-pill pill-personal">16%</span>
+      </div>
+      <div class="sentiment-row">
+        <span class="sentiment-label">Critical / challenging</span>
+        <span class="sentiment-pill pill-critical">9%</span>
+      </div>
+    </div>
+
+    <div class="gemini-badge">
+      <div class="gemini-dot"></div>
+      <span class="gemini-label">Powered by Gemini</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleTheme(el) {
+  const questions = el.nextElementSibling;
+  const isOpen = questions.classList.contains('open');
+
+  // Close all
+  document.querySelectorAll('.theme-questions').forEach(q => q.classList.remove('open'));
+  document.querySelectorAll('.theme-item').forEach(t => t.classList.remove('active'));
+
+  if (!isOpen) {
+    questions.classList.add('open');
+    el.classList.add('active');
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview + Theme Deep-Dive</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0a; color: #ccc; font-family: 'Inter', -apple-system, sans-serif; font-size: 13px; }
+
+  /* NAV */
+  .nav { background: #111; border-bottom: 1px solid #1e1e1e; padding: 0.6rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+  .nav-brand { color: #f36f21; font-weight: 700; font-size: 0.9rem; }
+  .nav-links { color: #555; font-size: 0.72rem; }
+
+  /* PAGE SWITCHER */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ======= MAIN PREVIEW PAGE ======= */
+  .layout { display: grid; grid-template-columns: 230px 1fr 230px; min-height: calc(100vh - 40px); }
+  .panel { padding: 1.1rem 0.9rem; display: flex; flex-direction: column; gap: 0.85rem; }
+  .panel-left { border-right: 1px solid #1a1a1a; }
+  .panel-right { border-left: 1px solid #1a1a1a; }
+  .panel-label { color: #555; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; }
+  .card { background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 0.85rem; }
+  .card-title { color: #999; font-size: 0.68rem; font-weight: 600; margin-bottom: 0.6rem; }
+
+  /* THEME CARDS — clickable, no expand */
+  .theme-card {
+    background: #0f0f0f;
+    border: 1px solid #222;
+    border-radius: 7px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .theme-card:hover { border-color: #f36f21; background: #1a1208; transform: translateX(2px); }
+  .theme-card:hover .theme-arrow { opacity: 1; color: #f36f21; }
+  .theme-row { display: flex; justify-content: space-between; align-items: center; }
+  .theme-name { font-size: 0.68rem; color: #ccc; font-weight: 500; }
+  .theme-arrow { color: #333; font-size: 0.75rem; transition: opacity 0.15s; opacity: 0; }
+  .theme-count { font-size: 0.6rem; font-weight: 700; color: #f36f21; background: rgba(243,111,33,0.12); padding: 1px 5px; border-radius: 10px; }
+  .theme-bar-wrap { background: #1e1e1e; border-radius: 3px; height: 3px; }
+  .theme-bar { height: 100%; border-radius: 3px; }
+  .theme-preview-q { font-size: 0.6rem; color: #555; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Other panel items */
+  .tension-item { display: flex; gap: 7px; align-items: flex-start; padding: 4px 0; border-bottom: 1px solid #181818; }
+  .tension-item:last-child { border-bottom: none; }
+  .tension-icon { color: #542785; font-size: 0.7rem; flex-shrink: 0; margin-top: 1px; }
+  .tension-text { font-size: 0.62rem; color: #777; line-height: 1.45; }
+  .tension-hl { color: #a78bda; }
+  .suggest-item { background: #0d1818; border: 1px solid #1a3030; border-radius: 5px; padding: 5px 8px; margin-bottom: 5px; }
+  .suggest-text { font-size: 0.62rem; color: #7dd4d4; line-height: 1.45; }
+  .suggest-why { font-size: 0.58rem; color: #4a8080; margin-top: 2px; }
+  .blind-item { padding: 5px 7px; background: #0f0f0f; border: 1px solid #1a241a; border-radius: 5px; margin-bottom: 4px; }
+  .blind-title { font-size: 0.63rem; color: #5e9e6e; font-weight: 600; }
+  .blind-desc { font-size: 0.6rem; color: #666; margin-top: 2px; line-height: 1.4; }
+  .sentiment-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #181818; }
+  .sentiment-row:last-child { border-bottom: none; }
+  .sentiment-label { font-size: 0.63rem; color: #777; }
+  .sentiment-pill { font-size: 0.6rem; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
+  .pill-a { background: rgba(95,158,110,0.15); color: #5e9e6e; }
+  .pill-c { background: rgba(84,39,133,0.2); color: #a78bda; }
+  .pill-p { background: rgba(100,100,100,0.15); color: #777; }
+  .pill-x { background: rgba(243,111,33,0.12); color: #c47a3a; }
+  .center { padding: 1.4rem 2rem; }
+  .back-link { color: #666; font-size: 0.72rem; margin-bottom: 0.9rem; display: block; }
+  .speaker-name { color: #fff; font-size: 1.7rem; font-weight: 700; font-family: Georgia, serif; }
+  .speaker-bar { width: 40px; height: 2px; background: #f36f21; margin: 0.35rem 0 0.5rem; }
+  .session-meta { color: #555; font-size: 0.72rem; margin-bottom: 1rem; }
+  .overlap-warn { border: 1px solid #f36f21; background: rgba(243,111,33,0.07); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 1rem; }
+  .overlap-title { color: #f36f21; font-size: 0.7rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .overlap-body { color: #777; font-size: 0.65rem; }
+  .output-block { background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 0.9rem; }
+  .output-label { color: #555; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.7rem; }
+  .section-item { border-left: 2px solid #f36f21; padding-left: 0.7rem; margin-bottom: 0.8rem; }
+  .section-item:nth-child(even) { border-left-color: #542785; }
+  .section-title { color: #bbb; font-size: 0.72rem; font-weight: 600; }
+  .section-q { color: #666; font-size: 0.65rem; margin-top: 0.2rem; }
+  .section-student { color: #555; font-style: italic; }
+  .gemini-badge { display: flex; align-items: center; gap: 5px; margin-top: 0.3rem; }
+  .gemini-dot { width: 5px; height: 5px; background: #7dd4d4; border-radius: 50%; animation: pulse 2s infinite; }
+  .gemini-label { color: #444; font-size: 0.58rem; }
+  @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+
+  /* ======= THEME DEEP-DIVE PAGE ======= */
+  .theme-page-layout { display: grid; grid-template-columns: 1fr 280px; gap: 0; min-height: calc(100vh - 40px); }
+  .theme-main { padding: 1.6rem 2rem; border-right: 1px solid #1a1a1a; }
+  .theme-sidebar { padding: 1.3rem 1rem; display: flex; flex-direction: column; gap: 0.85rem; background: #0d0d0d; }
+
+  .breadcrumb { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 1.2rem; }
+  .breadcrumb-link { color: #f36f21; font-size: 0.7rem; cursor: pointer; }
+  .breadcrumb-link:hover { text-decoration: underline; }
+  .breadcrumb-sep { color: #333; font-size: 0.7rem; }
+  .breadcrumb-current { color: #666; font-size: 0.7rem; }
+
+  .theme-heading { color: #fff; font-size: 1.4rem; font-weight: 700; font-family: Georgia, serif; }
+  .theme-heading-bar { width: 32px; height: 2px; background: #f36f21; margin: 0.3rem 0 0.4rem; }
+  .theme-meta { color: #555; font-size: 0.7rem; margin-bottom: 1.4rem; }
+
+  .question-card {
+    background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 0.9rem 1rem; margin-bottom: 0.7rem;
+  }
+  .q-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem; }
+  .q-text { color: #ddd; font-size: 0.75rem; line-height: 1.5; font-style: italic; flex: 1; padding-right: 0.8rem; }
+  .q-student { color: #555; font-size: 0.65rem; white-space: nowrap; }
+  .q-tier { font-size: 0.58rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+  .tier-1 { background: rgba(243,111,33,0.15); color: #f36f21; border: 1px solid rgba(243,111,33,0.3); }
+  .tier-2 { background: rgba(84,39,133,0.15); color: #a78bda; border: 1px solid rgba(84,39,133,0.3); }
+  .tier-3 { background: rgba(60,60,60,0.3); color: #666; border: 1px solid #282828; }
+
+  .analysis-block { background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 0.9rem; margin-bottom: 0.7rem; }
+  .analysis-label { color: #555; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; }
+  .analysis-label .gemini-dot { width: 5px; height: 5px; background: #7dd4d4; border-radius: 50%; animation: pulse 2s infinite; }
+  .analysis-body { color: #888; font-size: 0.7rem; line-height: 1.6; }
+  .analysis-body strong { color: #bbb; }
+
+  .sidebar-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 0.85rem; }
+  .sidebar-card-title { color: #999; font-size: 0.68rem; font-weight: 600; margin-bottom: 0.6rem; }
+
+  .probe-item { background: #0d1818; border: 1px solid #1a3030; border-radius: 5px; padding: 6px 9px; margin-bottom: 5px; }
+  .probe-q { font-size: 0.65rem; color: #7dd4d4; line-height: 1.45; font-style: italic; }
+  .probe-why { font-size: 0.58rem; color: #4a8080; margin-top: 2px; }
+
+  .angle-item { display: flex; gap: 6px; padding: 4px 0; border-bottom: 1px solid #181818; }
+  .angle-item:last-child { border-bottom: none; }
+  .angle-dot { color: #f36f21; font-size: 0.65rem; flex-shrink: 0; margin-top: 1px; }
+  .angle-text { font-size: 0.63rem; color: #888; line-height: 1.4; }
+
+  .pattern-item { display: flex; gap: 6px; padding: 4px 0; border-bottom: 1px solid #181818; align-items: flex-start; }
+  .pattern-item:last-child { border-bottom: none; }
+  .pattern-icon { flex-shrink: 0; font-size: 0.65rem; color: #542785; }
+  .pattern-text { font-size: 0.62rem; color: #777; line-height: 1.4; }
+  .pattern-hl { color: #a78bda; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <span class="nav-brand">MGMT <span>305</span></span>
+  <span class="nav-links">Dashboard &nbsp;&nbsp; History &nbsp;&nbsp; Roster &nbsp;&nbsp; Analytics</span>
+</div>
+
+<!-- =============================================================== -->
+<!-- PAGE 1: MAIN PREVIEW                                            -->
+<!-- =============================================================== -->
+<div class="page active" id="page-preview">
+<div class="layout">
+
+  <!-- LEFT PANEL -->
+  <div class="panel panel-left">
+    <span class="panel-label">Question Analysis</span>
+
+    <div class="card">
+      <div class="card-title">Theme Clusters <span style="color:#444;font-size:0.58rem;font-weight:400">— click to deep-dive</span></div>
+
+      <div class="theme-card" onclick="openTheme()">
+        <div class="theme-row">
+          <span class="theme-name">Career Pivots</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="theme-count">9</span>
+            <span class="theme-arrow">→</span>
+          </div>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:90%;background:linear-gradient(90deg,#f36f21,#c45a18)"></div></div>
+        <div class="theme-preview-q">"How did you know it was the right time to leave law?"</div>
+      </div>
+
+      <div class="theme-card" style="cursor:default;opacity:0.6" title="Click coming soon">
+        <div class="theme-row">
+          <span class="theme-name">Leadership Style</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="theme-count" style="background:rgba(84,39,133,0.15);color:#a78bda">7</span>
+            <span class="theme-arrow">→</span>
+          </div>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:70%;background:linear-gradient(90deg,#542785,#7b3fad)"></div></div>
+        <div class="theme-preview-q">"How do you build trust across a large org?"</div>
+      </div>
+
+      <div class="theme-card" style="cursor:default;opacity:0.5" title="Click coming soon">
+        <div class="theme-row">
+          <span class="theme-name">Industry Disruption</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="theme-count" style="background:#1e1e1e;color:#666">5</span>
+            <span class="theme-arrow">→</span>
+          </div>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:50%;background:#333"></div></div>
+        <div class="theme-preview-q">"Is streaming killing ESPN's brand identity?"</div>
+      </div>
+
+      <div class="theme-card" style="cursor:default;opacity:0.4" title="Click coming soon">
+        <div class="theme-row">
+          <span class="theme-name">Risk vs Stability</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="theme-count" style="background:#1e1e1e;color:#555">4</span>
+            <span class="theme-arrow">→</span>
+          </div>
+        </div>
+        <div class="theme-bar-wrap"><div class="theme-bar" style="width:40%;background:#2a2a2a"></div></div>
+        <div class="theme-preview-q">"When do you play it safe vs bet big?"</div>
+      </div>
+    </div>
+
+    <!-- Underlying Tensions -->
+    <div class="card">
+      <div class="card-title">⚡ Underlying Tensions</div>
+      <div class="tension-item">
+        <span class="tension-icon">↔</span>
+        <span class="tension-text"><span class="tension-hl">Passion vs pragmatism</span> — students split on whether following passion or financial stability drives better outcomes</span>
+      </div>
+      <div class="tension-item">
+        <span class="tension-icon">↔</span>
+        <span class="tension-text"><span class="tension-hl">Individual vs institution</span> — did he change ESPN, or did ESPN change him?</span>
+      </div>
+      <div class="tension-item">
+        <span class="tension-icon">↔</span>
+        <span class="tension-text"><span class="tension-hl">Short-term vs legacy</span> — students want tactical advice AND long-horizon thinking simultaneously</span>
+      </div>
+    </div>
+
+    <div class="gemini-badge">
+      <div class="gemini-dot"></div>
+      <span class="gemini-label">Powered by Gemini</span>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">
+    <a class="back-link">← New Session</a>
+    <div class="speaker-name">Pitaro</div>
+    <div class="speaker-bar"></div>
+    <p class="session-meta">March 24, 2026 · 25 files processed</p>
+    <div class="overlap-warn">
+      <p class="overlap-title">⚠ 8 themes appeared in recent sessions</p>
+      <p class="overlap-body">"Law Career Pivot", "Athlete Mindset", "ESPN's Future Vision"... — consider freshening the angle.</p>
+    </div>
+    <div class="output-block">
+      <p class="output-label">Top Student Questions</p>
+      <div class="section-item"><p class="section-title">1. Law Career Pivot</p><p class="section-q"><strong style="color:#999">Primary:</strong> "How did you know it was the right time to leave a stable law career?" <span class="section-student">(Cayden H.)</span></p></div>
+      <div class="section-item"><p class="section-title">2. Athlete Mindset in Leadership</p><p class="section-q"><strong style="color:#999">Primary:</strong> "How do you apply athlete discipline to running a media org?" <span class="section-student">(Maya S.)</span></p></div>
+      <div class="section-item"><p class="section-title">3. Decisions Amid Uncertainty</p><p class="section-q"><strong style="color:#999">Primary:</strong> "How do you make big calls when data is inconclusive?" <span class="section-student">(Noah F.)</span></p></div>
+      <div class="section-item"><p class="section-title">4. Balancing Streaming & Cable</p><p class="section-q"><strong style="color:#999">Primary:</strong> "Will ESPN ever go fully direct-to-consumer?" <span class="section-student">(Priya M.)</span></p></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel panel-right">
+    <span class="panel-label">Class Insights</span>
+
+    <div class="card">
+      <div class="card-title">✦ Gemini Suggests</div>
+      <div class="suggest-item"><div class="suggest-text">Press on the emotional cost of leaving law — students keep circling it from multiple angles</div><div class="suggest-why">→ 9 questions in Career Pivots cluster</div></div>
+      <div class="suggest-item"><div class="suggest-text">Bridge streaming & leadership — students treat them separately but they're deeply linked</div><div class="suggest-why">→ spans 3 theme clusters</div></div>
+      <div class="suggest-item"><div class="suggest-text">Ask a failure question early — students are too cautious to ask it themselves</div><div class="suggest-why">→ only 1 direct failure question submitted</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔍 Blind Spots</div>
+      <div class="blind-item"><div class="blind-title">Diversity & inclusion at ESPN</div><div class="blind-desc">No students asked — but it's been a significant public focus during his tenure</div></div>
+      <div class="blind-item"><div class="blind-title">The Disney relationship</div><div class="blind-desc">ESPN is a Disney subsidiary — students overlooked the parent-company dynamic entirely</div></div>
+      <div class="blind-item"><div class="blind-title">AI & sports media</div><div class="blind-desc">Zero questions on how AI is reshaping sports broadcasting</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Student Sentiment</div>
+      <div class="sentiment-row"><span class="sentiment-label">Aspirational</span><span class="sentiment-pill pill-a">44%</span></div>
+      <div class="sentiment-row"><span class="sentiment-label">Curious / analytical</span><span class="sentiment-pill pill-c">31%</span></div>
+      <div class="sentiment-row"><span class="sentiment-label">Personal / life advice</span><span class="sentiment-pill pill-p">16%</span></div>
+      <div class="sentiment-row"><span class="sentiment-label">Critical / challenging</span><span class="sentiment-pill pill-x">9%</span></div>
+    </div>
+
+    <div class="gemini-badge">
+      <div class="gemini-dot"></div>
+      <span class="gemini-label">Powered by Gemini</span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- =============================================================== -->
+<!-- PAGE 2: THEME DEEP-DIVE                                         -->
+<!-- =============================================================== -->
+<div class="page" id="page-theme">
+<div class="theme-page-layout">
+
+  <!-- MAIN CONTENT -->
+  <div class="theme-main">
+    <div class="breadcrumb">
+      <span class="breadcrumb-link" onclick="goBack()">← Pitaro</span>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-current">Career Pivots</span>
+    </div>
+
+    <div class="theme-heading">Career Pivots</div>
+    <div class="theme-heading-bar"></div>
+    <p class="theme-meta">9 student questions · analyzed by Gemini</p>
+
+    <!-- Gemini analysis summary -->
+    <div class="analysis-block">
+      <div class="analysis-label"><div class="gemini-dot"></div> Gemini Analysis</div>
+      <div class="analysis-body">
+        <strong>What students are really asking:</strong> The surface question is "when do you know it's time to leave?" — but underneath, students are wrestling with their own fear of risk. Most are juniors and seniors facing their first major career decision, and they're using Pitaro as a proxy for <strong>permission to take the leap</strong>. The emotional weight in these questions is unusually high compared to other sessions.<br><br>
+        <strong>Key pattern:</strong> 6 of the 9 questions frame career change in terms of <em>external validation</em> — what others thought, what signs appeared, what made it "safe." Only 2 questions address internal conviction. This suggests the class may benefit from being pushed toward the harder internal question: not "what told you it was okay" but "what would you have done if no one supported you?"
+      </div>
+    </div>
+
+    <!-- Individual questions -->
+    <div class="question-card">
+      <div class="q-header">
+        <span class="q-text">"How did you know it was the right time to leave a stable law career for a risky role in a completely new industry?"</span>
+        <span class="q-tier tier-1">Tier 1</span>
+      </div>
+      <span class="q-student">— Cayden H.</span>
+    </div>
+
+    <div class="question-card">
+      <div class="q-header">
+        <span class="q-text">"You received your JD in 1994 — it seems like you originally planned to pursue law. What led you to pivot away and build a career in sports media?"</span>
+        <span class="q-tier tier-1">Tier 1</span>
+      </div>
+      <span class="q-student">— Noah F.</span>
+    </div>
+
+    <div class="question-card">
+      <div class="q-header">
+        <span class="q-text">"Did anyone in your life try to talk you out of leaving law? How did you handle that?"</span>
+        <span class="q-tier tier-2">Tier 2</span>
+      </div>
+      <span class="q-student">— Maya S.</span>
+    </div>
+
+    <div class="question-card">
+      <div class="q-header">
+        <span class="q-text">"What did failure look like early in your career pivot — and how did you know to keep going?"</span>
+        <span class="q-tier tier-2">Tier 2</span>
+      </div>
+      <span class="q-student">— Jaylen R.</span>
+    </div>
+
+    <div class="question-card">
+      <div class="q-header">
+        <span class="q-text">"Was there a specific moment or a slow build where you knew law wasn't for you?"</span>
+        <span class="q-tier tier-2">Tier 2</span>
+      </div>
+      <span class="q-student">— Sofia B.</span>
+    </div>
+
+    <div class="question-card" style="opacity:0.6">
+      <div class="q-header">
+        <span class="q-text">"Did you have a financial safety net when you pivoted, or were you taking a real risk?"</span>
+        <span class="q-tier tier-3">Tier 3</span>
+      </div>
+      <span class="q-student">— Tyler K.</span>
+    </div>
+
+    <div style="color:#555;font-size:0.65rem;margin-top:0.5rem">+ 3 more questions (Tier 3)</div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="theme-sidebar">
+    <span class="panel-label">Deep-Dive Insights</span>
+
+    <!-- Probe questions -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">✦ Probe Questions</div>
+      <p style="color:#555;font-size:0.6rem;margin-bottom:0.5rem">Gemini-generated follow-ups to push past the surface</p>
+      <div class="probe-item">
+        <div class="probe-q">"If no one had supported your decision — no mentors, no encouragement — would you have still done it?"</div>
+        <div class="probe-why">→ pushes past external validation framing</div>
+      </div>
+      <div class="probe-item">
+        <div class="probe-q">"What was the worst-case scenario you had actually planned for?"</div>
+        <div class="probe-why">→ grounds the "risk" in specifics</div>
+      </div>
+      <div class="probe-item">
+        <div class="probe-q">"Looking back, was the pivot actually as risky as it felt at the time?"</div>
+        <div class="probe-why">→ reframes risk perception vs reality</div>
+      </div>
+    </div>
+
+    <!-- What students didn't ask -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">🔍 What Students Missed</div>
+      <div class="angle-item">
+        <span class="angle-dot">›</span>
+        <span class="angle-text">The <em>cost</em> of the pivot — relationships, identity, years of law school investment</span>
+      </div>
+      <div class="angle-item">
+        <span class="angle-dot">›</span>
+        <span class="angle-text">Whether the pivot was really a pivot or a gradual drift over time</span>
+      </div>
+      <div class="angle-item">
+        <span class="angle-dot">›</span>
+        <span class="angle-text">How his law background actually shaped his media leadership style</span>
+      </div>
+    </div>
+
+    <!-- Patterns -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">Patterns in This Cluster</div>
+      <div class="pattern-item">
+        <span class="pattern-icon">↑</span>
+        <span class="pattern-text"><span class="pattern-hl">High fear-of-regret framing</span> — 5 questions implicitly ask "how do I avoid looking back and wishing I had been braver?"</span>
+      </div>
+      <div class="pattern-item">
+        <span class="pattern-icon">≈</span>
+        <span class="pattern-text"><span class="pattern-hl">Convergent concern</span> — questions cluster around the same anxiety from different angles, suggesting deep class-wide preoccupation</span>
+      </div>
+    </div>
+
+    <div class="gemini-badge">
+      <div class="gemini-dot"></div>
+      <span class="gemini-label">Powered by Gemini</span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function openTheme() {
+  document.getElementById('page-preview').classList.remove('active');
+  document.getElementById('page-theme').classList.add('active');
+  window.scrollTo(0,0);
+}
+function goBack() {
+  document.getElementById('page-theme').classList.remove('active');
+  document.getElementById('page-preview').classList.add('active');
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
