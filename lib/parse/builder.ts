@@ -37,6 +37,7 @@ async function processInChunks<T, R>(
 export async function buildSubmissionsText(zipBuffer: Buffer): Promise<{
   text: string
   fileCount: number
+  submissions: ParsedSubmission[]
 }> {
   const entries = await extractZip(zipBuffer)
 
@@ -65,5 +66,6 @@ export async function buildSubmissionsText(zipBuffer: Buffer): Promise<{
   return {
     text: sections.join('\n\n'),
     fileCount: submissions.length,
+    submissions,
   }
 }
