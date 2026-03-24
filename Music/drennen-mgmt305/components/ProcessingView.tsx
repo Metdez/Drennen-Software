@@ -62,7 +62,7 @@ export function ProcessingView({
     stageTimersRef.current = []
     setProgress(100)
     setMessage('Done — redirecting...')
-    const id = setTimeout(onComplete, 600)
+    const id = setTimeout(onComplete, 700)
     return () => clearTimeout(id)
   }, [done, onComplete])
 
