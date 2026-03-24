@@ -1,6 +1,6 @@
 import unzipper from 'unzipper'
 
-interface ZipEntry {
+export interface ZipEntry {
   filename: string
   buffer: Buffer
   extension: string

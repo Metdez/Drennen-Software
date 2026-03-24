@@ -1,4 +1,4 @@
-import { extractZip } from './unzip'
+import { extractZip, ZipEntry } from './unzip'
 import { parsePdf } from './pdf'
 import { parseDocx } from './docx'
 
@@ -21,31 +21,41 @@ function extractStudentName(filename: string): string {
   return `${firstName} ${lastInitial}.`
 }
 
+async function processInChunks<T, R>(
+  items: T[],
+  chunkSize: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = []
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize)
+    results.push(...await Promise.all(chunk.map(fn)))
+  }
+  return results
+}
+
 export async function buildSubmissionsText(zipBuffer: Buffer): Promise<{
   text: string
   fileCount: number
 }> {
   const entries = await extractZip(zipBuffer)
 
-  const submissions: ParsedSubmission[] = []
-
-  for (const entry of entries) {
-    let text = ''
-
-    if (entry.extension === 'pdf') {
-      text = await parsePdf(entry.buffer)
-    } else if (entry.extension === 'docx') {
-      text = await parseDocx(entry.buffer)
+  const results = await processInChunks<ZipEntry, ParsedSubmission | null>(
+    entries,
+    5,
+    async (entry) => {
+      const text = entry.extension === 'pdf'
+        ? await parsePdf(entry.buffer)
+        : await parseDocx(entry.buffer)
+      if (!text.trim()) return null
+      return {
+        studentName: extractStudentName(entry.filename),
+        filename: entry.filename,
+        text: text.trim(),
+      }
     }
-
-    if (!text.trim()) continue // skip empty/failed files
-
-    submissions.push({
-      studentName: extractStudentName(entry.filename),
-      filename: entry.filename,
-      text: text.trim(),
-    })
-  }
+  )
+  const submissions = results.filter((s): s is ParsedSubmission => s !== null)
 
   // Build the formatted string for the AI
   const sections = submissions.map(sub =>
