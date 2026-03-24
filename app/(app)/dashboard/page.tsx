@@ -31,16 +31,22 @@ export default function DashboardPage() {
       formData.append('file', file)
 
       const res = await fetch(ROUTES.API_PROCESS, { method: 'POST', body: formData })
-      const data = await res.json()
-
-      if (!res.ok) {
-        // ProcessingView watches `error` and handles its own fade-out before calling onExited
-        setError(data.error || 'Failed to process files')
+      let data: Record<string, unknown> = {}
+      try {
+        data = await res.json()
+      } catch {
+        setError('Upload failed — the file may be too large or the server timed out.')
         return
       }
 
-      sessionStorage.setItem(`session_${data.sessionId}`, data.output)
-      pendingSessionIdRef.current = data.sessionId
+      if (!res.ok) {
+        // ProcessingView watches `error` and handles its own fade-out before calling onExited
+        setError((data.error as string) || 'Failed to process files')
+        return
+      }
+
+      sessionStorage.setItem(`session_${data.sessionId}`, data.output as string)
+      pendingSessionIdRef.current = data.sessionId as string
       setDone(true)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred'
