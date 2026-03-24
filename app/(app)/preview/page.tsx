@@ -26,6 +26,7 @@ function PreviewContent() {
     if (!sessionId) {
       setError('No session ID provided')
       setLoading(false)
+      setAnalysisLoading(false)
       return
     }
 
@@ -45,11 +46,16 @@ function PreviewContent() {
 
     // Check sessionStorage cache for analysis
     const storedAnalysis = sessionStorage.getItem(`analysis_${sessionId}`)
+    let analysisCacheLoaded = false
     if (storedAnalysis) {
       try {
         setAnalysis(JSON.parse(storedAnalysis))
         setAnalysisLoading(false)
-      } catch { /* ignore, will re-fetch */ }
+        analysisCacheLoaded = true
+      } catch {
+        // malformed cache — clear it and fall through to fetch
+        sessionStorage.removeItem(`analysis_${sessionId}`)
+      }
     }
 
     async function fetchSession() {
@@ -62,9 +68,9 @@ function PreviewContent() {
         if (!storedOutput && data.session?.output) {
           setOutput(data.session.output)
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!storedOutput) {
-          setError(err?.message || 'Failed to load session')
+          setError(err instanceof Error ? err.message : 'Failed to load session')
         }
       } finally {
         setLoading(false)
@@ -72,7 +78,7 @@ function PreviewContent() {
     }
 
     async function fetchAnalysis() {
-      if (storedAnalysis) return // already loaded from cache above
+      if (analysisCacheLoaded) return // cache was successfully parsed above
       try {
         const res = await fetch(ROUTES.API_SESSION_ANALYSIS(sessionId!))
         if (!res.ok) return
