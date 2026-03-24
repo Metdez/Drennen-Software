@@ -6,6 +6,8 @@ import { SpeakerInput } from '@/components/SpeakerInput'
 import { DropZone } from '@/components/DropZone'
 import { ProcessingView } from '@/components/ProcessingView'
 import { ROUTES } from '@/lib/constants'
+import { createClient } from '@/lib/supabase/client'
+import { uploadTempZip } from '@/lib/supabase/storage'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -26,11 +28,18 @@ export default function DashboardPage() {
     pendingSessionIdRef.current = null
 
     try {
-      const formData = new FormData()
-      formData.append('speakerName', speakerName)
-      formData.append('file', file)
-
-      const res = await fetch(ROUTES.API_PROCESS, { method: 'POST', body: formData })
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError('Session expired — please sign in again.')
+        return
+      }
+      const storagePath = await uploadTempZip(user.id, file)
+      const res = await fetch(ROUTES.API_PROCESS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ speakerName, storagePath }),
+      })
       let data: Record<string, unknown> = {}
       try {
         data = await res.json()

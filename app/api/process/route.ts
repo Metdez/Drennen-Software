@@ -3,33 +3,29 @@ import { getCurrentUser } from '@/lib/db/users'
 import { buildSubmissionsText } from '@/lib/parse/builder'
 import { generateQuestionSheet } from '@/lib/ai/client'
 import { insertSession } from '@/lib/db/sessions'
+import { downloadTempZip, deleteTempZip } from '@/lib/supabase/storage'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  let storagePath: string | null = null
   try {
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formData = await request.formData()
-    const speakerName = formData.get('speakerName') as string | null
-    const file = formData.get('file') as File | null
+    const body = await request.json() as { speakerName?: string; storagePath?: string }
+    const speakerName = body.speakerName ?? null
+    storagePath = body.storagePath ?? null
 
     if (!speakerName?.trim()) {
       return NextResponse.json({ error: 'Missing speakerName' }, { status: 400 })
     }
-    if (!file) {
-      return NextResponse.json({ error: 'Missing file' }, { status: 400 })
+    if (!storagePath) {
+      return NextResponse.json({ error: 'Missing storagePath' }, { status: 400 })
     }
-    if (!file.name.endsWith('.zip')) {
-      return NextResponse.json({ error: 'File must be a ZIP archive' }, { status: 400 })
-    }
-
-    // Convert File to Buffer (see GOTCHA-004)
-    const arrayBuffer = await file.arrayBuffer()
-    const zipBuffer = Buffer.from(arrayBuffer)
+    const zipBuffer = await downloadTempZip(storagePath)
 
     const { text, fileCount } = await buildSubmissionsText(zipBuffer)
 
@@ -56,5 +52,7 @@ export async function POST(request: Request) {
     console.error('[/api/process]', err)
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
+  } finally {
+    if (storagePath) await deleteTempZip(storagePath).catch(() => {})
   }
 }
