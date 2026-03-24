@@ -94,7 +94,7 @@ export function AnalysisPanelLeft({ sessionId, analysis, loading }: Props) {
                       />
                     </div>
                     <p className="text-[0.58rem] text-[var(--text-muted)] italic truncate">
-                      "{cluster.top_question}"
+                      &ldquo;{cluster.top_question}&rdquo;
                     </p>
                   </button>
                 )
