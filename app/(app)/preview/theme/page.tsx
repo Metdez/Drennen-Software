@@ -42,16 +42,19 @@ function ThemeContent() {
       }
     }
 
+    const controller = new AbortController()
+
     async function fetchThemeAnalysis() {
       if (cacheLoaded) return
       try {
         const url = `${ROUTES.API_SESSION_THEME_ANALYSIS(sessionId!)}?theme=${encodeURIComponent(theme!)}`
-        const res = await fetch(url)
+        const res = await fetch(url, { signal: controller.signal })
         if (!res.ok) throw new Error('Failed to load theme analysis')
         const result = await res.json()
         setData(result)
         sessionStorage.setItem(cacheKey, JSON.stringify(result))
       } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return
         setError(err instanceof Error ? err.message : 'Failed to load theme analysis')
       } finally {
         setLoading(false)
@@ -60,7 +63,7 @@ function ThemeContent() {
 
     async function fetchSpeakerName() {
       try {
-        const res = await fetch(`${ROUTES.API_SESSIONS}/${sessionId}`)
+        const res = await fetch(`${ROUTES.API_SESSIONS}/${sessionId}`, { signal: controller.signal })
         if (res.ok) {
           const d = await res.json()
           setSpeakerName(d.session?.speakerName ?? '')
@@ -72,6 +75,8 @@ function ThemeContent() {
 
     fetchThemeAnalysis()
     fetchSpeakerName()
+
+    return () => controller.abort()
   }, [sessionId, theme])
 
   const backHref = sessionId ? `${ROUTES.PREVIEW}?sessionId=${sessionId}` : ROUTES.DASHBOARD
@@ -117,7 +122,7 @@ function ThemeContent() {
             </h1>
             <div className="h-0.5 w-12 mb-2" style={{ background: BRAND.ORANGE }} />
             <p className="text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-sans)] mb-6">
-              {data.questions.length} student questions · analyzed by Gemini
+              {(data.questions ?? []).length} student questions · analyzed by Gemini
             </p>
 
             {/* Narrative analysis */}
@@ -135,7 +140,7 @@ function ThemeContent() {
 
             {/* Questions list */}
             <div className="flex flex-col gap-3">
-              {data.questions.map((q, i) => (
+              {(data.questions ?? []).map((q, i) => (
                 <div
                   key={i}
                   className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-4"
@@ -167,7 +172,7 @@ function ThemeContent() {
               Push past the surface answers
             </p>
             <div className="flex flex-col gap-1.5">
-              {data.probe_questions.map((p, i) => (
+              {(data.probe_questions ?? []).map((p, i) => (
                 <div
                   key={i}
                   className="rounded-lg p-2"
@@ -188,7 +193,7 @@ function ThemeContent() {
               🔍 What Students Missed
             </p>
             <div className="flex flex-col divide-y divide-[var(--border-accent)]">
-              {data.missed_angles.map((angle, i) => (
+              {(data.missed_angles ?? []).map((angle, i) => (
                 <div key={i} className="flex gap-2 py-1.5 first:pt-0 last:pb-0">
                   <span className="text-[#f36f21] text-[0.65rem] flex-shrink-0">›</span>
                   <p className="text-[0.62rem] text-[var(--text-muted)] leading-snug font-[family-name:var(--font-dm-sans)]">
@@ -205,7 +210,7 @@ function ThemeContent() {
               Patterns
             </p>
             <div className="flex flex-col divide-y divide-[var(--border-accent)]">
-              {data.patterns.map((pat, i) => (
+              {(data.patterns ?? []).map((pat, i) => (
                 <div key={i} className="flex gap-2 py-1.5 first:pt-0 last:pb-0 items-start">
                   <span className="text-sm flex-shrink-0">{pat.emoji}</span>
                   <p className="text-[0.62rem] text-[var(--text-muted)] leading-snug font-[family-name:var(--font-dm-sans)]">
