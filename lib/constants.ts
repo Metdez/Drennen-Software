@@ -2,12 +2,15 @@ export const ROUTES = {
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
   PREVIEW: '/preview',
+  PREVIEW_THEME: '/preview/theme',
   HISTORY: '/history',
   ROSTER: '/roster',
   ANALYTICS: '/analytics',
   API_PROCESS: '/api/process',
   API_SESSIONS: '/api/sessions',
   API_AUTH_CALLBACK: '/api/auth/callback',
+  API_SESSION_ANALYSIS: (id: string) => `/api/sessions/${id}/analysis`,
+  API_SESSION_THEME_ANALYSIS: (id: string) => `/api/sessions/${id}/theme-analysis`,
 } as const
 
 export const BRAND = {
