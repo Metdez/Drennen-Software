@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
 import { buildSubmissionsText } from '@/lib/parse/builder'
 import { generateQuestionSheet } from '@/lib/ai/client'
-import { insertSession } from '@/lib/db/sessions'
+import { insertSession, insertStudentSubmissions, insertSessionThemes } from '@/lib/db/sessions'
 import { downloadTempZip, deleteTempZip } from '@/lib/supabase/storage'
+import { parseThemesFromOutput } from '@/lib/parse/parseThemes'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     }
     const zipBuffer = await downloadTempZip(storagePath)
 
-    const { text, fileCount } = await buildSubmissionsText(zipBuffer)
+    const { text, fileCount, submissions } = await buildSubmissionsText(zipBuffer)
 
     if (fileCount === 0) {
       return NextResponse.json({ error: 'No readable student files found in ZIP' }, { status: 400 })
@@ -41,6 +42,16 @@ export async function POST(request: Request) {
       output,
       fileCount,
     })
+
+    // Persist per-student and per-theme data for analytics queries (non-blocking failures)
+    await Promise.all([
+      insertStudentSubmissions(session.id, submissions).catch((e) =>
+        console.error('[/api/process] insertStudentSubmissions failed:', e)
+      ),
+      insertSessionThemes(session.id, parseThemesFromOutput(output)).catch((e) =>
+        console.error('[/api/process] insertSessionThemes failed:', e)
+      ),
+    ])
 
     return NextResponse.json({
       sessionId: session.id,
