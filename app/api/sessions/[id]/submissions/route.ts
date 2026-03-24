@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
+import { getSessionById } from '@/lib/db/sessions'
 import { getSubmissionsBySession } from '@/lib/db/submissions'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,15 @@ export async function GET(
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const session = await getSessionById(params.id)
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
+    if (session.userId !== user.id) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
     const submissions = await getSubmissionsBySession(params.id)

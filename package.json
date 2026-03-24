@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@langchain/google-genai": "^2.1.26",
     "@react-pdf/renderer": "^3.x",
     "@supabase/ssr": "^0.x",

@@ -20,18 +20,14 @@ Respond ONLY with valid JSON (no markdown, no code fences): {"score": <integer 0
 export async function scoreSubmission(
   rawText: string
 ): Promise<{ score: number; explanation: string }> {
-  try {
-    const model = getGenAI().getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: SYSTEM_INSTRUCTION,
-    })
-    const result = await model.generateContent(rawText)
-    const text = result.response.text()
-    const parsed = JSON.parse(text)
-    return { score: parsed.score as number, explanation: parsed.explanation as string }
-  } catch {
-    return { score: 0, explanation: 'Scoring unavailable' }
-  }
+  const model = getGenAI().getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: SYSTEM_INSTRUCTION,
+  })
+  const result = await model.generateContent(rawText)
+  const text = result.response.text()
+  const parsed = JSON.parse(text)
+  return { score: parsed.score as number, explanation: parsed.explanation as string }
 }
 
 export async function scoreAllSubmissions(sessionId: string): Promise<void> {
