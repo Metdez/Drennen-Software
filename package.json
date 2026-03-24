@@ -14,6 +14,7 @@
     "@react-pdf/renderer": "^3.x",
     "@supabase/ssr": "^0.x",
     "@supabase/supabase-js": "^2.x",
+    "@vercel/functions": "^3.4.3",
     "docx": "^8.x",
     "mammoth": "^1.7.x",
     "next": "14.2.x",

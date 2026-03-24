@@ -5,6 +5,8 @@ import { generateQuestionSheet } from '@/lib/ai/client'
 import { insertSession, insertStudentSubmissions, insertSessionThemes } from '@/lib/db/sessions'
 import { downloadTempZip, deleteTempZip } from '@/lib/supabase/storage'
 import { parseThemesFromOutput } from '@/lib/parse/parseThemes'
+import { waitUntil } from '@vercel/functions'
+import { scoreAllSubmissions } from '@/lib/ai/scorer'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +54,9 @@ export async function POST(request: Request) {
         console.error('[/api/process] insertSessionThemes failed:', e)
       ),
     ])
+
+    // Kick off per-student quality scoring in the background — does not block the response
+    waitUntil(scoreAllSubmissions(session.id))
 
     return NextResponse.json({
       sessionId: session.id,
