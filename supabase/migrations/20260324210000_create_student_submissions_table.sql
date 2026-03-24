@@ -3,7 +3,7 @@
 -- Persists per-student raw text at processing time for analytics
 -- ============================================================
 
-CREATE TABLE student_submissions (
+CREATE TABLE IF NOT EXISTS student_submissions (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id    UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   student_name  TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE student_submissions (
   created_at    TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
-CREATE INDEX student_submissions_session_id_idx ON student_submissions(session_id);
+CREATE INDEX IF NOT EXISTS student_submissions_session_id_idx ON student_submissions(session_id);
 
 ALTER TABLE student_submissions ENABLE ROW LEVEL SECURITY;
 
