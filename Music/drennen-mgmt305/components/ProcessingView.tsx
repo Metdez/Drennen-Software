@@ -97,7 +97,7 @@ export function ProcessingView({
         <h2 className="font-[family-name:var(--font-playfair)] text-5xl font-bold text-[var(--text-primary)] mb-3">
           {speakerName}
         </h2>
-        <div className="h-0.5 w-12 bg-[#f36f21] mx-auto" />
+        <div className="h-0.5 w-12 bg-brand-orange mx-auto" />
       </div>
 
       {/* Progress bar */}
@@ -107,7 +107,7 @@ export function ProcessingView({
           style={{ background: 'var(--border-accent)' }}
         >
           <div
-            className="h-full rounded-full bg-[#f36f21]"
+            className="h-full rounded-full bg-brand-orange"
             style={{ width: `${progress}%`, transition: 'width 0.6s ease-out' }}
           />
         </div>
