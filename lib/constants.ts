@@ -6,12 +6,19 @@ export const ROUTES = {
   API_PROCESS: '/api/process',
   API_SESSIONS: '/api/sessions',
   API_AUTH_CALLBACK: '/api/auth/callback',
+  ROSTER: '/roster',
 } as const
+
+export function submissionsApiUrl(sessionId: string): string {
+  return `/api/sessions/${sessionId}/submissions`
+}
 
 export const BRAND = {
   ORANGE: '#f36f21',
   PURPLE: '#542785',
   GREEN: '#0f6b37',
+  AMBER: '#F59E0B',
+  RED: '#EF4444',
 } as const
 
 export const APP_NAME = 'Drennen MGMT 305' as const
