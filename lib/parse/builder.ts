@@ -8,10 +8,9 @@ export interface ParsedSubmission {
   text: string
 }
 
-// Canvas filenames sometimes include a numeric student ID as the second underscore-segment
-// (e.g. cuttingvictor_12345_file.pdf) which makes the "last initial" a digit like "1".
-// This maps common digit/letter confusions to their letter equivalents.
-const DIGIT_TO_LETTER: Record<string, string> = { '1': 'L', '0': 'O', '5': 'S', '8': 'B' }
+function toTitleCase(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+}
 
 function extractStudentName(filename: string): string {
   // Get just the base filename without path
@@ -20,11 +19,17 @@ function extractStudentName(filename: string): string {
 
   if (parts.length < 2) return 'Unknown Student'
 
-  const firstName = parts[0]
-  const rawInitial = parts[1].charAt(0).toUpperCase()
-  const lastInitial = DIGIT_TO_LETTER[rawInitial] ?? rawInitial
+  // Standard Canvas export format: Lastname_Firstname_StudentID_...
+  // If parts[1] is non-numeric it's the first name; parts[0] is the last name.
+  if (!/^\d+$/.test(parts[1])) {
+    const firstName = toTitleCase(parts[1])
+    const lastInitial = parts[0].charAt(0).toUpperCase()
+    return `${firstName} ${lastInitial}.`
+  }
 
-  return `${firstName} ${lastInitial}.`
+  // Fallback: concatenated format (e.g. lastnamefirstname_12345_...)
+  // Can't split the names, so just title-case the whole segment.
+  return `${toTitleCase(parts[0])} ${parts[1].charAt(0).toUpperCase()}.`
 }
 
 async function processInChunks<T, R>(

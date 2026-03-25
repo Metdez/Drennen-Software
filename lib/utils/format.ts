@@ -1,3 +1,11 @@
+export function formatStudentName(name: string): string {
+  // Title-case each word so stored names like "cuttingvictor L." display as "Cuttingvictor L."
+  return name
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
 export function formatDate(isoString: string): string {
   return new Date(isoString).toLocaleDateString('en-US', {
     year: 'numeric',

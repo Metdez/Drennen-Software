@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/db/users'
 import { getSessionById } from '@/lib/db/sessions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runSessionAnalysis } from '@/lib/ai/analysisAgent'
+import { getSessionAnalysis, insertSessionAnalysis } from '@/lib/db/sessionAnalyses'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,12 @@ export async function GET(
     const session = await getSessionById(params.id)
     if (!session || session.userId !== user.id) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
+    // Return cached analysis from DB if available (avoids Gemini call on repeat visits)
+    const cached = await getSessionAnalysis(params.id)
+    if (cached) {
+      return NextResponse.json(cached)
     }
 
     // Use admin client — ownership already verified above; avoids RLS auth dependency
@@ -45,6 +52,11 @@ export async function GET(
       session.speakerName,
       session.output,
       submissions
+    )
+
+    // Persist to DB so future visits are instant
+    await insertSessionAnalysis(params.id, user.id, analysis).catch(e =>
+      console.error('[/api/sessions/[id]/analysis] insertSessionAnalysis failed (non-fatal):', e)
     )
 
     return NextResponse.json(analysis)

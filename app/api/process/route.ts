@@ -7,6 +7,7 @@ import { downloadTempZip, deleteTempZip } from '@/lib/supabase/storage.server'
 import { parseThemesFromOutput, themesOverlap } from '@/lib/parse/parseThemes'
 import { getRecentThemeTitles } from '@/lib/db/themes'
 import { generateClassInsights } from '@/lib/ai/classInsights'
+import { generateAndCacheSessionAnalysis } from '@/lib/ai/generateSessionAnalysis'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +74,17 @@ export async function POST(request: Request) {
     // Fire-and-forget: regenerate class insights after each session (non-blocking)
     generateClassInsights(user.id).catch(e =>
       console.error('[/api/process] generateClassInsights failed (non-fatal):', e)
+    )
+
+    // Fire-and-forget: pre-compute session analysis so Preview loads instantly
+    generateAndCacheSessionAnalysis(
+      session.id,
+      user.id,
+      session.speakerName,
+      session.output,
+      submissions.map(s => ({ student_name: s.studentName, submission_text: s.text }))
+    ).catch(e =>
+      console.error('[/api/process] generateAndCacheSessionAnalysis failed (non-fatal):', e)
     )
 
     return NextResponse.json({

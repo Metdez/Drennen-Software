@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/db/users'
 import { getSessionById } from '@/lib/db/sessions'
 import { getSubmissionsBySession } from '@/lib/db/student_submissions'
 import { runSessionAnalysis, runThemeAnalysis } from '@/lib/ai/analysisAgent'
+import { getSessionAnalysis, insertSessionAnalysis } from '@/lib/db/sessionAnalyses'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,15 +29,21 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    const submissions = await getSubmissionsBySession(params.id)
+    // Use cached session analysis if available — avoids a redundant Gemini call
+    let sessionAnalysis = await getSessionAnalysis(params.id)
 
-    // Use session analysis to get questions per theme (Gemini clusters them semantically)
-    // This makes the route self-contained — no sessionStorage dependency
-    const sessionAnalysis = await runSessionAnalysis(
-      session.speakerName,
-      session.output,
-      submissions
-    )
+    if (!sessionAnalysis) {
+      const submissions = await getSubmissionsBySession(params.id)
+      sessionAnalysis = await runSessionAnalysis(
+        session.speakerName,
+        session.output,
+        submissions
+      )
+      // Persist for future requests
+      await insertSessionAnalysis(params.id, user.id, sessionAnalysis).catch(e =>
+        console.error('[/api/sessions/[id]/theme-analysis] insertSessionAnalysis failed (non-fatal):', e)
+      )
+    }
 
     const cluster = sessionAnalysis.theme_clusters.find(
       (c) => c.name.toLowerCase() === theme.toLowerCase()

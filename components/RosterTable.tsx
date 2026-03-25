@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
+import { formatStudentName } from '@/lib/utils/format'
 import type { StudentSummary } from '@/types'
 
 function participationVariant(count: number, total: number): 'success' | 'orange' | 'default' {
@@ -44,7 +45,7 @@ export function RosterTable({ students }: { students: StudentSummary[] }) {
               className="border-t border-[var(--border)] cursor-pointer transition-colors duration-150 hover:bg-[var(--surface-elevated)]"
             >
               <td className="px-5 py-4 text-sm font-medium text-[var(--text-primary)] font-[family-name:var(--font-dm-sans)]">
-                {student.studentName}
+                {formatStudentName(student.studentName)}
               </td>
               <td className="px-5 py-4 text-sm text-[var(--text-secondary)] font-[family-name:var(--font-dm-sans)]">
                 {student.sessionCount} of {student.totalSessions}

@@ -2,6 +2,7 @@ import { getCurrentUser } from '@/lib/db/users'
 import { getStudentDetail } from '@/lib/db/student_submissions'
 import { StudentSessionCard } from '@/components/StudentSessionCard'
 import { Badge } from '@/components/ui/Badge'
+import { formatStudentName } from '@/lib/utils/format'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -50,7 +51,7 @@ export default async function StudentDetailPage({
 
       <div className="mb-8 animate-fade-up">
         <h1 className="font-[family-name:var(--font-playfair)] text-4xl font-bold text-[var(--text-primary)] mb-2">
-          {detail.studentName}
+          {formatStudentName(detail.studentName)}
         </h1>
         <div className="h-0.5 w-12 bg-[#f36f21] mb-3" />
         <div className="flex items-center gap-3">
