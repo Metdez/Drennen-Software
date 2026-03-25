@@ -28,7 +28,8 @@ XAI_API_KEY=
 XAI_BASE_URL=          # defaults to https://api.x.ai/v1
 XAI_MODEL=             # defaults to grok-4-1-fast-reasoning
 GOOGLE_API_KEY=        # (or GEMINI_API_KEY) — used by the analytics SQL agent
-GEMINI_MODEL=          # defaults to gemini-3-flash-preview
+GEMINI_API_KEY=        # used by lib/ai/analysisAgent.ts for Analysis and Insights panel (theme clusters, tensions, suggestions, blind spots, sentiment)
+GEMINI_MODEL=          # defaults to gemini-3.1-flash-lite-preview
 DATABASE_URL=          # Postgres connection string — used by the analytics SQL agent
 ```
 
@@ -57,6 +58,7 @@ app/
     preview/                   → output display + download
     history/                   → past sessions list
     analytics/                 → submission trend charts, leaderboard, drop-off analysis
+    preview/theme/             → theme deep-dive (sessionId + theme name in query params)
     roster/                    → all students list with participation rates
     roster/[studentName]/      → per-student submission history
   api/
@@ -84,6 +86,7 @@ app/
 - `lib/parse/` — `unzip.ts`, `pdf.ts`, `docx.ts`, `builder.ts` (orchestrates them all)
 - `lib/ai/client.ts` — lazy OpenAI SDK client pointed at XAI_BASE_URL (used for session generation)
 - `lib/ai/prompt.ts` — system prompt template with `{{SPEAKER_NAME}}` placeholder
+- `lib/ai/analysisAgent.ts` — `runSessionAnalysis()` and `runThemeAnalysis()`: Gemini-powered per-session deep analysis; called client-side from `/preview` on demand; results cached in sessionStorage as `analysis_${sessionId}`
 - `lib/ai/classInsights.ts` — `generateClassInsights(userId)`: Gemini-powered class analysis, called fire-and-forget from `/api/process` after each session save; results stored in `class_insights` table
 - `lib/ai/sqlAgent.ts` — Gemini-powered NL→SQL→answer agent for analytics queries; calls the `execute_analytics_query` Supabase RPC
 - `lib/export/` — `pdf.ts` and `docx.ts` for download generation
@@ -106,7 +109,10 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 ### Dual AI systems
 
 - **xAI Grok** (via OpenAI SDK + `baseURL` override): session generation — turns student submissions into the 10-section interview sheet
-- **Google Gemini** (via `@google/genai`): analytics SQL agent — converts natural-language professor questions into SQL, executes them, then summarises results in plain English
+- **Google Gemini** (via `@google/genai`): three distinct uses —
+  - `analysisAgent.ts`: per-session analysis (theme clusters, tensions, suggestions, blind spots, sentiment) fetched client-side from `/preview`; also powers theme deep-dive via `runThemeAnalysis()`
+  - `classInsights.ts`: cross-session class analysis, fire-and-forget after each session save
+  - `sqlAgent.ts`: NL→SQL→answer agent for analytics page queries
 
 ### Key conventions
 
@@ -116,4 +122,5 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 - Brand colors live in `lib/constants.ts` (`BRAND.ORANGE`, `BRAND.PURPLE`, `BRAND.GREEN`) — use these instead of hardcoded hex values
 - Student name is parsed from filename: `FirstName_LastName...` → displayed as `"FirstName L."`
 - PDF/DOCX parse failures return empty string — processing continues for other files in the ZIP
-- `sessionStorage` cache: after generation, output is stored as `session_${sessionId}` to skip a round-trip on `/preview`
+- `sessionStorage` cache keys on `/preview`: `session_${sessionId}` (AI output), `overlap_${sessionId}` (overlapping themes JSON array), `analysis_${sessionId}` (per-session Gemini analysis JSON)
+- `/preview` has three tabs: `questions` (markdown output), `analysis` (AnalysisPanelLeft — theme clusters + tensions), `insights` (AnalysisPanelRight — suggestions, blind spots, sentiment)

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
 import { getSessionById } from '@/lib/db/sessions'
-import { getSubmissionsBySession } from '@/lib/db/student_submissions'
+import { createAdminClient } from '@/lib/supabase/server'
 import { runSessionAnalysis } from '@/lib/ai/analysisAgent'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +22,20 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    const submissions = await getSubmissionsBySession(params.id)
+    // Use admin client — ownership already verified above; avoids RLS auth dependency
+    const supabase = createAdminClient()
+    const { data: submRows, error: submError } = await supabase
+      .from('student_submissions')
+      .select('student_name, submission_text')
+      .eq('session_id', params.id)
+      .order('created_at', { ascending: true })
+
+    if (submError) throw new Error(`Failed to fetch submissions: ${submError.message}`)
+
+    const submissions = (submRows ?? []).map((r) => ({
+      student_name: r.student_name ?? '',
+      submission_text: r.submission_text ?? '',
+    }))
 
     if (submissions.length === 0) {
       return NextResponse.json({ empty: true })
@@ -37,6 +50,12 @@ export async function GET(
     return NextResponse.json(analysis)
   } catch (err) {
     console.error('[/api/sessions/[id]/analysis]', err)
-    return NextResponse.json({ error: 'Analysis failed' }, { status: 500 })
+    let message = err instanceof Error ? err.message : String(err)
+    // Gemini SDK sometimes wraps its error JSON as the message string — unwrap it
+    try {
+      const parsed = JSON.parse(message)
+      if (parsed?.error?.message) message = parsed.error.message
+    } catch { /* not JSON, use as-is */ }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

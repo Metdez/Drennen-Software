@@ -29,3 +29,10 @@ export interface ThemeAnalysis {
   missed_angles: string[]
   patterns: Array<{ emoji: string; text: string }>
 }
+
+export interface CrossSessionThemeAnalysis {
+  narrative: string
+  patterns: Array<{ emoji: string; text: string }>
+  missed_angles: string[]
+  relevant_questions: Array<{ student_name: string; text: string; speaker_name: string }>
+}

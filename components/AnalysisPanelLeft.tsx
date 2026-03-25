@@ -9,19 +9,17 @@ interface Props {
   sessionId: string
   analysis: SessionAnalysis | null
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
-function SkeletonCard() {
+function SkeletonBlock({ h = 'h-24' }: { h?: string }) {
   return (
-    <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-3 animate-pulse">
-      <div className="h-2.5 bg-[var(--border-accent)] rounded w-2/3 mb-3" />
-      <div className="h-2 bg-[var(--border-accent)] rounded w-full mb-2" />
-      <div className="h-2 bg-[var(--border-accent)] rounded w-4/5" />
-    </div>
+    <div className={`rounded-2xl border border-[var(--border-accent)] bg-[var(--surface)] ${h} animate-pulse`} />
   )
 }
 
-export function AnalysisPanelLeft({ sessionId, analysis, loading }: Props) {
+export function AnalysisPanelLeft({ sessionId, analysis, loading, error, onRetry }: Props) {
   const router = useRouter()
 
   function handleThemeClick(themeName: string) {
@@ -34,107 +32,148 @@ export function AnalysisPanelLeft({ sessionId, analysis, loading }: Props) {
     : 1
 
   return (
-    <div className="flex flex-col gap-3 py-10 px-4">
-      <p className="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
-        Question Analysis
-      </p>
+    <div className="py-10 px-4">
+      <div className="max-w-3xl mx-auto flex flex-col gap-8">
 
-      {loading && (
-        <>
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </>
-      )}
+        {/* Header */}
+        <div>
+          <p className="text-[0.65rem] uppercase tracking-[0.18em] text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)] mb-1">
+            Question Analysis
+          </p>
+          <div className="h-px bg-gradient-to-r from-[#f36f21] via-[#542785] to-transparent" />
+        </div>
 
-      {!loading && analysis && (
-        <>
-          {/* Theme Clusters */}
-          <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-3">
-            <p className="text-[0.65rem] font-semibold text-[var(--text-secondary)] mb-2 font-[family-name:var(--font-dm-sans)]">
-              Theme Clusters
-              <span className="text-[var(--text-muted)] font-normal ml-1">— click to explore</span>
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {analysis.theme_clusters.map((cluster, i) => {
-                const barWidth = Math.round((cluster.question_count / maxCount) * 100)
-                const isTop = i === 0
-                return (
-                  <button
-                    key={cluster.name}
-                    onClick={() => handleThemeClick(cluster.name)}
-                    className="w-full text-left rounded-lg border border-[var(--border-accent)] bg-[var(--bg)] p-2 group hover:border-[#f36f21] hover:bg-[rgba(243,111,33,0.05)] transition-all duration-150"
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[0.65rem] font-medium text-[var(--text-secondary)] group-hover:text-[#f36f21] transition-colors">
-                        {cluster.name}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{
-                            background: isTop ? 'rgba(243,111,33,0.12)' : 'rgba(255,255,255,0.05)',
-                            color: isTop ? BRAND.ORANGE : 'var(--text-muted)',
-                          }}
-                        >
-                          {cluster.question_count}
-                        </span>
-                        <span className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</span>
-                      </div>
-                    </div>
-                    <div className="h-[3px] rounded-full bg-[var(--border-accent)] mb-1.5">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${barWidth}%`,
-                          background: isTop
-                            ? `linear-gradient(90deg, ${BRAND.ORANGE}, ${BRAND.PURPLE})`
-                            : `linear-gradient(90deg, ${BRAND.PURPLE}, #333)`,
-                        }}
-                      />
-                    </div>
-                    <p className="text-[0.58rem] text-[var(--text-muted)] italic truncate">
-                      &ldquo;{cluster.top_question}&rdquo;
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
+        {loading && (
+          <div className="flex flex-col gap-4">
+            <SkeletonBlock h="h-8" />
+            <SkeletonBlock h="h-48" />
+            <SkeletonBlock h="h-32" />
           </div>
+        )}
 
-          {/* Underlying Tensions */}
-          {analysis.tensions.length > 0 && (
-            <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-3">
-              <p className="text-[0.65rem] font-semibold text-[var(--text-secondary)] mb-2 font-[family-name:var(--font-dm-sans)]">
-                ⚡ Underlying Tensions
-              </p>
-              <div className="flex flex-col divide-y divide-[var(--border-accent)]">
-                {analysis.tensions.map((t) => (
-                  <div key={t.label} className="flex gap-2 py-2 first:pt-0 last:pb-0">
-                    <span className="text-[#542785] text-[0.7rem] flex-shrink-0 mt-0.5">↔</span>
-                    <div>
-                      <span className="text-[0.62rem] text-[#a78bda] font-medium">{t.label}</span>
-                      <span className="text-[0.62rem] text-[var(--text-muted)]"> — {t.description}</span>
-                    </div>
-                  </div>
-                ))}
+        {!loading && analysis && (
+          <>
+            {/* Theme Clusters */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-base font-semibold text-[var(--text-primary)] font-[family-name:var(--font-dm-sans)]">
+                  Theme Clusters
+                </h2>
+                <span className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
+                  click any to deep-dive →
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {analysis.theme_clusters.map((cluster, i) => {
+                  const barWidth = Math.round((cluster.question_count / maxCount) * 100)
+                  const isTop = i === 0
+                  return (
+                    <button
+                      key={cluster.name}
+                      onClick={() => handleThemeClick(cluster.name)}
+                      className="w-full text-left rounded-2xl border border-[var(--border-accent)] bg-[var(--surface)] p-5 group hover:border-[#f36f21] transition-all duration-200"
+                      style={{ background: isTop ? 'rgba(243,111,33,0.04)' : undefined }}
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <span className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[#f36f21] transition-colors leading-snug font-[family-name:var(--font-dm-sans)]">
+                          {cluster.name}
+                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span
+                            className="text-xs font-bold px-2.5 py-1 rounded-full tabular-nums font-[family-name:var(--font-dm-sans)]"
+                            style={{
+                              background: isTop ? 'rgba(243,111,33,0.15)' : 'rgba(255,255,255,0.06)',
+                              color: isTop ? BRAND.ORANGE : 'var(--text-secondary)',
+                            }}
+                          >
+                            {cluster.question_count}
+                          </span>
+                          <span className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity text-sm">→</span>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="h-1 rounded-full bg-[var(--border-accent)] mb-3">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${barWidth}%`,
+                            background: isTop
+                              ? `linear-gradient(90deg, ${BRAND.ORANGE}, ${BRAND.PURPLE})`
+                              : `linear-gradient(90deg, ${BRAND.PURPLE}, rgba(84,39,133,0.3))`,
+                          }}
+                        />
+                      </div>
+
+                      {/* Top question preview */}
+                      <p className="text-xs text-[var(--text-muted)] italic leading-relaxed line-clamp-2 font-[family-name:var(--font-dm-sans)]">
+                        &ldquo;{cluster.top_question}&rdquo;
+                      </p>
+                    </button>
+                  )
+                })}
               </div>
             </div>
-          )}
-        </>
-      )}
 
-      {!loading && !analysis && (
-        <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-3">
-          <p className="text-[0.65rem] text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
-            No submission data available for this session.
-          </p>
+            {/* Underlying Tensions */}
+            {analysis.tensions.length > 0 && (
+              <div className="flex flex-col gap-4">
+                <h2 className="text-base font-semibold text-[var(--text-primary)] font-[family-name:var(--font-dm-sans)]">
+                  ⚡ Underlying Tensions
+                </h2>
+                <div className="flex flex-col gap-3">
+                  {analysis.tensions.map((t) => (
+                    <div
+                      key={t.label}
+                      className="rounded-2xl border border-[var(--border-accent)] bg-[var(--surface)] p-5"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[#a78bda] text-base">↔</span>
+                        <span className="text-sm font-semibold text-[#a78bda] font-[family-name:var(--font-dm-sans)]">
+                          {t.label}
+                        </span>
+                      </div>
+                      <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-[family-name:var(--font-dm-sans)]">
+                        {t.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {!loading && !analysis && error && (
+          <div className="rounded-2xl border border-red-900/40 bg-red-950/20 p-8 text-center flex flex-col items-center gap-3">
+            <p className="text-sm font-semibold text-red-400 font-[family-name:var(--font-dm-sans)]">Analysis failed to load</p>
+            <p className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">{error}</p>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="mt-1 text-xs px-4 py-1.5 rounded-full border border-[var(--border-accent)] text-[var(--text-secondary)] hover:text-[#f36f21] hover:border-[#f36f21] transition-colors font-[family-name:var(--font-dm-sans)]"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+
+        {!loading && !analysis && !error && (
+          <div className="rounded-2xl border border-[var(--border-accent)] bg-[var(--surface)] p-8 text-center">
+            <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
+              No submission data available for this session.
+            </p>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center gap-2 pt-2 border-t border-[var(--border-accent)]">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#7dd4d4] animate-pulse" />
+          <span className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">Powered by Gemini</span>
         </div>
-      )}
 
-      <div className="flex items-center gap-1.5 mt-1">
-        <div className="w-1.5 h-1.5 rounded-full bg-[#7dd4d4] animate-pulse" />
-        <span className="text-[0.58rem] text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">Powered by Gemini</span>
       </div>
     </div>
   )

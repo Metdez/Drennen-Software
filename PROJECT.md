@@ -25,8 +25,10 @@ A private web tool built for a university professor teaching MGMT 305. Each seme
 - **Download** — Export the interview sheet as a formatted PDF or Word document
 - **History** — Browse all past sessions; re-view or re-download any session
 - **Student Roster** — See every student who has submitted across sessions, with participation rates; click any student to see their full submission history
-- **Class Intelligence Report** — Gemini-powered AI analysis generated after every session upload. Surfaces question quality trends, theme evolution across speakers, top recurring themes, and a student watchlist. Replaces the old static charts with an AI-first narrative dashboard.
+- **Class Intelligence Report** — Gemini-powered AI analysis generated after every session upload. Surfaces question quality trends, theme evolution across speakers, and top recurring themes.
 - **Natural language queries** — Ask plain-English questions about the data ("Which student submitted the most?") and get back AI-generated SQL + a readable answer
+- **Session Analysis** — Per-session Gemini analysis accessible from the Preview page (Analysis + Insights tabs). Shows theme clusters with question counts, underlying tensions, interview suggestions, blind spots, and a sentiment breakdown across all student submissions.
+- **Theme Deep-Dive** — Click any theme cluster on the Analysis tab to open a dedicated page with a Gemini narrative, 3 probe questions, missed angles, and behavioral patterns across that cluster's questions.
 
 ---
 
@@ -39,7 +41,7 @@ A private web tool built for a university professor teaching MGMT 305. Each seme
 | Database | Supabase (PostgreSQL + RLS) |
 | Auth | Supabase Auth (email/password) |
 | AI — session generation | xAI Grok (via OpenAI SDK, `baseURL` override) |
-| AI — class insights | Google Gemini (via `@google/genai`) — class analysis + NL queries |
+| AI — class insights + session analysis | Google Gemini (via `@google/genai`) — class analysis, NL queries, session analysis, theme deep-dives |
 | File parsing | unzipper, pdf-parse, mammoth |
 | PDF export | @react-pdf/renderer |
 | Word export | docx |
@@ -63,9 +65,10 @@ drennen-restore/
 │   └── (app)/                        All protected routes — require authentication
 │       ├── layout.tsx                App shell with NavHeader; exports force-dynamic
 │       ├── dashboard/page.tsx        Upload form — speaker name input + drag-and-drop ZIP
-│       ├── preview/page.tsx          Output display — rendered markdown + PDF/DOCX download
+│       ├── preview/page.tsx          Tabbed output display: Questions / Analysis / Insights + PDF/DOCX download
+│       ├── preview/theme/page.tsx    Theme deep-dive — narrative, probe questions, missed angles, patterns
 │       ├── history/page.tsx          Table of all past sessions; click to re-view
-│       ├── analytics/page.tsx        AI Class Intelligence Report — narrative banner, theme evolution, participation trend, watchlist
+│       ├── analytics/page.tsx        AI Class Intelligence Report — narrative banner, theme evolution, top themes
 │       └── roster/
 │           ├── page.tsx              All students with session participation rates
 │           └── [studentName]/page.tsx  Per-student submission history (one card per session)
@@ -77,10 +80,15 @@ drennen-restore/
 │   ├── sessions/[id]/route.ts        GET — fetch a single session by ID
 │   ├── sessions/[id]/download/       GET ?format=pdf|docx — generate and stream export file
 │   │   └── route.ts
+│   ├── sessions/[id]/analysis/       GET — run/return Gemini session-level analysis (SessionAnalysis JSON)
+│   │   └── route.ts
+│   ├── sessions/[id]/theme-analysis/ GET ?theme=… — run/return Gemini theme deep-dive (ThemeAnalysis JSON)
+│   │   └── route.ts
 │   ├── analytics/route.ts            GET — aggregated analytics (trends, leaderboard, drop-off)
 │   ├── analytics/themes/route.ts     GET — theme frequency aggregated across all sessions
 │   ├── analytics/insights/route.ts   GET — saved Gemini class analysis (ClassInsights JSON)
-│   └── analytics/query/route.ts     POST { question } — NL → SQL → answer via Gemini
+│   ├── analytics/query/route.ts      POST { question } — NL → SQL → answer via Gemini
+│   └── admin/clear/route.ts          POST — admin utility to clear data
 │
 ├── components/
 │   ├── AuthForm.tsx                  Email/password sign-in form
@@ -94,6 +102,8 @@ drennen-restore/
 │   ├── RosterTable.tsx               Sortable table of students with participation counts
 │   ├── StudentSessionCard.tsx        Card showing one student's submission for a single session
 │   ├── ThemeFrequencyPanel.tsx       Bar chart / list of recurring themes across sessions
+│   ├── AnalysisPanelLeft.tsx         Preview "Analysis" tab — theme clusters + underlying tensions; clusters link to /preview/theme
+│   ├── AnalysisPanelRight.tsx        Preview "Insights" tab — Gemini suggestions, blind spots, student sentiment bars
 │   └── ui/
 │       ├── Badge.tsx                 Colored pill badge (used for tiers, counts)
 │       ├── Button.tsx                Styled button (primary / secondary / ghost variants)
@@ -115,6 +125,7 @@ drennen-restore/
 │   ├── ai/
 │   │   ├── client.ts                 Lazy OpenAI SDK client → xAI endpoint (session generation)
 │   │   ├── prompt.ts                 System prompt template with {{SPEAKER_NAME}} placeholder
+│   │   ├── analysisAgent.ts          runSessionAnalysis() + runThemeAnalysis() — Gemini session/theme analysis
 │   │   ├── classInsights.ts          generateClassInsights() — Gemini class analysis, triggered after each session
 │   │   └── sqlAgent.ts               Gemini NL→SQL→answer agent; calls execute_analytics_query RPC
 │   ├── parse/
@@ -134,6 +145,8 @@ drennen-restore/
 │   ├── session.ts                    SessionRow, Session, SessionSummary, CreateSessionInput
 │   ├── analytics.ts                  AnalyticsData, SessionAnalyticsRow, LeaderboardEntry, DropoffEntry
 │   ├── insights.ts                   ClassInsights, ThemeEvolutionEntry
+│   ├── analysis.ts                   SessionAnalysis, ThemeAnalysis, ThemeCluster, ThemeQuestion
+│   ├── student_submission.ts         StudentSubmission type
 │   ├── api.ts                        ProcessResponse, ApiError, DownloadFormat
 │   └── user.ts                       AuthUser
 │
@@ -185,6 +198,36 @@ drennen-restore/
 | created_at | TIMESTAMPTZ | |
 
 **RLS:** SELECT and INSERT only (scoped to own user_id) on `sessions`. The `execute_analytics_query` RPC runs as SECURITY DEFINER and validates all queries are read-only SELECT before executing.
+
+---
+
+## Triple AI Architecture
+
+| System | Model | Purpose |
+|---|---|---|
+| xAI Grok | via OpenAI SDK + `baseURL` override | Session generation — turns raw submissions into the 10-section interview sheet |
+| Google Gemini (`classInsights.ts`) | `@google/genai` | Class-level analysis — narrative, theme evolution, quality trend; stored in `class_insights` table; triggered fire-and-forget after each session |
+| Google Gemini (`analysisAgent.ts`) | `@google/genai` | Per-session analysis — `runSessionAnalysis()` maps submissions to theme clusters, tensions, suggestions, blind spots, sentiment; `runThemeAnalysis()` does a deep-dive on a single cluster |
+
+Session analysis results are **not persisted to the database** — they are computed on demand by `/api/sessions/[id]/analysis` and `/api/sessions/[id]/theme-analysis`, then cached client-side in `sessionStorage`.
+
+---
+
+## Preview Page — Tab Structure
+
+The `/preview` page has three tabs:
+
+| Tab | Component | Content |
+|---|---|---|
+| Questions | `OutputPreview` | Rendered markdown interview sheet + overlapping-themes warning banner |
+| Analysis | `AnalysisPanelLeft` | Theme clusters (bar chart, clickable → `/preview/theme`), underlying tensions |
+| Insights | `AnalysisPanelRight` | Gemini interview suggestions, blind spots, student sentiment breakdown |
+
+`sessionStorage` keys used on this page:
+- `session_${sessionId}` — raw AI output markdown (set by `/api/process`)
+- `overlap_${sessionId}` — array of theme titles that appeared in recent sessions
+- `analysis_${sessionId}` — `SessionAnalysis` JSON (cached after first fetch)
+- `theme_${sessionId}_${encodedTheme}` — `ThemeAnalysis` JSON per theme (cached on the theme page)
 
 ---
 

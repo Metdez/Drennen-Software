@@ -1,12 +1,12 @@
 import { GoogleGenAI } from '@google/genai'
-import type { SessionAnalysis, ThemeAnalysis } from '@/types'
+import type { SessionAnalysis, ThemeAnalysis, CrossSessionThemeAnalysis } from '@/types'
 
 function getGeminiClient() {
   const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
   return {
     ai: new GoogleGenAI({ apiKey }),
-    model: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
+    model: process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview',
   }
 }
 
@@ -172,4 +172,76 @@ export async function runThemeAnalysis(
 
   const raw = (response.text ?? '').trim()
   return JSON.parse(raw) as ThemeAnalysis
+}
+
+// ---------------------------------------------------------------------------
+// Cross-session Theme analysis
+// ---------------------------------------------------------------------------
+
+function buildCrossSessionThemeAnalysisPrompt(
+  themeName: string,
+  questions: Array<{ text: string; student_name: string; session_id: string; speaker_name: string }>
+): string {
+  const questionsText = questions
+    .map((q) => `[${q.speaker_name}] [${q.student_name}]: ${q.text}`)
+    .join('\n')
+
+  return `You are doing a deep analysis of a core theme that has emerged across multiple university guest speaker sessions.
+
+Theme: ${themeName}
+All student questions potentially related to this theme (${questions.length} total):
+---
+${questionsText}
+---
+
+Your task:
+1. Review all the provided questions. Some may be loosely related, some very directly related.
+2. Select only the questions that are truly relevant to the core theme.
+3. Write a compelling analysis.
+
+Return a JSON object with EXACTLY this structure:
+{
+  "narrative": "string — 2 paragraphs analyzing what students are consistently asking about this theme across different speakers. What is the underlying curiosity or anxiety?",
+  "patterns": [
+    {
+      "emoji": "string — a single emoji",
+      "text": "string — one sentence describing a specific pattern or sub-theme"
+    }
+  ],
+  "missed_angles": [
+    "string — what aspects of this theme are students failing to ask about?"
+  ],
+  "relevant_questions": [
+    {
+      "student_name": "string",
+      "text": "string",
+      "speaker_name": "string"
+    }
+  ]
+}
+
+Rules:
+- relevant_questions: Include ONLY the questions from the input list that strongly match the theme.
+- patterns: exactly 2-3 items
+- missed_angles: exactly 2 items
+- Return ONLY valid JSON. No markdown fences, no explanation.`
+}
+
+export async function runCrossSessionThemeAnalysis(
+  themeName: string,
+  questions: Array<{ text: string; student_name: string; session_id: string; speaker_name: string }>
+): Promise<CrossSessionThemeAnalysis> {
+  const { ai, model } = getGeminiClient()
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: buildCrossSessionThemeAnalysisPrompt(themeName, questions),
+    config: {
+      systemInstruction: 'You are an expert at analyzing student questions across multiple sessions. Always respond with valid JSON only.',
+      responseMimeType: 'application/json',
+    },
+  })
+
+  const raw = (response.text ?? '').trim()
+  return JSON.parse(raw) as CrossSessionThemeAnalysis
 }

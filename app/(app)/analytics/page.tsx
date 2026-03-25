@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import Link from 'next/link'
 import type { AnalyticsData, ClassInsights, SessionAnalyticsRow } from '@/types'
 
 export default function AnalyticsPage() {
@@ -49,7 +49,6 @@ export default function AnalyticsPage() {
       <div className="flex gap-4 flex-wrap mb-6 animate-fade-up-delay-1">
         {[
           { label: 'Sessions', value: String(data.meta.totalSessions) },
-          { label: 'Students', value: data.meta.hasAnyStudentData ? String(data.meta.totalUniqueStudents) : '—' },
           { label: 'Unique Themes', value: uniqueThemeCount != null ? String(uniqueThemeCount) : '—' },
         ].map(p => (
           <div
@@ -70,20 +69,14 @@ export default function AnalyticsPage() {
         <ThemeEvolution evolution={insights.themeEvolution} newThemes={insights.topThemes.filter(t => t.isNew).map(t => t.title)} />
       )}
 
-      {/* Participation trend chart */}
-      <PanelCard title="Participation trend" delay="delay-3">
-        <ParticipationChart sessions={data.sessions} />
-      </PanelCard>
+
 
       {/* Top themes */}
       {insights && insights.topThemes.length > 0 && (
         <TopThemes themes={insights.topThemes} />
       )}
 
-      {/* Watchlist */}
-      {insights && insights.watchlist.length > 0 && (
-        <Watchlist watchlist={insights.watchlist} />
-      )}
+
     </div>
   )
 }
@@ -101,7 +94,7 @@ function InsightsBanner({
 }) {
   if (!insights) {
     return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-2">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-2 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[var(--brand-orange)]">✦</span>
           <h2 className="font-[family-name:var(--font-playfair)] text-lg font-bold text-[var(--text-primary)]">
@@ -132,11 +125,11 @@ function InsightsBanner({
   const lastSpeaker = insights.themeEvolution.at(-1)?.speakerName
 
   return (
-    <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-2">
+    <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-2 shadow-sm">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex items-center gap-2">
           <span className="text-[var(--brand-orange)]">✦</span>
-          <h2 className="font-[family-name:var(--font-playfair)] text-lg font-bold text-[var(--text-primary)]">
+          <h2 className="font-[family-name:var(--font-playfair)] text-xl font-bold text-[var(--text-primary)]">
             AI Class Analysis
           </h2>
         </div>
@@ -154,7 +147,7 @@ function InsightsBanner({
           {trendIcon} {insights.qualityTrend.direction.charAt(0).toUpperCase() + insights.qualityTrend.direction.slice(1)}
         </span>
         <span className="text-[var(--text-muted)]">—</span>
-        <span className="text-[var(--text-muted)]">{insights.qualityTrend.description}</span>
+        <span className="text-sm text-[var(--text-secondary)] font-medium">{insights.qualityTrend.description}</span>
       </div>
     </div>
   )
@@ -166,10 +159,10 @@ function InsightsBanner({
 
 // All theme pill colors cycle through these brand palette entries
 const THEME_COLORS = [
-  { bg: 'rgba(255,107,0,0.15)', border: 'rgba(255,107,0,0.4)', text: 'var(--brand-orange)' },
-  { bg: 'rgba(130,80,255,0.15)', border: 'rgba(130,80,255,0.4)', text: 'var(--brand-purple)' },
-  { bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.4)', text: 'var(--brand-green)' },
-  { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', text: '#60a5fa' },
+  { bg: 'rgba(255,107,0,0.15)', border: 'rgba(255,107,0,0.4)', text: '#fb923c' },   // Lighter orange
+  { bg: 'rgba(130,80,255,0.15)', border: 'rgba(130,80,255,0.4)', text: '#c084fc' }, // Lighter purple
+  { bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.4)', text: '#4ade80' },   // Lighter green
+  { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', text: '#60a5fa' }, // Light blue
 ]
 
 function ThemeEvolution({
@@ -192,25 +185,26 @@ function ThemeEvolution({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-2">
-      <h2 className="font-[family-name:var(--font-playfair)] text-xl font-bold text-[var(--text-primary)] mb-1">
-        Theme evolution
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-8 animate-fade-up-delay-3 shadow-sm">
+      <h2 className="font-[family-name:var(--font-playfair)] text-2xl font-bold text-[var(--text-primary)] mb-1">
+        Theme Evolution
       </h2>
-      <div className="h-0.5 w-8 bg-[var(--brand-orange)] mb-4" />
-      <p className="text-xs text-[var(--text-muted)] mb-4">
-        Questions themes extracted per session, ordered chronologically.
+      <div className="h-0.5 w-12 bg-[var(--brand-orange)] mb-4" />
+      <p className="text-sm text-[var(--text-secondary)] mb-6">
+        Tracing student engagement patterns and question themes across sessions.
       </p>
 
-      <div className="space-y-3">
-        {evolution.map(entry => {
+      <div className="space-y-4">
+        {evolution.map((entry) => {
           const date = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          
           return (
-            <div key={entry.sessionId} className="flex items-start gap-3">
-              <div className="shrink-0 w-28 pt-0.5">
-                <div className="text-xs font-medium text-[var(--text-primary)] truncate">{entry.speakerName}</div>
+            <div key={entry.sessionId} className="flex flex-col md:flex-row md:items-start gap-3">
+              <div className="shrink-0 w-32 pt-0.5">
+                <div className="text-sm font-semibold text-[var(--text-primary)] truncate">{entry.speakerName}</div>
                 <div className="text-xs text-[var(--text-muted)]">{date}</div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2 flex-1">
                 {entry.themes.map(theme => {
                   const c = THEME_COLORS[colorMap.get(theme) ?? 0]
                   const isNew = newThemes.includes(theme)
@@ -237,54 +231,6 @@ function ThemeEvolution({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Participation Trend (kept from original, re-labeled)
-// ---------------------------------------------------------------------------
-
-function ParticipationChart({ sessions }: { sessions: SessionAnalyticsRow[] }) {
-  const chartData = sessions.map(s => ({
-    date: new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    rate: s.relativeSubmissionRate,
-    noData: !s.hasStudentData,
-  }))
-  return (
-    <>
-      <p className="text-xs text-[var(--text-muted)] mb-3">
-        Relative to highest-attendance session (100% = most submissions in any session)
-      </p>
-      <ResponsiveContainer width="100%" height={240}>
-        <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-          <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
-          <YAxis
-            domain={[0, 100]}
-            tickFormatter={v => `${v}%`}
-            tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
-          />
-          <ReferenceLine y={100} stroke="var(--border-accent)" strokeDasharray="4 4" />
-          <Tooltip
-            contentStyle={{
-              background: 'var(--surface-elevated)',
-              border: '1px solid var(--border-accent)',
-              borderRadius: 8,
-            }}
-            formatter={(value, _name, props: { payload?: { noData?: boolean } }) => [
-              `${value}%${props.payload?.noData ? ' (no student data)' : ''}`,
-              'Relative rate',
-            ]}
-          />
-          <Line
-            dataKey="rate"
-            stroke="var(--brand-purple)"
-            strokeWidth={2}
-            dot={{ fill: 'var(--brand-purple)', r: 4 }}
-            activeDot={{ r: 6 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Top Themes
@@ -292,19 +238,23 @@ function ParticipationChart({ sessions }: { sessions: SessionAnalyticsRow[] }) {
 
 function TopThemes({ themes }: { themes: ClassInsights['topThemes'] }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-3">
-      <h2 className="font-[family-name:var(--font-playfair)] text-xl font-bold text-[var(--text-primary)] mb-1">
-        Top themes
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-4 shadow-sm">
+      <h2 className="font-[family-name:var(--font-playfair)] text-2xl font-bold text-[var(--text-primary)] mb-1">
+        Top Themes
       </h2>
-      <div className="h-0.5 w-8 bg-[var(--brand-orange)] mb-4" />
-      <div className="space-y-2">
+      <div className="h-0.5 w-12 bg-[var(--brand-purple)] mb-4" />
+      <div className="space-y-3">
         {themes.map((t, i) => (
-          <div key={t.title} className="flex items-center gap-3">
-            <span className="text-xs text-[var(--text-muted)] w-5 text-right shrink-0">{i + 1}</span>
-            <div className="flex-1 text-sm text-[var(--text-primary)] font-medium flex items-center gap-2">
+          <Link 
+            key={t.title} 
+            href={`/analytics/theme/${encodeURIComponent(t.title)}`}
+            className="flex items-center gap-3 p-3 -mx-3 rounded-lg hover:bg-[var(--surface-hover)] transition-colors group cursor-pointer"
+          >
+            <span className="text-sm font-medium text-[var(--text-muted)] w-5 text-right shrink-0">{i + 1}</span>
+            <div className="flex-1 text-sm text-[var(--text-primary)] font-medium flex items-center gap-2 group-hover:text-[var(--brand-orange)] transition-colors">
               {t.title}
               {t.isNew && (
-                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-[rgba(255,107,0,0.15)] text-[var(--brand-orange)] border border-[rgba(255,107,0,0.3)]">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,107,0,0.1)] text-[#fb923c] border border-[rgba(255,107,0,0.2)] group-hover:bg-[#fb923c] group-hover:text-white transition-colors">
                   NEW
                 </span>
               )}
@@ -312,41 +262,16 @@ function TopThemes({ themes }: { themes: ClassInsights['topThemes'] }) {
             <span className="text-xs text-[var(--text-muted)] shrink-0">
               {t.sessionCount} session{t.sessionCount !== 1 ? 's' : ''}
             </span>
-          </div>
+            <span className="text-[var(--brand-orange)] opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1 duration-200">
+              →
+            </span>
+          </Link>
         ))}
       </div>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Watchlist
-// ---------------------------------------------------------------------------
-
-function Watchlist({ watchlist }: { watchlist: ClassInsights['watchlist'] }) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-6 animate-fade-up-delay-3">
-      <h2 className="font-[family-name:var(--font-playfair)] text-xl font-bold text-[var(--text-primary)] mb-1">
-        Student watchlist
-      </h2>
-      <div className="h-0.5 w-8 bg-[var(--brand-orange)] mb-1" />
-      <p className="text-xs text-[var(--text-muted)] mb-4">
-        Students absent from recent sessions who may need follow-up.
-      </p>
-      <div className="space-y-2">
-        {watchlist.map(w => (
-          <div key={w.studentName} className="flex items-start gap-3 text-sm">
-            <span className="text-yellow-500 mt-0.5 shrink-0">⚠</span>
-            <div>
-              <span className="font-medium text-[var(--text-primary)]">{w.studentName}</span>
-              <span className="text-[var(--text-muted)]"> — {w.reason}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Shared

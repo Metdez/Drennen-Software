@@ -11,23 +11,19 @@ function buildPrompt(input: Awaited<ReturnType<typeof fetchInsightsInput>>): str
     themes: s.themes,
   }))
 
-  return `You are a data analyst helping a university professor understand class engagement trends.
+  return `You are an expert curriculum analyst helping a university professor understand what their students most want to learn and discuss.
+
+Your job is to identify the CORE THEMES across all student questions — the recurring topics, curiosities, and concerns that students keep coming back to. What are students hungry to hear about? What patterns reveal what this class actually cares about?
 
 Session data (${input.sessions.length} session${input.sessions.length !== 1 ? 's' : ''}, oldest first):
 ${JSON.stringify(sessionSummary, null, 2)}
 
-Top contributors (by sessions attended):
-${input.leaderboard.slice(0, 5).map(l => `- ${l.studentName}: ${l.submissionCount} session(s)`).join('\n') || '- No data yet'}
-
-Students absent from recent sessions:
-${input.dropoff.length ? input.dropoff.map(d => `- ${d.studentName} (last seen: ${d.lastSeenSpeaker})`).join('\n') : '- None detected'}
-
 Return a JSON object with exactly this structure:
 {
-  "narrative": "2-3 sentence plain-English summary for the professor. Be specific and insightful.",
+  "narrative": "2-3 sentence synthesis for the professor. Focus on: what core topics do students keep asking about? What does this reveal about what the class wants to learn? Be specific — name the actual themes.",
   "qualityTrend": {
     "direction": "improving" | "declining" | "stable",
-    "description": "One sentence about what drove this direction."
+    "description": "One sentence about how the depth or sophistication of student questions has evolved across sessions."
   },
   "topThemes": [
     { "title": "theme title", "sessionCount": number, "isNew": boolean }
@@ -42,8 +38,8 @@ Return a JSON object with exactly this structure:
 }
 
 Rules:
-- narrative: professor-facing, actionable, mention specific speakers or themes by name
-- qualityTrend.direction: infer from whether themes are becoming more strategic/sophisticated over sessions
+- narrative: answer "what do these students want to hear about?" — synthesize the dominant themes into a clear picture of student curiosity and intent; mention specific theme names
+- qualityTrend.direction: infer from whether themes are becoming more strategic, personal, or sophisticated over sessions
 - topThemes: all unique themes across all sessions, sorted by sessionCount descending; isNew=true only if theme first appeared in the most recent session
 - watchlist: only students absent from the last 2 sessions (if 2+ sessions exist); max 5 entries; empty array if none
 - themeEvolution: one entry per session in chronological order, preserving the sessionId and date exactly as provided
@@ -58,7 +54,7 @@ export async function generateClassInsights(userId: string): Promise<void> {
   if (input.sessions.length === 0) return
 
   const ai = new GoogleGenAI({ apiKey })
-  const model = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'
+  const model = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview'
 
   const response = await ai.models.generateContent({
     model,
