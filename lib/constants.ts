@@ -11,6 +11,7 @@ export const ROUTES = {
   API_AUTH_CALLBACK: '/api/auth/callback',
   API_SESSION_ANALYSIS: (id: string) => `/api/sessions/${id}/analysis`,
   API_SESSION_THEME_ANALYSIS: (id: string) => `/api/sessions/${id}/theme-analysis`,
+  API_STUDENT_PROFILE: (name: string) => `/api/roster/${encodeURIComponent(name)}/profile`,
 } as const
 
 export const BRAND = {
