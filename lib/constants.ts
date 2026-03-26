@@ -12,6 +12,11 @@ export const ROUTES = {
   API_SESSION_ANALYSIS: (id: string) => `/api/sessions/${id}/analysis`,
   API_SESSION_THEME_ANALYSIS: (id: string) => `/api/sessions/${id}/theme-analysis`,
   API_STUDENT_PROFILE: (name: string) => `/api/roster/${encodeURIComponent(name)}/profile`,
+  SHARED: (token: string) => `/shared/${token}`,
+  API_SESSION_SHARE: (id: string) => `/api/sessions/${id}/share`,
+  API_SHARED_SESSION: (token: string) => `/api/shared/${token}`,
+  API_SHARED_ANALYSIS: (token: string) => `/api/shared/${token}/analysis`,
+  API_SHARED_DOWNLOAD: (token: string) => `/api/shared/${token}/download`,
 } as const
 
 export const BRAND = {

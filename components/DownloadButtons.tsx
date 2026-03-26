@@ -15,22 +15,23 @@ const DownloadIcon = () => (
   </svg>
 )
 
-export function DownloadButtons({ sessionId, speakerName }: { sessionId: string, speakerName: string }) {
+export function DownloadButtons({ sessionId, speakerName, downloadUrl }: { sessionId: string, speakerName: string, downloadUrl?: (format: 'pdf' | 'docx') => string }) {
   const [downloading, setDownloading] = useState<'pdf' | 'docx' | null>(null)
 
   async function handleDownload(format: 'pdf' | 'docx') {
     setDownloading(format)
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/download?format=${format}`)
+      const fetchUrl = downloadUrl ? downloadUrl(format) : `/api/sessions/${sessionId}/download?format=${format}`
+      const res = await fetch(fetchUrl)
       if (!res.ok) throw new Error('Download failed')
 
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
+      const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
+      a.href = blobUrl
       a.download = `${speakerName.replace(/\s+/g, '_')}_Questions.${format === 'pdf' ? 'pdf' : 'docx'}`
       a.click()
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(blobUrl)
     } catch (err) {
       console.error(err)
       alert('Failed to download file.')

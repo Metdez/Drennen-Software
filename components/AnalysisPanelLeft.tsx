@@ -11,6 +11,7 @@ interface Props {
   loading: boolean
   error?: string | null
   onRetry?: () => void
+  readOnly?: boolean
 }
 
 function SkeletonBlock({ h = 'h-24' }: { h?: string }) {
@@ -19,7 +20,7 @@ function SkeletonBlock({ h = 'h-24' }: { h?: string }) {
   )
 }
 
-export function AnalysisPanelLeft({ sessionId, analysis, loading, error, onRetry }: Props) {
+export function AnalysisPanelLeft({ sessionId, analysis, loading, error, onRetry, readOnly }: Props) {
   const router = useRouter()
 
   function handleThemeClick(themeName: string) {
@@ -59,20 +60,23 @@ export function AnalysisPanelLeft({ sessionId, analysis, loading, error, onRetry
                 <h2 className="text-base font-semibold text-[var(--text-primary)] font-[family-name:var(--font-dm-sans)]">
                   Theme Clusters
                 </h2>
-                <span className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
-                  click any to deep-dive →
-                </span>
+                {!readOnly && (
+                  <span className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
+                    click any to deep-dive →
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-col gap-3">
                 {analysis.theme_clusters.map((cluster, i) => {
                   const barWidth = Math.round((cluster.question_count / maxCount) * 100)
                   const isTop = i === 0
+                  const Wrapper = readOnly ? 'div' : 'button'
                   return (
-                    <button
+                    <Wrapper
                       key={cluster.name}
-                      onClick={() => handleThemeClick(cluster.name)}
-                      className="w-full text-left rounded-2xl border border-[var(--border-accent)] bg-[var(--surface)] p-5 group hover:border-[#f36f21] transition-all duration-200"
+                      {...(!readOnly ? { onClick: () => handleThemeClick(cluster.name) } : {})}
+                      className={`w-full text-left rounded-2xl border border-[var(--border-accent)] bg-[var(--surface)] p-5 group transition-all duration-200${readOnly ? '' : ' hover:border-[#f36f21]'}`}
                       style={{ background: isTop ? 'rgba(243,111,33,0.04)' : undefined }}
                     >
                       <div className="flex items-start justify-between gap-4 mb-3">
@@ -89,7 +93,7 @@ export function AnalysisPanelLeft({ sessionId, analysis, loading, error, onRetry
                           >
                             {cluster.question_count}
                           </span>
-                          <span className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity text-sm">→</span>
+                          {!readOnly && <span className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity text-sm">→</span>}
                         </div>
                       </div>
 
@@ -110,7 +114,7 @@ export function AnalysisPanelLeft({ sessionId, analysis, loading, error, onRetry
                       <p className="text-xs text-[var(--text-muted)] italic leading-relaxed line-clamp-2 font-[family-name:var(--font-dm-sans)]">
                         &ldquo;{cluster.top_question}&rdquo;
                       </p>
-                    </button>
+                    </Wrapper>
                   )
                 })}
               </div>

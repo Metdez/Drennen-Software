@@ -29,3 +29,18 @@ export interface SessionSummary {
   createdAt: string
   fileCount: number
 }
+
+export interface SessionShareRow {
+  id: string
+  session_id: string
+  user_id: string
+  share_token: string
+  created_at: string
+}
+
+export interface SessionShare {
+  id: string
+  sessionId: string
+  shareToken: string
+  createdAt: string
+}

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { OutputPreview } from '@/components/OutputPreview'
 import { DownloadButtons } from '@/components/DownloadButtons'
+import { ShareButton } from '@/components/ShareButton'
 import { AnalysisPanelLeft } from '@/components/AnalysisPanelLeft'
 import { AnalysisPanelRight } from '@/components/AnalysisPanelRight'
 import { ROUTES } from '@/lib/constants'
@@ -179,7 +180,8 @@ function PreviewContent() {
               {session.fileCount} {session.fileCount === 1 ? 'file' : 'files'} processed
             </p>
           </div>
-          <div className="shrink-0 pt-1">
+          <div className="shrink-0 pt-1 flex items-center gap-3">
+            <ShareButton sessionId={sessionId} />
             <DownloadButtons sessionId={sessionId} speakerName={session.speakerName} />
           </div>
         </div>
