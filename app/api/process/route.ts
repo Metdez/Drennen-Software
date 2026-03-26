@@ -8,6 +8,7 @@ import { parseThemesFromOutput, themesOverlap } from '@/lib/parse/parseThemes'
 import { getRecentThemeTitles } from '@/lib/db/themes'
 import { generateClassInsights } from '@/lib/ai/classInsights'
 import { generateAndCacheSessionAnalysis } from '@/lib/ai/generateSessionAnalysis'
+import { generateStudentProfiles } from '@/lib/ai/studentProfile'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +86,12 @@ export async function POST(request: Request) {
       submissions.map(s => ({ student_name: s.studentName, submission_text: s.text }))
     ).catch(e =>
       console.error('[/api/process] generateAndCacheSessionAnalysis failed (non-fatal):', e)
+    )
+
+    // Fire-and-forget: regenerate profiles for students in this upload
+    const affectedStudents = [...new Set(submissions.map(s => s.studentName))]
+    generateStudentProfiles(user.id, affectedStudents).catch(e =>
+      console.error('[/api/process] generateStudentProfiles failed (non-fatal):', e)
     )
 
     return NextResponse.json({

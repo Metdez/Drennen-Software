@@ -1,6 +1,6 @@
 import { getCurrentUser } from '@/lib/db/users'
 import { getStudentDetail } from '@/lib/db/student_submissions'
-import { StudentSessionCard } from '@/components/StudentSessionCard'
+import { StudentDetailTabs } from '@/components/StudentDetailTabs'
 import { Badge } from '@/components/ui/Badge'
 import { formatStudentName } from '@/lib/utils/format'
 import { redirect, notFound } from 'next/navigation'
@@ -49,7 +49,7 @@ export default async function StudentDetailPage({
         </Link>
       </div>
 
-      <div className="mb-8 animate-fade-up">
+      <div className="mb-6 animate-fade-up">
         <h1 className="font-[family-name:var(--font-playfair)] text-4xl font-bold text-[var(--text-primary)] mb-2">
           {formatStudentName(detail.studentName)}
         </h1>
@@ -64,11 +64,10 @@ export default async function StudentDetailPage({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 animate-fade-up-delay-1">
-        {detail.sessions.map((session) => (
-          <StudentSessionCard key={session.sessionId} session={session} />
-        ))}
-      </div>
+      <StudentDetailTabs
+        studentName={detail.studentName}
+        sessions={detail.sessions}
+      />
     </div>
   )
 }
