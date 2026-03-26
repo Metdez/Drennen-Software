@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export interface ThemeFrequency {
   themeTitle: string
@@ -49,7 +49,7 @@ export async function getRecentThemeTitles(
   excludeSessionId: string,
   limit = 5
 ): Promise<string[]> {
-  const supabase = createClient()
+  const supabase = createAdminClient()
 
   // Fetch the N most-recent session IDs for this user (excluding current)
   const { data: sessions, error: sessionsError } = await supabase

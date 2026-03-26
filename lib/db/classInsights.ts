@@ -1,4 +1,4 @@
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import type { ClassInsights, ThemeEvolutionEntry } from '@/types'
 
 export async function getClassInsights(userId: string): Promise<ClassInsights | null> {
@@ -38,7 +38,7 @@ export interface InsightsInput {
 }
 
 export async function fetchInsightsInput(userId: string): Promise<InsightsInput> {
-  const supabase = createClient()
+  const supabase = createAdminClient()
 
   // Sessions oldest-first
   const { data: sessionRows, error: sessErr } = await supabase

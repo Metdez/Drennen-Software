@@ -12,24 +12,44 @@ function toTitleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 
-function extractStudentName(filename: string): string {
-  // Get just the base filename without path
-  const base = filename.split('/').pop() ?? filename
-  const parts = base.split('_')
+function splitCamelCaseName(segment: string): { firstName: string; lastName: string } {
+  // Split on lowercase→uppercase transitions: "HannaZack" → ["Hanna","Zack"]
+  const parts = segment.split(/(?<=[a-z])(?=[A-Z])/)
+  if (parts.length < 2) return { firstName: segment, lastName: '' }
+  // Canvas format is LastnameFirstname — last segment is the first name
+  return {
+    firstName: parts[parts.length - 1],
+    lastName: parts.slice(0, -1).join(''),
+  }
+}
 
+function extractStudentName(filename: string): string {
+  const base = filename.split('/').pop() ?? filename
+  const segments = base.split('_')
+
+  if (segments.length < 2) return 'Unknown Student'
+
+  // Filter out LATE marker (Canvas adds _LATE_ for late submissions)
+  const parts = segments.filter(s => s.toUpperCase() !== 'LATE')
   if (parts.length < 2) return 'Unknown Student'
 
-  // Standard Canvas export format: Lastname_Firstname_StudentID_...
-  // If parts[1] is non-numeric it's the first name; parts[0] is the last name.
-  if (!/^\d+$/.test(parts[1])) {
+  // Format A: Lastname_Firstname_StudentID (underscore-separated names)
+  if (!/^\d+$/.test(parts[1]) && parts.length >= 3 && /^\d+$/.test(parts[2])) {
     const firstName = toTitleCase(parts[1])
     const lastInitial = parts[0].charAt(0).toUpperCase()
     return `${firstName} ${lastInitial}.`
   }
 
-  // Fallback: concatenated format (e.g. lastnamefirstname_12345_...)
-  // Can't split the names, so just title-case the whole segment.
-  return `${toTitleCase(parts[0])} ${parts[1].charAt(0).toUpperCase()}.`
+  // Format B/C: LastnameFirstname_StudentID (concatenated, with or without LATE)
+  if (/^\d+$/.test(parts[1])) {
+    const { firstName, lastName } = splitCamelCaseName(parts[0])
+    if (lastName) {
+      return `${toTitleCase(firstName)} ${lastName.charAt(0).toUpperCase()}.`
+    }
+    return toTitleCase(firstName)
+  }
+
+  return toTitleCase(parts[0])
 }
 
 async function processInChunks<T, R>(
