@@ -33,6 +33,9 @@ yarn-error.log*
 # planning docs with real secrets
 docs/ENV.md
 
+# worktrees
+.worktrees/
+
 # vercel
 .vercel
 
