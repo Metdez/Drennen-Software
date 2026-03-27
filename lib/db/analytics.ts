@@ -1,15 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import type { AnalyticsData, SessionAnalyticsRow, LeaderboardEntry, DropoffEntry } from '@/types'
 
-export async function getAnalytics(userId: string): Promise<AnalyticsData> {
+export async function getAnalytics(userId: string, semesterId?: string): Promise<AnalyticsData> {
   const supabase = createClient()
 
   // Sessions oldest-first for chronological charts
-  const { data: sessionRows, error: sessErr } = await supabase
+  let sessQuery = supabase
     .from('sessions')
     .select('id, speaker_name, created_at, file_count')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+  if (semesterId) sessQuery = sessQuery.eq('semester_id', semesterId)
+  const { data: sessionRows, error: sessErr } = await sessQuery.order('created_at', { ascending: true })
   if (sessErr) throw new Error(sessErr.message)
 
   const sessionIds = (sessionRows ?? []).map(s => s.id)

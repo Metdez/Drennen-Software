@@ -4,11 +4,17 @@ import type { ClassInsights, ThemeEvolutionEntry } from '@/types'
 
 function buildPrompt(input: Awaited<ReturnType<typeof fetchInsightsInput>>): string {
   const lastSession = input.sessions.at(-1)
+  const sessionsWithDebriefs = input.sessions.filter(s => s.debriefRating !== null)
   const sessionSummary = input.sessions.map(s => ({
     speaker: s.speakerName,
     date: new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     submissions: s.submissionCount,
     themes: s.themes,
+    ...(s.debriefRating !== null ? {
+      debriefRating: s.debriefRating,
+      homeRunQuestions: s.debriefHomeRunCount,
+      flatQuestions: s.debriefFlatCount,
+    } : {}),
   }))
 
   return `You are an expert curriculum analyst helping a university professor understand what their students most want to learn and discuss.
@@ -17,6 +23,8 @@ Your job is to identify the CORE THEMES across all student questions — the rec
 
 Session data (${input.sessions.length} session${input.sessions.length !== 1 ? 's' : ''}, oldest first):
 ${JSON.stringify(sessionSummary, null, 2)}
+${sessionsWithDebriefs.length > 0 ? `
+Post-session debrief data is available for ${sessionsWithDebriefs.length} session(s). Sessions with debriefRating, homeRunQuestions, and flatQuestions fields have professor feedback on which questions actually resonated in the room. Use this ground-truth data to assess which themes consistently produce the richest conversations vs. which fall flat.` : ''}
 
 Return a JSON object with exactly this structure:
 {
@@ -46,11 +54,11 @@ Rules:
 - generatedAt: current ISO timestamp`
 }
 
-export async function generateClassInsights(userId: string): Promise<void> {
+export async function generateClassInsights(userId: string, semesterId?: string): Promise<void> {
   const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
 
-  const input = await fetchInsightsInput(userId)
+  const input = await fetchInsightsInput(userId, semesterId)
   if (input.sessions.length === 0) return
 
   const ai = new GoogleGenAI({ apiKey })
@@ -81,14 +89,25 @@ export async function generateClassInsights(userId: string): Promise<void> {
     themes: s.themes,
   }))
 
+  // Build sessionEffectiveness from ground-truth debrief data
+  const sessionEffectiveness = input.sessions
+    .filter(s => s.debriefRating !== null)
+    .map(s => ({
+      speakerName: s.speakerName,
+      rating: s.debriefRating!,
+      homeRunCount: s.debriefHomeRunCount,
+      flatCount: s.debriefFlatCount,
+    }))
+
   const analysis: ClassInsights = {
     narrative: parsed.narrative ?? '',
     qualityTrend: parsed.qualityTrend ?? { direction: 'stable', description: '' },
     topThemes: parsed.topThemes ?? [],
     watchlist: parsed.watchlist ?? [],
     themeEvolution,
+    ...(sessionEffectiveness.length > 0 ? { sessionEffectiveness } : {}),
     generatedAt: new Date().toISOString(),
   }
 
-  await upsertClassInsights(userId, analysis, input.sessions.length)
+  await upsertClassInsights(userId, analysis, input.sessions.length, semesterId)
 }

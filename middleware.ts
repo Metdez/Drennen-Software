@@ -28,7 +28,12 @@ export async function middleware(request: NextRequest) {
 
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
     request.nextUrl.pathname.startsWith('/preview') ||
-    request.nextUrl.pathname.startsWith('/history')
+    request.nextUrl.pathname.startsWith('/history') ||
+    request.nextUrl.pathname.startsWith('/analytics') ||
+    request.nextUrl.pathname.startsWith('/roster') ||
+    request.nextUrl.pathname.startsWith('/reports') ||
+    request.nextUrl.pathname.startsWith('/compare') ||
+    request.nextUrl.pathname.startsWith('/semesters')
 
   if (isProtectedRoute && !user) {
     return NextResponse.redirect(new URL('/login', request.url))

@@ -8,9 +8,11 @@ import { ProcessingView } from '@/components/ProcessingView'
 import { ROUTES } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTempZip } from '@/lib/supabase/storage'
+import { useSemesterContext } from '@/components/SemesterContext'
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { activeSemester } = useSemesterContext()
   const [speakerName, setSpeakerName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -99,6 +101,12 @@ export default function DashboardPage() {
             <p className="text-[var(--text-secondary)] text-sm font-[family-name:var(--font-dm-sans)]">
               Enter the speaker&apos;s name and upload the Canvas ZIP file to generate a question sheet.
             </p>
+            {activeSemester && (
+              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)] text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)]" />
+                Uploading to: {activeSemester.name}
+              </div>
+            )}
           </div>
 
           {/* Error */}

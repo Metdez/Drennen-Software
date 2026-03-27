@@ -1,5 +1,6 @@
 "use client"
 
+import { SemesterSelector } from '@/components/SemesterSelector'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -53,6 +54,8 @@ export function NavHeader() {
             </Link>
           )
         })}
+
+        <SemesterSelector />
 
         {email && (
           <span className="text-xs text-[var(--text-muted)] max-w-[180px] truncate">

@@ -23,13 +23,24 @@ Professors upload student question submissions for guest speaker sessions; the A
 
 Tables available to you:
 
+  semesters (
+    id           UUID PRIMARY KEY,
+    user_id      UUID,           -- professor's user ID
+    name         TEXT,           -- e.g. "Spring 2026"
+    start_date   DATE,
+    end_date     DATE,
+    status       TEXT,           -- 'active' or 'archived'
+    created_at   TIMESTAMPTZ
+  )
+
   sessions (
     id           UUID PRIMARY KEY,
     user_id      UUID,           -- professor's user ID
     speaker_name TEXT,           -- name of the guest speaker
     created_at   TIMESTAMPTZ,
     output       TEXT,           -- full AI-generated markdown output
-    file_count   INTEGER         -- number of student files processed
+    file_count   INTEGER,        -- number of student files processed
+    semester_id  UUID REFERENCES semesters(id)  -- nullable; NULL = unassigned to any semester
   )
 
   student_submissions (
@@ -54,6 +65,7 @@ Rules:
 - Return concise, readable column aliases in result sets.
 - student_name is stored as "FirstName L." — use ILIKE '%Jake%' for partial first-name matching.
 - session_themes.theme_number is 1-based ordering within a session.
+- sessions.semester_id links to semesters. When the user asks about a specific semester, filter by sessions.semester_id. NULL semester_id means the session is unassigned to any semester.
 `.trim()
 
 function buildSqlPrompt(question: string): string {

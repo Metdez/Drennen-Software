@@ -13,6 +13,7 @@ export async function insertSession(input: CreateSessionInput): Promise<Session>
       speaker_name: input.speakerName,
       output: input.output,
       file_count: input.fileCount,
+      semester_id: input.semesterId ?? null,
     })
     .select()
     .single()
@@ -21,13 +22,14 @@ export async function insertSession(input: CreateSessionInput): Promise<Session>
   return rowToSession(data as SessionRow)
 }
 
-export async function getSessionsByUser(userId: string): Promise<SessionSummary[]> {
+export async function getSessionsByUser(userId: string, semesterId?: string): Promise<SessionSummary[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('sessions')
-    .select('id, speaker_name, created_at, file_count')
+    .select('id, speaker_name, created_at, file_count, semester_id')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+  if (semesterId) query = query.eq('semester_id', semesterId)
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) throw new Error(`Failed to fetch sessions: ${error.message}`)
   return (data as SessionRow[]).map(rowToSessionSummary)

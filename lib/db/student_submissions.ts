@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { StudentSummary, StudentDetail, SessionWithSubmission } from '@/types'
 
 export async function getSubmissionsBySession(
@@ -19,9 +19,57 @@ export async function getSubmissionsBySession(
   }))
 }
 
-export async function getStudentsWithParticipation(): Promise<StudentSummary[]> {
+/**
+ * Returns distinct student names for a session (lighter than getSubmissionsBySession).
+ */
+export async function getStudentNamesBySession(sessionId: string): Promise<string[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('student_submissions')
+    .select('student_name')
+    .eq('session_id', sessionId)
+
+  if (error) throw new Error(`Failed to fetch student names: ${error.message}`)
+  const names = new Set((data ?? []).map(r => r.student_name as string))
+  return [...names].sort()
+}
+
+export async function getStudentsWithParticipation(semesterId?: string): Promise<StudentSummary[]> {
   const supabase = createClient()
 
+  if (semesterId) {
+    // Semester-scoped: first get session IDs for this semester, then filter submissions
+    const { data: semSessions, error: semErr } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('semester_id', semesterId)
+    if (semErr) throw new Error(`Failed to fetch semester sessions: ${semErr.message}`)
+
+    const sessionIds = (semSessions ?? []).map(s => s.id)
+    if (sessionIds.length === 0) return []
+
+    const { data: subs, error: subErr } = await supabase
+      .from('student_submissions')
+      .select('student_name, session_id')
+      .in('session_id', sessionIds)
+    if (subErr) throw new Error(`Failed to fetch submissions: ${subErr.message}`)
+
+    const map = new Map<string, Set<string>>()
+    for (const row of subs ?? []) {
+      if (!map.has(row.student_name)) map.set(row.student_name, new Set())
+      map.get(row.student_name)!.add(row.session_id)
+    }
+
+    return Array.from(map.entries())
+      .map(([studentName, sessionSet]) => ({
+        studentName,
+        sessionCount: sessionSet.size,
+        totalSessions: sessionIds.length,
+      }))
+      .sort((a, b) => a.studentName.localeCompare(b.studentName))
+  }
+
+  // Unscoped: original behavior
   const [submissionsResult, sessionsResult] = await Promise.all([
     supabase.from('student_submissions').select('student_name, session_id'),
     supabase.from('sessions').select('id', { count: 'exact', head: true }),
@@ -46,15 +94,23 @@ export async function getStudentsWithParticipation(): Promise<StudentSummary[]> 
     .sort((a, b) => a.studentName.localeCompare(b.studentName))
 }
 
-export async function getStudentDetail(studentName: string): Promise<StudentDetail | null> {
+export async function getStudentDetail(studentName: string, semesterId?: string): Promise<StudentDetail | null> {
   const supabase = createClient()
 
+  let submissionsQuery = supabase
+    .from('student_submissions')
+    .select('session_id, submission_text, filename, sessions(speaker_name, created_at, semester_id)')
+    .eq('student_name', studentName)
+  if (semesterId) {
+    submissionsQuery = submissionsQuery.eq('sessions.semester_id', semesterId)
+  }
+
+  let sessionsCountQuery = supabase.from('sessions').select('id', { count: 'exact', head: true })
+  if (semesterId) sessionsCountQuery = sessionsCountQuery.eq('semester_id', semesterId)
+
   const [submissionsResult, sessionsResult] = await Promise.all([
-    supabase
-      .from('student_submissions')
-      .select('session_id, submission_text, filename, sessions(speaker_name, created_at)')
-      .eq('student_name', studentName),
-    supabase.from('sessions').select('id', { count: 'exact', head: true }),
+    submissionsQuery,
+    sessionsCountQuery,
   ])
 
   if (submissionsResult.error) throw new Error(`Failed to fetch student detail: ${submissionsResult.error.message}`)

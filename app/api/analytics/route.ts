@@ -4,11 +4,14 @@ import { getAnalytics } from '@/lib/db/analytics'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const semesterId = searchParams.get('semester') || undefined
+
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const data = await getAnalytics(user.id)
+    const data = await getAnalytics(user.id, semesterId)
     return NextResponse.json(data)
   } catch (err) {
     console.error('[/api/analytics]', err)

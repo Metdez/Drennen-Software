@@ -1,13 +1,18 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import type { ClassInsights, ThemeEvolutionEntry } from '@/types'
+import type { ClassInsights, ThemeEvolutionEntry, QuestionFeedback, DebriefStatus } from '@/types'
 
-export async function getClassInsights(userId: string): Promise<ClassInsights | null> {
+export async function getClassInsights(userId: string, semesterId?: string): Promise<ClassInsights | null> {
   const supabase = createAdminClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('class_insights')
     .select('analysis')
     .eq('user_id', userId)
-    .maybeSingle()
+  if (semesterId) {
+    query = query.eq('semester_id', semesterId)
+  } else {
+    query = query.is('semester_id', null)
+  }
+  const { data, error } = await query.maybeSingle()
   if (error) throw new Error(error.message)
   return data ? (data.analysis as ClassInsights) : null
 }
@@ -15,14 +20,41 @@ export async function getClassInsights(userId: string): Promise<ClassInsights | 
 export async function upsertClassInsights(
   userId: string,
   analysis: ClassInsights,
-  sessionCount: number
+  sessionCount: number,
+  semesterId?: string
 ): Promise<void> {
   const supabase = createAdminClient()
-  const { error } = await supabase.from('class_insights').upsert(
-    { user_id: userId, analysis, session_count: sessionCount, updated_at: new Date().toISOString() },
-    { onConflict: 'user_id' }
-  )
-  if (error) throw new Error(error.message)
+
+  // Partial unique indexes don't work with Supabase JS upsert, so check-then-insert/update
+  let query = supabase
+    .from('class_insights')
+    .select('id')
+    .eq('user_id', userId)
+  if (semesterId) {
+    query = query.eq('semester_id', semesterId)
+  } else {
+    query = query.is('semester_id', null)
+  }
+  const { data: existing } = await query.maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase
+      .from('class_insights')
+      .update({ analysis, session_count: sessionCount, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase
+      .from('class_insights')
+      .insert({
+        user_id: userId,
+        analysis,
+        session_count: sessionCount,
+        updated_at: new Date().toISOString(),
+        semester_id: semesterId ?? null,
+      })
+    if (error) throw new Error(error.message)
+  }
 }
 
 export interface InsightsInput {
@@ -32,20 +64,25 @@ export interface InsightsInput {
     date: string
     submissionCount: number
     themes: string[]
+    debriefRating: number | null
+    debriefHomeRunCount: number
+    debriefFlatCount: number
+    debriefFollowups: string
   }>
   leaderboard: Array<{ studentName: string; submissionCount: number }>
   dropoff: Array<{ studentName: string; lastSeenSpeaker: string }>
 }
 
-export async function fetchInsightsInput(userId: string): Promise<InsightsInput> {
+export async function fetchInsightsInput(userId: string, semesterId?: string): Promise<InsightsInput> {
   const supabase = createAdminClient()
 
   // Sessions oldest-first
-  const { data: sessionRows, error: sessErr } = await supabase
+  let sessQuery = supabase
     .from('sessions')
     .select('id, speaker_name, created_at, file_count')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+  if (semesterId) sessQuery = sessQuery.eq('semester_id', semesterId)
+  const { data: sessionRows, error: sessErr } = await sessQuery.order('created_at', { ascending: true })
   if (sessErr) throw new Error(sessErr.message)
 
   const rows = sessionRows ?? []
@@ -70,6 +107,13 @@ export async function fetchInsightsInput(userId: string): Promise<InsightsInput>
     .in('session_id', sessionIds)
   if (stuErr) throw new Error(stuErr.message)
 
+  // Completed debriefs for enrichment
+  const { data: debriefRows } = await supabase
+    .from('session_debriefs')
+    .select('session_id, overall_rating, questions_feedback, followup_topics, status')
+    .in('session_id', sessionIds)
+    .eq('status', 'complete')
+
   // Group themes by session
   const themesBySession = new Map<string, string[]>()
   for (const t of themeRows ?? []) {
@@ -78,13 +122,32 @@ export async function fetchInsightsInput(userId: string): Promise<InsightsInput>
     themesBySession.set(t.session_id, list)
   }
 
-  const sessions: InsightsInput['sessions'] = rows.map(s => ({
-    sessionId: s.id,
-    speakerName: s.speaker_name,
-    date: s.created_at,
-    submissionCount: s.file_count,
-    themes: themesBySession.get(s.id) ?? [],
-  }))
+  // Group debriefs by session
+  const debriefBySession = new Map<string, { rating: number | null; homeRuns: number; flats: number; followups: string }>()
+  for (const d of debriefRows ?? []) {
+    const feedback = (d.questions_feedback ?? []) as QuestionFeedback[]
+    debriefBySession.set(d.session_id, {
+      rating: d.overall_rating,
+      homeRuns: feedback.filter(q => q.status === 'home_run').length,
+      flats: feedback.filter(q => q.status === 'flat').length,
+      followups: d.followup_topics ?? '',
+    })
+  }
+
+  const sessions: InsightsInput['sessions'] = rows.map(s => {
+    const db = debriefBySession.get(s.id)
+    return {
+      sessionId: s.id,
+      speakerName: s.speaker_name,
+      date: s.created_at,
+      submissionCount: s.file_count,
+      themes: themesBySession.get(s.id) ?? [],
+      debriefRating: db?.rating ?? null,
+      debriefHomeRunCount: db?.homeRuns ?? 0,
+      debriefFlatCount: db?.flats ?? 0,
+      debriefFollowups: db?.followups ?? '',
+    }
+  })
 
   // Leaderboard
   const countByStudent = new Map<string, number>()

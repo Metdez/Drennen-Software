@@ -21,5 +21,11 @@ export interface ClassInsights {
     reason: string
   }>
   themeEvolution: ThemeEvolutionEntry[]
+  sessionEffectiveness?: Array<{
+    speakerName: string
+    rating: number
+    homeRunCount: number
+    flatCount: number
+  }>
   generatedAt: string
 }

@@ -9,6 +9,8 @@ import { getRecentThemeTitles } from '@/lib/db/themes'
 import { generateClassInsights } from '@/lib/ai/classInsights'
 import { generateAndCacheSessionAnalysis } from '@/lib/ai/generateSessionAnalysis'
 import { generateStudentProfiles } from '@/lib/ai/studentProfile'
+import { classifyAndStoreTiers } from '@/lib/ai/tierClassifier'
+import { getActiveSemester } from '@/lib/db/semesters'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,11 +42,15 @@ export async function POST(request: Request) {
 
     const { output } = await generateQuestionSheet(speakerName.trim(), text)
 
+    const activeSemester = await getActiveSemester(user.id)
+    const semesterId = activeSemester?.id ?? null
+
     const session = await insertSession({
       userId: user.id,
       speakerName: speakerName.trim(),
       output,
       fileCount,
+      semesterId,
     })
 
     // Persist per-student and per-theme data for analytics queries (non-blocking failures)
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
     }
 
     // Fire-and-forget: regenerate class insights after each session (non-blocking)
-    generateClassInsights(user.id).catch(e =>
+    generateClassInsights(user.id, semesterId ?? undefined).catch(e =>
       console.error('[/api/process] generateClassInsights failed (non-fatal):', e)
     )
 
@@ -92,6 +98,11 @@ export async function POST(request: Request) {
     const affectedStudents = [...new Set(submissions.map(s => s.studentName))]
     generateStudentProfiles(user.id, affectedStudents).catch(e =>
       console.error('[/api/process] generateStudentProfiles failed (non-fatal):', e)
+    )
+
+    // Fire-and-forget: classify question quality tiers via Gemini
+    classifyAndStoreTiers(session.id, session.speakerName, session.output).catch(e =>
+      console.error('[/api/process] classifyAndStoreTiers failed (non-fatal):', e)
     )
 
     return NextResponse.json({

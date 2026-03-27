@@ -10,14 +10,16 @@ export interface ThemeFrequency {
  * Returns theme frequency aggregated across all sessions for a user,
  * sorted by count descending (then by most-recent occurrence for stability).
  */
-export async function getThemeFrequency(userId: string): Promise<ThemeFrequency[]> {
+export async function getThemeFrequency(userId: string, semesterId?: string): Promise<ThemeFrequency[]> {
   const supabase = createClient()
 
   // Join through sessions to filter by user_id (session_themes has no user_id column)
-  const { data, error } = await supabase
+  let query = supabase
     .from('session_themes')
-    .select('theme_title, created_at, sessions!inner(user_id)')
+    .select('theme_title, created_at, sessions!inner(user_id, semester_id)')
     .eq('sessions.user_id', userId)
+  if (semesterId) query = query.eq('sessions.semester_id', semesterId)
+  const { data, error } = await query
 
   if (error) throw new Error(`Failed to fetch theme frequency: ${error.message}`)
 
@@ -41,22 +43,40 @@ export async function getThemeFrequency(userId: string): Promise<ThemeFrequency[
 }
 
 /**
+ * Returns ordered theme titles for a single session.
+ */
+export async function getThemesBySessionId(sessionId: string): Promise<string[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('session_themes')
+    .select('theme_title')
+    .eq('session_id', sessionId)
+    .order('theme_number', { ascending: true })
+
+  if (error) throw new Error(`Failed to fetch themes for session: ${error.message}`)
+  return (data ?? []).map(t => (t as any).theme_title as string)
+}
+
+/**
  * Returns a flat list of theme titles from the N most-recent sessions
  * for a user, excluding the given session (used to detect overlap after save).
  */
 export async function getRecentThemeTitles(
   userId: string,
   excludeSessionId: string,
-  limit = 5
+  limit = 5,
+  semesterId?: string
 ): Promise<string[]> {
   const supabase = createAdminClient()
 
   // Fetch the N most-recent session IDs for this user (excluding current)
-  const { data: sessions, error: sessionsError } = await supabase
+  let sessQuery = supabase
     .from('sessions')
     .select('id')
     .eq('user_id', userId)
     .neq('id', excludeSessionId)
+  if (semesterId) sessQuery = sessQuery.eq('semester_id', semesterId)
+  const { data: sessions, error: sessionsError } = await sessQuery
     .order('created_at', { ascending: false })
     .limit(limit)
 

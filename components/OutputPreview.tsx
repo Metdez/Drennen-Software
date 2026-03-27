@@ -1,43 +1,6 @@
-interface Question {
-  label: string
-  text: string
-  attribution: string
-}
+import { parseSections } from '@/lib/parse/parseQuestions'
 
-interface Section {
-  title: string
-  primary: Question | null
-  backup: Question | null
-}
-
-function parseOutput(output: string): Section[] {
-  const sections: Section[] = []
-  let current: Section | null = null
-
-  for (const raw of output.split('\n')) {
-    const line = raw.trim()
-    if (!line || line === '**Top Student Questions**') continue
-
-    const titleMatch = line.match(/^\*{3}(\d+\.\s+.+?)\*{3}$/)
-    if (titleMatch) {
-      if (current) sections.push(current)
-      current = { title: titleMatch[1], primary: null, backup: null }
-      continue
-    }
-
-    const qMatch = line.match(/^\*\*(Primary|Backup):\*\*\s+(.*?)\s*\*\(([^)]+)\)\*\s*$/)
-    if (qMatch && current) {
-      const q: Question = { label: qMatch[1], text: qMatch[2], attribution: qMatch[3] }
-      if (q.label === 'Primary') current.primary = q
-      else current.backup = q
-    }
-  }
-
-  if (current) sections.push(current)
-  return sections
-}
-
-function QuestionRow({ q }: { q: Question }) {
+function QuestionRow({ q }: { q: { label: string; text: string; attribution: string } }) {
   return (
     <p className="leading-relaxed mb-2 text-sm font-[family-name:var(--font-dm-sans)] text-[var(--text-secondary)]">
       <span className="font-semibold text-[var(--text-primary)]">{q.label}:</span>{' '}
@@ -48,7 +11,7 @@ function QuestionRow({ q }: { q: Question }) {
 }
 
 export function OutputPreview({ output }: { output: string }) {
-  const sections = parseOutput(output)
+  const sections = parseSections(output)
 
   return (
     <div className="rounded-2xl border border-[var(--border-accent)] overflow-hidden" style={{ background: 'var(--surface)' }}>

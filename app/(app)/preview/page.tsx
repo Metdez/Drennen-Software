@@ -6,12 +6,14 @@ import Link from 'next/link'
 import { OutputPreview } from '@/components/OutputPreview'
 import { DownloadButtons } from '@/components/DownloadButtons'
 import { ShareButton } from '@/components/ShareButton'
+import { GenerateBriefButton } from '@/components/GenerateBriefButton'
 import { AnalysisPanelLeft } from '@/components/AnalysisPanelLeft'
 import { AnalysisPanelRight } from '@/components/AnalysisPanelRight'
+import { DebriefPanel } from '@/components/DebriefPanel'
 import { ROUTES } from '@/lib/constants'
-import type { Session, SessionAnalysis } from '@/types'
+import type { Session, SessionAnalysis, SessionDebrief } from '@/types'
 
-type Tab = 'questions' | 'analysis' | 'insights'
+type Tab = 'questions' | 'analysis' | 'insights' | 'debrief'
 
 function PreviewContent() {
   const searchParams = useSearchParams()
@@ -26,6 +28,10 @@ function PreviewContent() {
   const [analysisLoading, setAnalysisLoading] = useState(true)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('questions')
+  const [debrief, setDebrief] = useState<SessionDebrief | null>(null)
+  const [debriefLoading, setDebriefLoading] = useState(false)
+  const [debriefFetched, setDebriefFetched] = useState(false)
+  const [studentNames, setStudentNames] = useState<string[]>([])
 
   const fetchAnalysis = useCallback(async () => {
     if (!sessionId) return
@@ -79,6 +85,30 @@ function PreviewContent() {
       setAnalysisLoading(false)
     }
   }, [sessionId])
+
+  const fetchDebrief = useCallback(async () => {
+    if (!sessionId || debriefFetched) return
+    setDebriefLoading(true)
+    try {
+      const res = await fetch(ROUTES.API_SESSION_DEBRIEF(sessionId))
+      if (!res.ok) return
+      const data = await res.json()
+      setDebrief(data.debrief)
+      setStudentNames(data.studentNames ?? [])
+      setDebriefFetched(true)
+    } catch {
+      // non-fatal
+    } finally {
+      setDebriefLoading(false)
+    }
+  }, [sessionId, debriefFetched])
+
+  // Lazy-load debrief data when the tab is first selected
+  useEffect(() => {
+    if (activeTab === 'debrief' && !debriefFetched) {
+      fetchDebrief()
+    }
+  }, [activeTab, debriefFetched, fetchDebrief])
 
   useEffect(() => {
     if (!sessionId) {
@@ -151,6 +181,7 @@ function PreviewContent() {
     { key: 'questions', label: 'Questions' },
     { key: 'analysis', label: 'Analysis' },
     { key: 'insights', label: 'Insights' },
+    { key: 'debrief', label: 'Debrief' },
   ]
 
   return (
@@ -181,6 +212,20 @@ function PreviewContent() {
             </p>
           </div>
           <div className="shrink-0 pt-1 flex items-center gap-3">
+            <button
+              onClick={() => setActiveTab('debrief')}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold font-[family-name:var(--font-dm-sans)] border transition-colors duration-200 ${
+                activeTab === 'debrief'
+                  ? 'bg-[#542785] text-white border-[#542785]'
+                  : 'text-[#542785] border-[#542785] hover:bg-[rgba(84,39,133,0.08)]'
+              }`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+              </svg>
+              Debrief
+            </button>
+            <GenerateBriefButton sessionId={sessionId} speakerName={session.speakerName} />
             <ShareButton sessionId={sessionId} />
             <DownloadButtons sessionId={sessionId} speakerName={session.speakerName} />
           </div>
@@ -259,6 +304,25 @@ function PreviewContent() {
             error={analysisError}
             onRetry={fetchAnalysis}
           />
+        </div>
+      )}
+
+      {activeTab === 'debrief' && (
+        <div className="animate-fade-up">
+          {debriefLoading && (
+            <div className="flex items-center justify-center py-20 text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-sans)]">
+              Loading debrief...
+            </div>
+          )}
+          {!debriefLoading && output && session && (
+            <DebriefPanel
+              sessionId={sessionId}
+              sessionOutput={output}
+              speakerName={session.speakerName}
+              studentNames={studentNames}
+              initialDebrief={debrief}
+            />
+          )}
         </div>
       )}
     </div>

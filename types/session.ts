@@ -5,6 +5,7 @@ export interface SessionRow {
   created_at: string
   output: string
   file_count: number
+  semester_id: string | null
 }
 
 export interface Session {
@@ -14,6 +15,7 @@ export interface Session {
   createdAt: string
   output: string
   fileCount: number
+  semesterId: string | null
 }
 
 export interface CreateSessionInput {
@@ -21,6 +23,7 @@ export interface CreateSessionInput {
   speakerName: string
   output: string
   fileCount: number
+  semesterId?: string | null
 }
 
 export interface SessionSummary {
@@ -28,6 +31,9 @@ export interface SessionSummary {
   speakerName: string
   createdAt: string
   fileCount: number
+  semesterId: string | null
+  debriefStatus: import('./debrief').DebriefStatus | null
+  debriefRating: number | null
 }
 
 export interface SessionShareRow {
