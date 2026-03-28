@@ -11,9 +11,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { priceId } = await request.json()
+  const body = await request.json()
+  const plan: string | undefined = body.plan
+  const rawPriceId: string | undefined = body.priceId
+
+  const priceId = plan
+    ? plan === 'annual'
+      ? process.env.STRIPE_PRICE_ANNUAL
+      : process.env.STRIPE_PRICE_MONTHLY
+    : rawPriceId
+
   if (!priceId) {
-    return NextResponse.json({ error: 'Missing priceId' }, { status: 400 })
+    return NextResponse.json({ error: 'Missing plan or priceId' }, { status: 400 })
   }
 
   const profile = await getSubscriptionProfile(user.id)

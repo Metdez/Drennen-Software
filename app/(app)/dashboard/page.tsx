@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation'
 import { SpeakerInput } from '@/components/SpeakerInput'
 import { DropZone } from '@/components/DropZone'
 import { ProcessingView } from '@/components/ProcessingView'
+import { PaywallModal } from '@/components/PaywallModal'
 import { ROUTES } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTempZip } from '@/lib/supabase/storage'
 import { useSemesterContext } from '@/components/SemesterContext'
+import { useSubscription } from '@/components/SubscriptionContext'
 
 export default function DashboardPage() {
   const router = useRouter()
   const { activeSemester } = useSemesterContext()
+  const { canGenerate, reason, isLoading: subscriptionLoading } = useSubscription()
   const [speakerName, setSpeakerName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -79,6 +82,10 @@ export default function DashboardPage() {
     setDone(false)
     setError(null)
   }, [])
+
+  if (!subscriptionLoading && !canGenerate) {
+    return <PaywallModal reason={reason} />
+  }
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-8">
