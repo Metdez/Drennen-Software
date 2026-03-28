@@ -11,8 +11,20 @@ ALTER TABLE public.profiles
 
 -- Backfill existing users: give them 1 free session
 UPDATE public.profiles
-SET free_sessions_remaining = 1
-WHERE stripe_customer_id IS NULL;
+SET free_sessions_remaining = 1;
+
+-- Atomic decrement function for free sessions (avoids TOCTOU race condition)
+CREATE OR REPLACE FUNCTION public.decrement_free_session(user_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.profiles
+  SET free_sessions_remaining = free_sessions_remaining - 1
+  WHERE id = user_id AND free_sessions_remaining > 0;
+END;
+$$;
 
 -- Update trigger so new signups get a 3-day trial instead
 CREATE OR REPLACE FUNCTION public.handle_new_user()

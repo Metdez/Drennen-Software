@@ -78,7 +78,19 @@ export async function checkSubscriptionAccess(userId: string): Promise<Subscript
     }
   }
 
-  // 5. No subscription at all
+  // 5. Legacy user whose free session was used up
+  if (freeSessionsRemaining === 0 && !trialEndsAt) {
+    return {
+      canGenerate: false,
+      reason: 'free_used',
+      trialEndsAt,
+      trialDaysRemaining: null,
+      subscriptionStatus,
+      freeSessionsRemaining,
+    }
+  }
+
+  // 6. No subscription at all
   return {
     canGenerate: false,
     reason: 'no_subscription',
@@ -92,19 +104,9 @@ export async function checkSubscriptionAccess(userId: string): Promise<Subscript
 export async function decrementFreeSession(userId: string): Promise<void> {
   const adminClient = createAdminClient()
 
-  // Read current value, then decrement (minimum 0)
-  const { data } = await adminClient
-    .from('profiles')
-    .select('free_sessions_remaining')
-    .eq('id', userId)
-    .single()
-
-  if (data && data.free_sessions_remaining > 0) {
-    await adminClient
-      .from('profiles')
-      .update({ free_sessions_remaining: data.free_sessions_remaining - 1 })
-      .eq('id', userId)
-  }
+  // Atomic decrement using RPC to avoid TOCTOU race condition
+  const { error } = await adminClient.rpc('decrement_free_session', { user_id: userId })
+  if (error) throw new Error(`Failed to decrement free session: ${error.message}`)
 }
 
 export async function getSubscriptionProfile(userId: string): Promise<SubscriptionProfile | null> {
