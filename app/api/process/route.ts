@@ -11,6 +11,7 @@ import { generateAndCacheSessionAnalysis } from '@/lib/ai/generateSessionAnalysi
 import { generateStudentProfiles } from '@/lib/ai/studentProfile'
 import { classifyAndStoreTiers } from '@/lib/ai/tierClassifier'
 import { getActiveSemester } from '@/lib/db/semesters'
+import { checkSubscriptionAccess, decrementFreeSession } from '@/lib/db/subscription'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,14 @@ export async function POST(request: Request) {
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const access = await checkSubscriptionAccess(user.id)
+    if (!access.canGenerate) {
+      return NextResponse.json(
+        { error: 'subscription_required', reason: access.reason },
+        { status: 403 }
+      )
     }
 
     const body = await request.json() as { speakerName?: string; storagePath?: string }
@@ -52,6 +61,10 @@ export async function POST(request: Request) {
       fileCount,
       semesterId,
     })
+
+    if (access.reason === 'free_session') {
+      await decrementFreeSession(user.id)
+    }
 
     // Persist per-student and per-theme data for analytics queries (non-blocking failures)
     const parsedThemes = parseThemesFromOutput(output)
