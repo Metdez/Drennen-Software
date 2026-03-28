@@ -26,6 +26,7 @@
     "react": "^18.x",
     "react-dom": "^18.x",
     "recharts": "^3.8.0",
+    "stripe": "^21.0.1",
     "unzipper": "^0.12.x"
   },
   "devDependencies": {
