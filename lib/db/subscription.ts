@@ -25,8 +25,8 @@ export async function checkSubscriptionAccess(userId: string): Promise<Subscript
   const trialEndsAt = data.trial_ends_at ? String(data.trial_ends_at) : null
   const freeSessionsRemaining = data.free_sessions_remaining ?? 0
 
-  // 1. Active subscription
-  if (subscriptionStatus === 'active') {
+  // 1. Active subscription (includes Stripe-managed trial via 'trialing')
+  if (subscriptionStatus === 'active' || subscriptionStatus === 'trialing') {
     return {
       canGenerate: true,
       reason: 'subscribed',

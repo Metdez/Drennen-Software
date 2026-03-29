@@ -6,12 +6,10 @@ import { PaywallModal } from '@/components/PaywallModal'
 import { BRAND, ROUTES } from '@/lib/constants'
 
 interface Invoice {
-  id: string
-  date: number
-  amount_paid: number
-  currency: string
-  status: string
-  hosted_invoice_url: string | null
+  date: string
+  amount: number
+  status: string | null
+  url: string | null
 }
 
 export default function AccountPage() {
@@ -101,15 +99,15 @@ export default function AccountPage() {
   const isSubscribed =
     subscriptionStatus === 'active' || subscriptionStatus === 'trialing'
 
-  function formatCurrency(amount: number, currency: string) {
+  function formatCurrency(amount: number) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || 'usd',
-    }).format(amount / 100)
+      currency: 'usd',
+    }).format(amount)
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+  function formatDate(isoDate: string) {
+    return new Date(isoDate).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -221,7 +219,7 @@ export default function AccountPage() {
           >
             {invoices.map((invoice, i) => (
               <div
-                key={invoice.id}
+                key={i}
                 className="flex items-center justify-between px-4 py-3 text-sm font-[family-name:var(--font-dm-sans)]"
                 style={{
                   borderBottom:
@@ -233,24 +231,26 @@ export default function AccountPage() {
                     {formatDate(invoice.date)}
                   </span>
                   <span style={{ color: 'var(--text-primary)' }}>
-                    {formatCurrency(invoice.amount_paid, invoice.currency)}
+                    {formatCurrency(invoice.amount)}
                   </span>
-                  <span
-                    className="text-xs rounded-full px-2 py-0.5"
-                    style={{
-                      color: invoice.status === 'paid' ? BRAND.GREEN : 'var(--text-muted)',
-                      background:
-                        invoice.status === 'paid'
-                          ? `${BRAND.GREEN}15`
-                          : 'var(--surface-elevated)',
-                    }}
-                  >
-                    {invoice.status}
-                  </span>
+                  {invoice.status && (
+                    <span
+                      className="text-xs rounded-full px-2 py-0.5"
+                      style={{
+                        color: invoice.status === 'paid' ? BRAND.GREEN : 'var(--text-muted)',
+                        background:
+                          invoice.status === 'paid'
+                            ? `${BRAND.GREEN}15`
+                            : 'var(--surface-elevated)',
+                      }}
+                    >
+                      {invoice.status}
+                    </span>
+                  )}
                 </div>
-                {invoice.hosted_invoice_url && (
+                {invoice.url && (
                   <a
-                    href={invoice.hosted_invoice_url}
+                    href={invoice.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs hover:underline"

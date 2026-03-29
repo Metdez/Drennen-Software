@@ -71,6 +71,12 @@ export default function DashboardPage() {
       }
 
       if (!res.ok) {
+        if (data.error === 'subscription_required') {
+          // Subscription expired between page load and submit — refresh and show paywall
+          refreshSubscription()
+          setError('Your subscription is required to generate sessions. Please subscribe to continue.')
+          return
+        }
         // ProcessingView watches `error` and handles its own fade-out before calling onExited
         setError((data.error as string) || 'Failed to process files')
         return
