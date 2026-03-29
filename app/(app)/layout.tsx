@@ -1,6 +1,7 @@
 import { SemesterProvider } from '@/components/SemesterContext'
 import { SubscriptionProvider } from '@/components/SubscriptionContext'
 import { NavHeader } from '@/components/NavHeader'
+import { TrialBanner } from '@/components/TrialBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SemesterProvider>
           <NavHeader />
           <main className="max-w-4xl mx-auto px-6 py-10">
+            <TrialBanner />
             {children}
           </main>
         </SemesterProvider>

@@ -31,6 +31,10 @@ GOOGLE_API_KEY=        # (or GEMINI_API_KEY) — used by the analytics SQL agent
 GEMINI_API_KEY=        # used by lib/ai/analysisAgent.ts for Analysis and Insights panel (theme clusters, tensions, suggestions, blind spots, sentiment)
 GEMINI_MODEL=          # defaults to gemini-3.1-flash-lite-preview
 DATABASE_URL=          # Postgres connection string — used by the analytics SQL agent
+STRIPE_SECRET_KEY=     # Stripe secret key for server-side API calls
+STRIPE_WEBHOOK_SECRET= # Stripe webhook signing secret
+STRIPE_PRICE_MONTHLY=  # Stripe Price ID for monthly subscription plan
+STRIPE_PRICE_ANNUAL=   # Stripe Price ID for annual subscription plan
 ```
 
 ## Architecture
@@ -62,6 +66,7 @@ app/
     roster/                    → all students list with participation rates
     roster/[studentName]/      → per-student submission history
     semesters/                 → semester management (create, archive, assign sessions)
+    account/                   → subscription & billing management
   api/
     auth/callback/             → Supabase PKCE callback
     process/                   → main ZIP → AI pipeline (POST)
@@ -78,6 +83,11 @@ app/
     semesters/[id]/            → update semester (PATCH)
     semesters/assign/          → assign sessions to a semester (POST)
     semesters/compare/         → cohort comparison across semesters (GET)
+    subscription/              → current user's subscription access status (GET)
+    stripe/checkout/           → create Stripe Checkout session (POST)
+    stripe/webhook/            → handle Stripe webhook events (POST)
+    stripe/portal/             → create Stripe Billing Portal session (POST)
+    stripe/invoices/           → list user's Stripe invoices (GET)
 ```
 
 ### Library layout
@@ -103,6 +113,8 @@ app/
 - `lib/ai/sqlAgent.ts` — Gemini-powered NL→SQL→answer agent for analytics queries; calls the `execute_analytics_query` Supabase RPC
 - `lib/export/` — `pdf.ts` and `docx.ts` for download generation
 - `lib/utils/transforms.ts` — `rowToSession` / `rowToSessionSummary` (snake_case DB rows → camelCase types)
+- `lib/stripe/index.ts` — Stripe SDK singleton using `STRIPE_SECRET_KEY`
+- `lib/db/subscription.ts` — `checkSubscriptionAccess()`, `decrementFreeSession()`, `getSubscriptionProfile()`, `updateStripeCustomerId()`, `updateSubscriptionFromWebhook()`
 - `lib/constants.ts` — `ROUTES`, `BRAND` colors, `APP_NAME`, `AI_CONFIG`, accepted file types
 
 ### Database
@@ -118,6 +130,8 @@ Three core tables with RLS. Sessions are **immutable** — no UPDATE or DELETE p
 | `session_debriefs` | One row per session — post-session debrief: rating, question feedback, observations, AI summary |
 | `semesters` | One row per semester per professor — name, start/end dates, status (`active`/`archived`) |
 | `cohort_comparisons` | Cross-semester comparison data — session counts, student counts, avg submissions, theme persistence |
+
+The `profiles` table also stores Stripe subscription fields: `stripe_customer_id`, `subscription_status`, `stripe_subscription_id`, `subscription_price_id`, `subscription_current_period_end`, `trial_ends_at`, `free_sessions_remaining`. The `decrement_free_session` SQL function atomically decrements free sessions.
 
 The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL agent to run read-only SELECT queries bypassing RLS. It validates queries server-side before executing them.
 
@@ -140,4 +154,5 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 - PDF/DOCX parse failures return empty string — processing continues for other files in the ZIP
 - `sessionStorage` cache keys on `/preview`: `session_${sessionId}` (AI output), `overlap_${sessionId}` (overlapping themes JSON array), `analysis_${sessionId}` (per-session Gemini analysis JSON)
 - `/preview` has four tabs: `questions` (markdown output), `analysis` (AnalysisPanelLeft — theme clusters + tensions), `insights` (AnalysisPanelRight — suggestions, blind spots, sentiment), `debrief` (DebriefPanel — post-session capture with auto-save)
+- Subscription is managed via Stripe. Session generation (`/api/process`) is gated by `checkSubscriptionAccess()`. Existing users get 1 free session; new users get a 3-day trial. The `SubscriptionContext` provides client-side access to subscription state. Stripe webhooks are the source of truth for subscription status changes.
 - Semesters are optional groupings for sessions. Each professor can have one `active` semester at a time; others are `archived`. New sessions created via `/api/process` are automatically assigned to the active semester if one exists. Sessions with `semester_id = NULL` are unassigned and can be bulk-assigned from `/semesters`.

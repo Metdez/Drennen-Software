@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { SpeakerInput } from '@/components/SpeakerInput'
 import { DropZone } from '@/components/DropZone'
 import { ProcessingView } from '@/components/ProcessingView'
@@ -14,8 +14,10 @@ import { useSubscription } from '@/components/SubscriptionContext'
 
 export default function DashboardPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { activeSemester } = useSemesterContext()
-  const { canGenerate, reason, isLoading: subscriptionLoading } = useSubscription()
+  const { canGenerate, reason, isLoading: subscriptionLoading, refreshSubscription } = useSubscription()
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false)
   const [speakerName, setSpeakerName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -23,6 +25,21 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   // Holds the session ID from API response until the completion animation fires
   const pendingSessionIdRef = useRef<string | null>(null)
+
+  // Handle post-checkout redirect
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'success') {
+      setCheckoutSuccess(true)
+      refreshSubscription()
+      // Clean up URL
+      const url = new URL(window.location.href)
+      url.searchParams.delete('checkout')
+      router.replace(url.pathname + url.search, { scroll: false })
+      // Auto-dismiss after 5 seconds
+      const timer = setTimeout(() => setCheckoutSuccess(false), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, refreshSubscription, router])
 
   const handleGenerate = async () => {
     if (!speakerName || !file) return
@@ -99,6 +116,20 @@ export default function DashboardPage() {
         />
       ) : (
         <>
+          {/* Checkout success banner */}
+          {checkoutSuccess && (
+            <div
+              className="animate-fade-up p-4 rounded-lg text-sm font-[family-name:var(--font-dm-sans)]"
+              style={{
+                background: 'rgba(15, 107, 55, 0.12)',
+                border: '1px solid rgba(15, 107, 55, 0.25)',
+                color: '#4ade80',
+              }}
+            >
+              Subscription activated! You&apos;re all set to generate sessions.
+            </div>
+          )}
+
           {/* Hero header */}
           <div className="animate-fade-up">
             <h1 className="font-[family-name:var(--font-playfair)] text-4xl font-bold text-[var(--text-primary)] mb-2">
