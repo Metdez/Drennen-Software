@@ -113,7 +113,7 @@ export default function PortfolioStudentDetailPage() {
                       <span key={tag} className="text-xs rounded-full px-2.5 py-0.5 font-[family-name:var(--font-dm-sans)]" style={{ background: 'var(--surface-hover)', color: 'var(--text-secondary)' }}>{tag}</span>
                     ))}
                   </div>
-                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.interests.narrative}</p>
+                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.interests.observations.join('. ')}</p>
                 </div>
               )}
               {profile.careerDirection && (
@@ -124,7 +124,7 @@ export default function PortfolioStudentDetailPage() {
                       <span key={field} className="text-xs rounded-full px-2.5 py-0.5 font-[family-name:var(--font-dm-sans)]" style={{ background: 'rgba(84,39,133,0.12)', color: '#542785' }}>{field}</span>
                     ))}
                   </div>
-                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.careerDirection.narrative}</p>
+                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.careerDirection.observations.join('. ')}</p>
                 </div>
               )}
               {profile.growthTrajectory && (
@@ -139,7 +139,7 @@ export default function PortfolioStudentDetailPage() {
                   >
                     {profile.growthTrajectory.direction}
                   </span>
-                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.growthTrajectory.narrative}</p>
+                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.growthTrajectory.observations.join('. ')}</p>
                 </div>
               )}
               {profile.personality && (
@@ -150,7 +150,7 @@ export default function PortfolioStudentDetailPage() {
                       <span key={trait} className="text-xs rounded-full px-2.5 py-0.5 font-[family-name:var(--font-dm-sans)]" style={{ background: 'rgba(243,111,33,0.12)', color: '#f36f21' }}>{trait}</span>
                     ))}
                   </div>
-                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.personality.narrative}</p>
+                  <p className="text-sm font-[family-name:var(--font-dm-sans)]" style={{ color: 'var(--text-secondary)' }}>{profile.personality.observations.join('. ')}</p>
                 </div>
               )}
             </>

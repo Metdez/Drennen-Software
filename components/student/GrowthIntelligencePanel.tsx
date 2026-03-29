@@ -122,7 +122,7 @@ export function GrowthIntelligencePanel({ growth }: Props) {
               <span className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] font-bold">Evidence</span>
               {growth.thinkingArc.evidenceHighlights.map((evidence, i) => (
                 <div key={i} className="text-xs text-[var(--text-secondary)] italic border-l-2 border-[#542785]/40 pl-3">
-                  "{evidence}"
+                  &ldquo;{evidence}&rdquo;
                 </div>
               ))}
             </div>

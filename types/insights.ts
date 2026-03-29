@@ -30,5 +30,31 @@ export interface ClassInsights {
     homeRunCount: number
     flatCount: number
   }>
+  speakerRecommendations?: SpeakerRecommendations
+  generatedAt: string
+}
+
+export interface SpeakerPatternAnalysis {
+  bestEngagementTypes: string
+  topResonatingTopics: Array<{
+    topic: string
+    avgRating: number
+    homeRunPct: number
+  }>
+  successPatterns: string[]
+  cautionPatterns: string[]
+  dataConfidence: 'low' | 'moderate' | 'high'
+  insufficientDataNote: string | null
+}
+
+export interface SpeakerRecommendations {
+  recommendations: Array<{
+    topicArea: string
+    whyRecommended: string
+    studentInterestSignals: string[]
+    complementsContrasts: string
+    idealSpeakerProfile: string
+  }>
+  patternAnalysis: SpeakerPatternAnalysis
   generatedAt: string
 }

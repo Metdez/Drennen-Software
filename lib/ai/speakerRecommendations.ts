@@ -16,8 +16,6 @@ function buildPrompt(input: InsightsInput): string {
       debriefRating: s.debriefRating,
       homeRunQuestions: s.debriefHomeRunCount,
       flatQuestions: s.debriefFlatCount,
-      speakerFeedback: s.debriefSpeakerFeedback || undefined,
-      surpriseMoments: s.debriefSurpriseMoments || undefined,
       followupTopics: s.debriefFollowups || undefined,
     } : {}),
     ...(s.studentReflectionThemes.length > 0 ? {
