@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useSemesterContext } from '@/components/SemesterContext'
+import { useSemesterContext } from '@/components/semester/SemesterContext'
 import { ROUTES } from '@/lib/constants'
 import type { CohortComparisonData } from '@/types/comparison'
 

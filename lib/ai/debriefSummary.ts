@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { SessionDebrief, QuestionFeedback } from '@/types'
 
 function groupByStatus(feedback: QuestionFeedback[]): Record<string, string[]> {
@@ -44,14 +44,10 @@ export async function generateDebriefSummary(
   speakerName: string,
   debrief: SessionDebrief,
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
-
-  const ai = new GoogleGenAI({ apiKey })
-  const model = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview'
+  const ai = getGeminiClient()
 
   const response = await ai.models.generateContent({
-    model,
+    model: getGeminiModel(),
     contents: buildPrompt(speakerName, debrief),
     config: {
       systemInstruction:

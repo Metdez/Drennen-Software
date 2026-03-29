@@ -86,6 +86,8 @@ export interface StudentGrowthHighlight {
   studentName: string
   narrative: string
   sessionsParticipated: number
+  growthSignal?: string
+  thinkingProgression?: string
 }
 
 export interface StudentGrowthSection {

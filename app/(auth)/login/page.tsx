@@ -1,6 +1,14 @@
-import { AuthForm } from '@/components/AuthForm'
+'use client'
 
-export default function LoginPage() {
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { AuthForm } from '@/components/layout/AuthForm'
+
+function LoginContent() {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const searchParams = useSearchParams()
+  const callbackError = searchParams.get('error')
+
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
       {/* LEFT PANEL — hidden on mobile */}
@@ -52,13 +60,34 @@ export default function LoginPage() {
             className="p-8 rounded-2xl border border-[var(--border-accent)]"
             style={{ background: 'var(--surface)' }}
           >
-            <h2 className="font-[family-name:var(--font-playfair)] text-xl font-semibold mb-6 text-[var(--text-primary)]">
-              Welcome back
+            <h2 className="font-[family-name:var(--font-playfair)] text-xl font-semibold mb-1 text-[var(--text-primary)]">
+              {mode === 'signin' ? 'Welcome back' : 'Create your account'}
             </h2>
-            <AuthForm />
+            {mode === 'signup' && (
+              <p className="text-sm text-[var(--text-secondary)] mb-5 font-[family-name:var(--font-dm-sans)]">
+                Start with a 3-day free trial. No credit card required.
+              </p>
+            )}
+            {mode === 'signin' && <div className="mb-5" />}
+
+            {callbackError && (
+              <div className="mb-4 p-3 rounded-lg bg-[rgba(220,38,38,0.1)] border border-[rgba(220,38,38,0.25)] text-red-400 text-sm font-[family-name:var(--font-dm-sans)]">
+                Authentication failed. Please try again.
+              </div>
+            )}
+
+            <AuthForm mode={mode} onModeChange={setMode} />
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }

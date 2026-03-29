@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { SessionsTable } from '@/components/SessionsTable'
-import { useSemesterContext } from '@/components/SemesterContext'
+import { SessionsTable } from '@/components/session/SessionsTable'
+import { useSemesterContext } from '@/components/semester/SemesterContext'
 import { ROUTES } from '@/lib/constants'
 import type { SessionSummary } from '@/types'
 

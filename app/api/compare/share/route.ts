@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
-import { enableComparisonShare, revokeComparisonShare } from '@/lib/db/comparisons'
+import { enableComparisonShare, revokeComparisonShare } from '@/lib/db/savedComparisons'
 
 export const dynamic = 'force-dynamic'
 

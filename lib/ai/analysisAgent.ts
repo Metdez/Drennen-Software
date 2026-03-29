@@ -1,14 +1,5 @@
-import { GoogleGenAI } from '@google/genai'
+import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { SessionAnalysis, ThemeAnalysis, CrossSessionThemeAnalysis } from '@/types'
-
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
-  return {
-    ai: new GoogleGenAI({ apiKey }),
-    model: process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview',
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Session-level analysis
@@ -89,7 +80,8 @@ export async function runSessionAnalysis(
   sessionOutput: string,
   submissions: Array<{ student_name: string; submission_text: string }>
 ): Promise<SessionAnalysis> {
-  const { ai, model } = getGeminiClient()
+  const ai = getGeminiClient()
+  const model = getGeminiModel()
 
   const response = await ai.models.generateContent({
     model,
@@ -159,7 +151,8 @@ export async function runThemeAnalysis(
   speakerName: string,
   questions: Array<{ text: string; student_name: string }>
 ): Promise<ThemeAnalysis> {
-  const { ai, model } = getGeminiClient()
+  const ai = getGeminiClient()
+  const model = getGeminiModel()
 
   const response = await ai.models.generateContent({
     model,
@@ -231,7 +224,8 @@ export async function runCrossSessionThemeAnalysis(
   themeName: string,
   questions: Array<{ text: string; student_name: string; session_id: string; speaker_name: string }>
 ): Promise<CrossSessionThemeAnalysis> {
-  const { ai, model } = getGeminiClient()
+  const ai = getGeminiClient()
+  const model = getGeminiModel()
 
   const response = await ai.models.generateContent({
     model,

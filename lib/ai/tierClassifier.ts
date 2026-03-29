@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { TierData } from '@/types'
 import { upsertTierData } from '@/lib/db/tierData'
 
@@ -46,14 +46,10 @@ export async function classifyQuestionTiers(
   speakerName: string,
   output: string
 ): Promise<TierData> {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
-
-  const ai = new GoogleGenAI({ apiKey })
-  const model = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview'
+  const ai = getGeminiClient()
 
   const response = await ai.models.generateContent({
-    model,
+    model: getGeminiModel(),
     contents: buildPrompt(speakerName, output),
     config: {
       responseMimeType: 'application/json',

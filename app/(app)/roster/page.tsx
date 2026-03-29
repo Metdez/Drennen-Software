@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { RosterTable } from '@/components/RosterTable'
-import { ClearDataButton } from '@/components/ClearDataButton'
-import { useSemesterContext } from '@/components/SemesterContext'
+import { RosterTable } from '@/components/student/RosterTable'
+import { ClearDataButton } from '@/components/layout/ClearDataButton'
+import { useSemesterContext } from '@/components/semester/SemesterContext'
 import type { StudentSummary } from '@/types'
 
 export default function RosterPage() {

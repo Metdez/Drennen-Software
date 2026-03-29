@@ -3,17 +3,21 @@
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { OutputPreview } from '@/components/OutputPreview'
-import { DownloadButtons } from '@/components/DownloadButtons'
-import { ShareButton } from '@/components/ShareButton'
-import { GenerateBriefButton } from '@/components/GenerateBriefButton'
-import { AnalysisPanelLeft } from '@/components/AnalysisPanelLeft'
-import { AnalysisPanelRight } from '@/components/AnalysisPanelRight'
-import { DebriefPanel } from '@/components/DebriefPanel'
+import { OutputPreview } from '@/components/session/OutputPreview'
+import { DownloadButtons } from '@/components/session/DownloadButtons'
+import { ShareButton } from '@/components/session/ShareButton'
+import { GeneratePortalButton } from '@/components/speaker/GeneratePortalButton'
+import { AnalysisPanelLeft } from '@/components/analytics/AnalysisPanelLeft'
+import { AnalysisPanelRight } from '@/components/analytics/AnalysisPanelRight'
+import { DebriefPanel } from '@/components/debrief/DebriefPanel'
+import { SpeakerAnalysisUploadZone } from '@/components/speaker/SpeakerAnalysisUploadZone'
+import { SpeakerAnalysisPanel } from '@/components/speaker/SpeakerAnalysisPanel'
+import { StudentDebriefUploadZone } from '@/components/speaker/StudentDebriefUploadZone'
+import { StudentReflectionsPanel } from '@/components/student/StudentReflectionsPanel'
 import { ROUTES } from '@/lib/constants'
-import type { Session, SessionAnalysis, SessionDebrief } from '@/types'
+import type { Session, SessionAnalysis, SessionDebrief, StudentSpeakerAnalysis, StudentDebriefAnalysis } from '@/types'
 
-type Tab = 'questions' | 'analysis' | 'insights' | 'debrief'
+type Tab = 'questions' | 'analysis' | 'insights' | 'debrief' | 'speaker-analysis' | 'reflections'
 
 function PreviewContent() {
   const searchParams = useSearchParams()
@@ -32,6 +36,16 @@ function PreviewContent() {
   const [debriefLoading, setDebriefLoading] = useState(false)
   const [debriefFetched, setDebriefFetched] = useState(false)
   const [studentNames, setStudentNames] = useState<string[]>([])
+  const [speakerAnalysis, setSpeakerAnalysis] = useState<StudentSpeakerAnalysis | null>(null)
+  const [speakerAnalysisFileCount, setSpeakerAnalysisFileCount] = useState(0)
+  const [hasSpeakerAnalyses, setHasSpeakerAnalyses] = useState(false)
+  const [speakerAnalysisLoading, setSpeakerAnalysisLoading] = useState(false)
+  const [speakerAnalysisFetched, setSpeakerAnalysisFetched] = useState(false)
+  const [studentDebriefAnalysis, setStudentDebriefAnalysis] = useState<StudentDebriefAnalysis | null>(null)
+  const [studentDebriefFileCount, setStudentDebriefFileCount] = useState(0)
+  const [hasStudentDebriefs, setHasStudentDebriefs] = useState(false)
+  const [studentDebriefLoading, setStudentDebriefLoading] = useState(false)
+  const [studentDebriefFetched, setStudentDebriefFetched] = useState(false)
 
   const fetchAnalysis = useCallback(async () => {
     if (!sessionId) return
@@ -103,12 +117,62 @@ function PreviewContent() {
     }
   }, [sessionId, debriefFetched])
 
+  const fetchStudentDebriefs = useCallback(async () => {
+    if (!sessionId) return
+    setStudentDebriefLoading(true)
+    try {
+      const res = await fetch(ROUTES.API_SESSION_STUDENT_DEBRIEFS(sessionId))
+      if (!res.ok) return
+      const data = await res.json()
+      setHasStudentDebriefs(data.hasDebriefs ?? false)
+      setStudentDebriefAnalysis(data.analysis ?? null)
+      setStudentDebriefFileCount(data.fileCount ?? 0)
+      setStudentDebriefFetched(true)
+    } catch {
+      // non-fatal
+    } finally {
+      setStudentDebriefLoading(false)
+    }
+  }, [sessionId])
+
   // Lazy-load debrief data when the tab is first selected
   useEffect(() => {
     if (activeTab === 'debrief' && !debriefFetched) {
       fetchDebrief()
     }
   }, [activeTab, debriefFetched, fetchDebrief])
+
+  const fetchSpeakerAnalyses = useCallback(async () => {
+    if (!sessionId) return
+    setSpeakerAnalysisLoading(true)
+    try {
+      const res = await fetch(ROUTES.API_SESSION_SPEAKER_ANALYSES(sessionId))
+      if (!res.ok) return
+      const data = await res.json()
+      setHasSpeakerAnalyses(data.hasAnalyses ?? false)
+      setSpeakerAnalysis(data.analysis ?? null)
+      setSpeakerAnalysisFileCount(data.fileCount ?? 0)
+      setSpeakerAnalysisFetched(true)
+    } catch {
+      // non-fatal
+    } finally {
+      setSpeakerAnalysisLoading(false)
+    }
+  }, [sessionId])
+
+  // Lazy-load student debrief reflections when the tab is first selected
+  useEffect(() => {
+    if (activeTab === 'reflections' && !studentDebriefFetched) {
+      fetchStudentDebriefs()
+    }
+  }, [activeTab, studentDebriefFetched, fetchStudentDebriefs])
+
+  // Lazy-load speaker analyses when the tab is first selected
+  useEffect(() => {
+    if (activeTab === 'speaker-analysis' && !speakerAnalysisFetched) {
+      fetchSpeakerAnalyses()
+    }
+  }, [activeTab, speakerAnalysisFetched, fetchSpeakerAnalyses])
 
   useEffect(() => {
     if (!sessionId) {
@@ -182,14 +246,49 @@ function PreviewContent() {
     { key: 'analysis', label: 'Analysis' },
     { key: 'insights', label: 'Insights' },
     { key: 'debrief', label: 'Debrief' },
+    { key: 'reflections', label: 'Reflections' },
+    { key: 'speaker-analysis', label: 'Speaker Analysis' },
   ]
 
+  const tabIcons: Record<Tab, JSX.Element> = {
+    questions: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+      </svg>
+    ),
+    analysis: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
+      </svg>
+    ),
+    insights: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+      </svg>
+    ),
+    debrief: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+      </svg>
+    ),
+    reflections: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+    ),
+    'speaker-analysis': (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+      </svg>
+    ),
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-0">
       {/* Back link */}
       <Link
         href={ROUTES.DASHBOARD}
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[#f36f21] transition-colors duration-200 w-fit font-[family-name:var(--font-dm-sans)]"
+        className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[#f36f21] transition-colors duration-200 w-fit font-[family-name:var(--font-dm-sans)] mb-5"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -197,55 +296,72 @@ function PreviewContent() {
         New Session
       </Link>
 
-      {/* Header row: speaker name on left, download buttons on right */}
+      {/* Session Hero Card */}
       {session && (
-        <div className="animate-fade-up flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-[family-name:var(--font-playfair)] text-4xl font-bold text-[var(--text-primary)] mb-2">
-              {session.speakerName}
-            </h1>
-            <div className="h-0.5 w-16 bg-[#f36f21] mb-3" />
-            <p className="text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-sans)]">
-              {new Date(session.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-              <span className="mx-2 opacity-40">·</span>
-              {session.fileCount} {session.fileCount === 1 ? 'file' : 'files'} processed
-            </p>
-          </div>
-          <div className="shrink-0 pt-1 flex items-center gap-3">
-            <button
-              onClick={() => setActiveTab('debrief')}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold font-[family-name:var(--font-dm-sans)] border transition-colors duration-200 ${
-                activeTab === 'debrief'
-                  ? 'bg-[#542785] text-white border-[#542785]'
-                  : 'text-[#542785] border-[#542785] hover:bg-[rgba(84,39,133,0.08)]'
-              }`}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
-              </svg>
-              Debrief
-            </button>
-            <GenerateBriefButton sessionId={sessionId} speakerName={session.speakerName} />
-            <ShareButton sessionId={sessionId} />
-            <DownloadButtons sessionId={sessionId} speakerName={session.speakerName} />
+        <div className="animate-fade-up session-hero-card mb-6">
+          {/* Top row: Speaker Name + Meta on left, Actions on right */}
+          <div className="flex flex-col lg:flex-row lg:items-start gap-5">
+            {/* Left: Speaker info */}
+            <div className="flex-1 min-w-0">
+              <h1 className="font-[family-name:var(--font-playfair)] text-3xl lg:text-4xl font-bold text-[var(--text-primary)] mb-3 truncate">
+                {session.speakerName}
+              </h1>
+
+              {/* Meta pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="session-meta-pill">
+                  <svg className="h-3.5 w-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  </svg>
+                  {new Date(session.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </span>
+                <span className="session-meta-pill">
+                  <svg className="h-3.5 w-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                  {session.fileCount} {session.fileCount === 1 ? 'file' : 'files'}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: Action buttons — organized into groups */}
+            <div className="flex flex-col items-end gap-3 shrink-0">
+              {/* Primary actions: Downloads */}
+              <div className="flex items-center gap-2">
+                <DownloadButtons sessionId={sessionId} speakerName={session.speakerName} />
+              </div>
+
+              {/* Secondary actions: Debrief, Portal, Share */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveTab('debrief')}
+                  className="session-action-btn session-action-btn--purple"
+                  title="Post-session debrief"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+                  </svg>
+                  <span className="hidden sm:inline">Debrief</span>
+                </button>
+                <GeneratePortalButton sessionId={sessionId} speakerName={session.speakerName} />
+                <ShareButton sessionId={sessionId} />
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Tab bar */}
+      {/* Tab bar — pill-style */}
       {session && (
-        <div className="border-b border-[var(--border-accent)]">
-          <div className="flex">
+        <div className="session-tab-bar">
+          <div className="session-tab-list">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-5 py-2.5 text-sm font-medium font-[family-name:var(--font-dm-sans)] border-b-2 -mb-px transition-colors duration-200 ${
-                  activeTab === tab.key
-                    ? 'text-[#f36f21] border-[#f36f21]'
-                    : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
-                }`}
+                className={`session-tab ${activeTab === tab.key ? 'session-tab--active' : ''}`}
               >
+                {tabIcons[tab.key]}
                 {tab.label}
               </button>
             ))}
@@ -256,26 +372,6 @@ function PreviewContent() {
       {/* Tab panels */}
       {activeTab === 'questions' && (
         <div className="flex flex-col gap-6">
-          {overlappingThemes.length > 0 && (
-            <div
-              className="animate-fade-up rounded-xl px-5 py-4 border font-[family-name:var(--font-dm-sans)]"
-              style={{ borderColor: '#f36f21', background: 'rgba(243,111,33,0.07)' }}
-            >
-              <p className="text-sm font-semibold text-[#f36f21] mb-1">
-                ⚠ {overlappingThemes.length} {overlappingThemes.length === 1 ? 'theme' : 'themes'} appeared in recent sessions
-              </p>
-              <p className="text-sm text-[var(--text-secondary)]">
-                {overlappingThemes.map((t, i) => (
-                  <span key={t}>
-                    {i > 0 && ', '}
-                    &ldquo;{t}&rdquo;
-                  </span>
-                ))}
-                {' '}— consider freshening the angle before the next session.
-              </p>
-            </div>
-          )}
-
           {output && (
             <div className="animate-fade-up-delay-1">
               <OutputPreview output={output} />
@@ -322,6 +418,84 @@ function PreviewContent() {
               studentNames={studentNames}
               initialDebrief={debrief}
             />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'reflections' && (
+        <div className="animate-fade-up">
+          {studentDebriefLoading && (
+            <div className="flex items-center justify-center py-20 text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-sans)]">
+              Loading reflections...
+            </div>
+          )}
+          {!studentDebriefLoading && hasStudentDebriefs && studentDebriefAnalysis && (
+            <StudentReflectionsPanel
+              analysis={studentDebriefAnalysis}
+              fileCount={studentDebriefFileCount}
+            />
+          )}
+          {!studentDebriefLoading && !hasStudentDebriefs && (
+            <StudentDebriefUploadZone
+              sessionId={sessionId}
+              onUploadComplete={() => {
+                setStudentDebriefFetched(false)
+                fetchStudentDebriefs()
+              }}
+            />
+          )}
+          {!studentDebriefLoading && hasStudentDebriefs && !studentDebriefAnalysis && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-4 h-4 border-2 border-[#542785] border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
+                AI analysis is being generated. Check back in a moment.
+              </p>
+              <button
+                onClick={() => { setStudentDebriefFetched(false); fetchStudentDebriefs() }}
+                className="text-sm text-[#542785] hover:underline font-[family-name:var(--font-dm-sans)]"
+              >
+                Refresh
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'speaker-analysis' && (
+        <div className="animate-fade-up">
+          {speakerAnalysisLoading && (
+            <div className="flex items-center justify-center py-20 text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-sans)]">
+              Loading speaker analyses...
+            </div>
+          )}
+          {!speakerAnalysisLoading && hasSpeakerAnalyses && speakerAnalysis && (
+            <SpeakerAnalysisPanel
+              analysis={speakerAnalysis}
+              fileCount={speakerAnalysisFileCount}
+            />
+          )}
+          {!speakerAnalysisLoading && !hasSpeakerAnalyses && (
+            <SpeakerAnalysisUploadZone
+              sessionId={sessionId}
+              onUploadComplete={() => {
+                setSpeakerAnalysisFetched(false)
+                fetchSpeakerAnalyses()
+              }}
+            />
+          )}
+          {!speakerAnalysisLoading && hasSpeakerAnalyses && !speakerAnalysis && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-4 h-4 border-2 border-[#0f6b37] border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
+                AI analysis is being generated. Check back in a moment.
+              </p>
+              <button
+                onClick={() => { setSpeakerAnalysisFetched(false); fetchSpeakerAnalyses() }}
+                className="text-sm text-[#0f6b37] hover:underline font-[family-name:var(--font-dm-sans)]"
+              >
+                Refresh
+              </button>
+            </div>
           )}
         </div>
       )}

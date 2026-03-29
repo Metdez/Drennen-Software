@@ -18,10 +18,15 @@ export async function POST(request: Request) {
 
   const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
-  const session = await getStripe().billingPortal.sessions.create({
-    customer: profile.stripeCustomerId,
-    return_url: `${origin}/account`,
-  })
-
-  return NextResponse.json({ url: session.url })
+  try {
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: profile.stripeCustomerId,
+      return_url: `${origin}/account`,
+    })
+    return NextResponse.json({ url: session.url })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Stripe portal session failed'
+    console.error('Stripe portal error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }

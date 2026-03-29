@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
-import { getSemesterComparisonData } from '@/lib/db/comparison'
+import { getSemesterComparisonData } from '@/lib/db/semesterComparison'
 import { generateCohortComparison } from '@/lib/ai/semesterComparison'
 
 export const dynamic = 'force-dynamic'

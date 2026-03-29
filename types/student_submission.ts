@@ -27,6 +27,8 @@ export interface StudentSummary {
   studentName: string
   sessionCount: number    // sessions where this student submitted
   totalSessions: number   // total sessions for this professor
+  growthSignal?: string
+  flaggedForFollowup?: boolean
 }
 
 export interface SessionWithSubmission {
@@ -35,6 +37,8 @@ export interface SessionWithSubmission {
   createdAt: string
   submissionText: string
   filename: string
+  debriefText?: string
+  speakerAnalysisText?: string
 }
 
 export interface StudentDetail {

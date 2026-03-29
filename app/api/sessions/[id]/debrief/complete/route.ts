@@ -4,6 +4,7 @@ import { getSessionById } from '@/lib/db/sessions'
 import { getDebrief, completeDebrief } from '@/lib/db/debriefs'
 import { generateDebriefSummary } from '@/lib/ai/debriefSummary'
 import { generateClassInsights } from '@/lib/ai/classInsights'
+import { generateAndPublishPostSessionFeedback } from '@/lib/ai/speakerPortalPostSession'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,11 @@ export async function POST(
     // Fire-and-forget: regenerate class insights to incorporate debrief data
     generateClassInsights(user.id).catch(e =>
       console.error('[/api/sessions/[id]/debrief/complete] generateClassInsights failed (non-fatal):', e)
+    )
+
+    // Fire-and-forget: auto-generate and publish post-session feedback to speaker portal
+    generateAndPublishPostSessionFeedback(params.id).catch(e =>
+      console.error('[/api/sessions/[id]/debrief/complete] generateAndPublishPostSessionFeedback failed (non-fatal):', e)
     )
 
     return NextResponse.json({

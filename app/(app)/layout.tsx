@@ -1,7 +1,7 @@
-import { SemesterProvider } from '@/components/SemesterContext'
-import { SubscriptionProvider } from '@/components/SubscriptionContext'
-import { NavHeader } from '@/components/NavHeader'
-import { TrialBanner } from '@/components/TrialBanner'
+import { SemesterProvider } from '@/components/semester/SemesterContext'
+import { SubscriptionProvider } from '@/components/subscription/SubscriptionContext'
+import { NavHeader } from '@/components/layout/NavHeader'
+import { SubscriptionBanner } from '@/components/subscription/SubscriptionBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SemesterProvider>
           <NavHeader />
           <main className="max-w-4xl mx-auto px-6 py-10">
-            <TrialBanner />
+            <SubscriptionBanner />
             {children}
           </main>
         </SemesterProvider>

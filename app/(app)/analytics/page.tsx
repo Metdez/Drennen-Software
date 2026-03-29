@@ -1,18 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { useSemesterContext } from '@/components/SemesterContext'
-import type { AnalyticsData, ClassInsights, SessionAnalyticsRow } from '@/types'
-import { ReportConfigPanel } from '@/components/ReportConfigPanel'
-
-type Tab = 'overview' | 'themes' | 'insights'
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'themes', label: 'Themes' },
-  { key: 'insights', label: 'AI Insights' },
-]
+import { useSemesterContext } from '@/components/semester/SemesterContext'
+import { ReportConfigPanel } from '@/components/layout/ReportConfigPanel'
+import { WhatChangedBanner } from '@/components/analytics/WhatChangedBanner'
+import { ThemeExplorer } from '@/components/analytics/ThemeExplorer'
+import { CollapsiblePanel } from '@/components/analytics/CollapsiblePanel'
+import type { AnalyticsData, ClassInsights } from '@/types'
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
@@ -22,18 +17,6 @@ export default function AnalyticsPage() {
   const [showReportConfig, setShowReportConfig] = useState(false)
 
   const { activeSemesterId, loading: semesterLoading } = useSemesterContext()
-
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const initialTab = (searchParams.get('tab') as Tab) || 'overview'
-  const [tab, setTab] = useState<Tab>(TABS.some(t => t.key === initialTab) ? initialTab : 'overview')
-
-  const switchTab = useCallback((t: Tab) => {
-    setTab(t)
-    const url = new URL(window.location.href)
-    url.searchParams.set('tab', t)
-    window.history.replaceState({}, '', url.toString())
-  }, [])
 
   useEffect(() => {
     if (semesterLoading) return
@@ -60,10 +43,22 @@ export default function AnalyticsPage() {
   if (error || !data) return <ErrorCard message={error ?? 'Failed to load analytics'} />
   if (data.sessions.length === 0) return <EmptyState />
 
+  const uniqueThemeCount = insights
+    ? new Set(insights.topThemes.map(t => t.title)).size
+    : 0
+
   return (
-    <div>
+    <>
+      {/* Report Config Modal — rendered outside main content for correct z-index stacking */}
+      <ReportConfigPanel
+        isOpen={showReportConfig}
+        onClose={() => setShowReportConfig(false)}
+        analyticsData={data}
+      />
+
+      <div className="animate-fade-up">
       {/* Header */}
-      <div className="mb-6 animate-fade-up">
+      <div className="mb-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-[family-name:var(--font-playfair)] text-4xl font-bold text-[var(--text-primary)] mb-2">
@@ -86,288 +81,33 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Report Config Modal */}
-      <ReportConfigPanel
-        isOpen={showReportConfig}
-        onClose={() => setShowReportConfig(false)}
-        analyticsData={data}
-      />
-
-      {/* Tab bar */}
-      <TabBar active={tab} onChange={switchTab} />
-
-      {/* Tab content */}
-      {tab === 'overview' && <OverviewTab data={data} insights={insights} onSwitchTab={switchTab} />}
-      {tab === 'themes' && <ThemesTab data={data} insights={insights} />}
-      {tab === 'insights' && <InsightsTab data={data} insights={insights} />}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Tab Bar
-// ---------------------------------------------------------------------------
-
-function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
-  return (
-    <div className="flex gap-0 mb-6 border-b border-[var(--border)] animate-fade-up-delay-1">
-      {TABS.map(t => (
-        <button
-          key={t.key}
-          onClick={() => onChange(t.key)}
-          className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-            active === t.key
-              ? 'text-[var(--brand-orange)]'
-              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-          }`}
-        >
-          {t.label}
-          {active === t.key && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--brand-orange)]" />
-          )}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Overview Tab
-// ---------------------------------------------------------------------------
-
-function OverviewTab({
-  data,
-  insights,
-  onSwitchTab,
-}: {
-  data: AnalyticsData
-  insights: ClassInsights | null
-  onSwitchTab: (t: Tab) => void
-}) {
-  const uniqueThemeCount = insights
-    ? new Set(insights.themeEvolution.flatMap(e => e.themes)).size
-    : 0
-
-  const latestSession = data.sessions.at(-1)
-  const latestEvolution = insights?.themeEvolution.at(-1)
-
-  return (
-    <div className="space-y-4 animate-fade-up-delay-2">
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Sessions', value: String(data.meta.totalSessions) },
-          { label: 'Unique Themes', value: uniqueThemeCount > 0 ? String(uniqueThemeCount) : '—' },
-          { label: 'Students', value: String(data.meta.totalUniqueStudents) },
-        ].map(p => (
-          <div
-            key={p.label}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-4"
-          >
-            <div className="text-2xl font-bold text-[var(--text-primary)]">{p.value}</div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 uppercase tracking-wide">{p.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Two column: AI Summary + Latest Session */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* AI Summary */}
-        <InsightsBanner insights={insights} />
-
-        {/* Latest Session */}
-        {latestSession && (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-            <h3 className="font-[family-name:var(--font-playfair)] text-sm font-bold text-[var(--text-primary)] mb-3">
-              Latest Session
-            </h3>
-            <div className="text-sm font-medium text-[var(--text-primary)]">{latestSession.speakerName}</div>
-            <div className="text-xs text-[var(--text-muted)] mb-3">
-              {new Date(latestSession.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              {' · '}{latestSession.submissionCount} submissions
-            </div>
-            {latestEvolution && latestEvolution.themes.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {latestEvolution.themes.slice(0, 3).map(theme => (
-                  <Link
-                    key={theme}
-                    href={`/analytics/theme/${encodeURIComponent(theme)}`}
-                    className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border bg-[rgba(255,107,0,0.1)] border-[rgba(255,107,0,0.2)] text-[#fb923c] hover:bg-[rgba(255,107,0,0.2)] transition-colors"
-                  >
-                    {theme}
-                  </Link>
-                ))}
-                {latestEvolution.themes.length > 3 && (
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border bg-[rgba(59,130,246,0.1)] border-[rgba(59,130,246,0.2)] text-[#60a5fa]">
-                    +{latestEvolution.themes.length - 3} more
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Top Themes Preview */}
-      {insights && insights.topThemes.length > 0 && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-          <h3 className="font-[family-name:var(--font-playfair)] text-lg font-bold text-[var(--text-primary)] mb-1">
-            What Students Care About Most
-          </h3>
-          <div className="h-0.5 w-10 bg-[var(--brand-orange)] mb-4" />
-
-          <div className="space-y-1">
-            {insights.topThemes.slice(0, 3).map((t, i) => (
-              <ThemeRow key={t.title} theme={t} rank={i + 1} totalSessions={data.meta.totalSessions} />
-            ))}
-          </div>
-
-          {insights.topThemes.length > 3 && (
-            <button
-              onClick={() => onSwitchTab('themes')}
-              className="mt-4 text-sm text-[var(--brand-orange)] hover:underline"
-            >
-              View all {insights.topThemes.length} themes →
-            </button>
-          )}
-        </div>
+      {/* What Changed Banner */}
+      {insights && (
+        <WhatChangedBanner insights={insights} semesterId={activeSemesterId} />
       )}
-    </div>
-  )
-}
 
-// ---------------------------------------------------------------------------
-// Themes Tab
-// ---------------------------------------------------------------------------
-
-function ThemesTab({ data, insights }: { data: AnalyticsData; insights: ClassInsights | null }) {
-  if (!insights || insights.topThemes.length === 0) {
-    return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center animate-fade-up-delay-2">
-        <p className="text-sm text-[var(--text-secondary)]">
-          No theme data yet. Themes will appear after your next session upload.
-        </p>
-      </div>
-    )
-  }
-
-  const newThemes = insights.topThemes.filter(t => t.isNew).map(t => t.title)
-
-  // Build a submission count lookup from analytics data
-  const submissionMap = new Map(data.sessions.map(s => [s.sessionId, s.submissionCount]))
-
-  return (
-    <div className="space-y-6 animate-fade-up-delay-2">
-      {/* All Themes Ranked */}
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-        <h3 className="font-[family-name:var(--font-playfair)] text-lg font-bold text-[var(--text-primary)] mb-1">
-          All Themes
-        </h3>
-        <div className="h-0.5 w-10 bg-[var(--brand-orange)] mb-1" />
-        <p className="text-xs text-[var(--text-muted)] mb-4">Click any theme for AI-powered deep analysis</p>
-
-        <div className="space-y-1">
-          {insights.topThemes.map((t, i) => (
-            <ThemeRow key={t.title} theme={t} rank={i + 1} totalSessions={data.meta.totalSessions} />
+      {/* AI Narrative */}
+      {insights ? (
+        <div className="bg-[var(--surface)] border border-[rgba(255,107,0,0.15)] rounded-xl p-6 mb-7">
+          <div className="text-[10px] text-[var(--brand-orange)] tracking-widest uppercase mb-3 flex items-center gap-1.5">
+            <span className="text-sm">✦</span> AI SYNTHESIS
+          </div>
+          <h2 className="font-[family-name:var(--font-playfair)] text-[22px] font-bold text-[var(--text-primary)] mb-3.5">
+            What Your Students Want to Know
+          </h2>
+          {insights.narrative.split('\n\n').map((paragraph, i) => (
+            <p key={i} className="text-sm text-[var(--text-secondary)] leading-[1.75] mb-3">
+              {paragraph}
+            </p>
           ))}
-        </div>
-      </div>
-
-      {/* Theme Evolution Timeline */}
-      {insights.themeEvolution.length > 0 && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-          <h3 className="font-[family-name:var(--font-playfair)] text-lg font-bold text-[var(--text-primary)] mb-1">
-            How Themes Evolve Across Speakers
-          </h3>
-          <div className="h-0.5 w-10 bg-[rgba(130,80,255,0.6)] mb-4" />
-
-          <div className="space-y-4">
-            {insights.themeEvolution.map((entry, idx) => {
-              const date = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              const subs = submissionMap.get(entry.sessionId)
-
-              return (
-                <div
-                  key={entry.sessionId}
-                  className={`flex flex-col md:flex-row md:items-start gap-3 ${
-                    idx < insights.themeEvolution.length - 1 ? 'pb-4 border-b border-[rgba(255,255,255,0.05)]' : ''
-                  }`}
-                >
-                  <div className="shrink-0 w-28">
-                    <div className="text-sm font-semibold text-[var(--text-primary)] truncate">{entry.speakerName}</div>
-                    <div className="text-xs text-[var(--text-muted)]">
-                      {date}{subs != null ? ` · ${subs} subs` : ''}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 flex-1">
-                    {entry.themes.map(theme => {
-                      const colorIdx = Math.abs(hashString(theme)) % THEME_COLORS.length
-                      const c = THEME_COLORS[colorIdx]
-                      const isNew = newThemes.includes(theme)
-                      return (
-                        <Link
-                          key={theme}
-                          href={`/analytics/theme/${encodeURIComponent(theme)}`}
-                          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border hover:opacity-80 transition-opacity"
-                          style={{ background: c.bg, borderColor: c.border, color: c.text }}
-                        >
-                          {isNew && <span className="text-[var(--brand-orange)]">★</span>}
-                          {theme}
-                        </Link>
-                      )
-                    })}
-                    {entry.themes.length === 0 && (
-                      <span className="text-xs text-[var(--text-muted)] italic">No theme data</span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+          <div className="text-[11px] text-[var(--text-muted)] mt-4 flex items-center gap-3">
+            <span>Updated {new Date(insights.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span style={{ color: 'var(--border)' }}>·</span>
+            <span>Based on {data.meta.totalSessions} sessions, {data.meta.totalUniqueStudents} students</span>
           </div>
         </div>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// AI Insights Tab
-// ---------------------------------------------------------------------------
-
-function InsightsTab({ data, insights }: { data: AnalyticsData; insights: ClassInsights | null }) {
-  const [query, setQuery] = useState('')
-  const [queryAnswer, setQueryAnswer] = useState<string | null>(null)
-  const [querySql, setQuerySql] = useState<string | null>(null)
-  const [queryLoading, setQueryLoading] = useState(false)
-  const [queryError, setQueryError] = useState<string | null>(null)
-
-  const handleQuery = async () => {
-    const q = query.trim()
-    if (!q) return
-    setQueryLoading(true)
-    setQueryAnswer(null)
-    setQuerySql(null)
-    setQueryError(null)
-    try {
-      const res = await fetch('/api/analytics/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q }),
-      })
-      const json = await res.json()
-      if (json.error) { setQueryError(json.error) }
-      else { setQueryAnswer(json.answer); setQuerySql(json.sql) }
-    } catch (e) {
-      setQueryError(e instanceof Error ? e.message : 'Query failed')
-    } finally {
-      setQueryLoading(false)
-    }
-  }
-
-  if (!insights) {
-    return (
-      <div className="space-y-6 animate-fade-up-delay-2">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+      ) : (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-8 text-center mb-7">
           <div className="flex items-center justify-center gap-2 mb-3">
             <span className="text-[var(--brand-orange)]">✦</span>
             <h3 className="font-[family-name:var(--font-playfair)] text-lg font-bold text-[var(--text-primary)]">
@@ -378,288 +118,224 @@ function InsightsTab({ data, insights }: { data: AnalyticsData; insights: ClassI
             AI insights will generate after your next session upload.
           </p>
         </div>
+      )}
 
-        {/* NL query still works even without insights */}
-        <QueryBox
-          query={query}
-          setQuery={setQuery}
-          onSubmit={handleQuery}
-          loading={queryLoading}
-          answer={queryAnswer}
-          sql={querySql}
-          error={queryError}
-        />
+      {/* Quick Stats */}
+      <div className="grid grid-cols-4 gap-3 mb-8">
+        {[
+          { label: 'Sessions', value: String(data.meta.totalSessions) },
+          { label: 'Students', value: String(data.meta.totalUniqueStudents) },
+          { label: 'Unique Themes', value: uniqueThemeCount > 0 ? String(uniqueThemeCount) : '—' },
+          {
+            label: 'Quality',
+            value: insights
+              ? insights.qualityTrend.direction === 'improving' ? '▲' : insights.qualityTrend.direction === 'declining' ? '▼' : '◆'
+              : '—',
+            color: insights
+              ? insights.qualityTrend.direction === 'improving' ? 'var(--brand-green)' : insights.qualityTrend.direction === 'declining' ? '#ef4444' : undefined
+              : undefined,
+            sub: insights?.qualityTrend.direction
+              ? insights.qualityTrend.direction.charAt(0).toUpperCase() + insights.qualityTrend.direction.slice(1)
+              : undefined,
+          },
+        ].map(p => (
+          <div
+            key={p.label}
+            className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-4 text-center"
+          >
+            <div
+              className="text-2xl font-bold text-[var(--text-primary)]"
+              style={'color' in p && p.color ? { color: p.color } : undefined}
+            >
+              {p.value}
+            </div>
+            <div className="text-[10px] text-[var(--text-muted)] mt-1 uppercase tracking-wide">{p.label}</div>
+            {'sub' in p && p.sub && (
+              <div
+                className="text-[11px] mt-1"
+                style={'color' in p && p.color ? { color: p.color } : { color: 'var(--text-muted)' }}
+              >
+                {p.sub}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
-    )
-  }
 
-  const trendColor =
-    insights.qualityTrend.direction === 'improving'
-      ? 'var(--brand-green)'
-      : insights.qualityTrend.direction === 'declining'
-      ? '#ef4444'
-      : 'var(--text-muted)'
+      {/* Theme Explorer */}
+      {insights && insights.topThemes.length > 0 && (
+        <ThemeExplorer themes={insights.topThemes} totalSessions={data.meta.totalSessions} />
+      )}
 
-  const trendIcon =
-    insights.qualityTrend.direction === 'improving' ? '▲' :
-    insights.qualityTrend.direction === 'declining' ? '▼' : '◆'
+      {/* Supporting Intelligence */}
+      <SupportingIntelligence data={data} insights={insights} />
+    </div>
+    </>
+  )
+}
 
-  // Derive cross-session patterns from topThemes
-  const topPatterns = insights.topThemes.slice(0, 3).map(t => ({
-    title: t.title,
-    pct: data.meta.totalSessions > 0 ? Math.round((t.sessionCount / data.meta.totalSessions) * 100) : 0,
-    sessionCount: t.sessionCount,
-  }))
+// ---------------------------------------------------------------------------
+// Supporting Intelligence
+// ---------------------------------------------------------------------------
+
+function SupportingIntelligence({ data, insights }: { data: AnalyticsData; insights: ClassInsights | null }) {
+  const topLeader = data.leaderboard[0]
+
+  // Build submission count lookup for timeline
+  const submissionMap = new Map(data.sessions.map(s => [s.sessionId, s.submissionCount]))
 
   return (
-    <div className="space-y-4 animate-fade-up-delay-2">
-      {/* Full Narrative */}
-      <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-5 shadow-sm">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-[var(--brand-orange)]">✦</span>
-            <h3 className="font-[family-name:var(--font-playfair)] text-lg font-bold text-[var(--text-primary)]">
-              Class Narrative
-            </h3>
-          </div>
-          <span className="text-xs text-[var(--text-muted)] whitespace-nowrap shrink-0">
-            Updated {new Date(insights.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
-        </div>
-        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-          {insights.narrative}
-        </p>
+    <div className="mb-8">
+      <div className="text-[10px] text-[var(--text-muted)] tracking-widest uppercase mb-3">
+        SUPPORTING INTELLIGENCE
       </div>
 
-      {/* Two column: Quality Trend + Cross-Session Patterns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Quality Trend</h3>
-          <div className="flex items-center gap-3">
-            <span style={{ color: trendColor }} className="text-2xl font-bold">{trendIcon}</span>
-            <div>
-              <div style={{ color: trendColor }} className="text-sm font-semibold">
-                {insights.qualityTrend.direction.charAt(0).toUpperCase() + insights.qualityTrend.direction.slice(1)}
-              </div>
-              <div className="text-xs text-[var(--text-muted)]">{insights.qualityTrend.description}</div>
-            </div>
+      {/* Leaderboard */}
+      <CollapsiblePanel
+        icon="📊"
+        title="Engagement Leaderboard"
+        preview={topLeader ? `Top: ${topLeader.studentName} (${topLeader.submissionCount} submissions)` : 'No data yet'}
+      >
+        {data.leaderboard.length > 0 ? (
+          <div>
+            {data.leaderboard.map((entry, i) => {
+              const maxCount = data.leaderboard[0]?.submissionCount ?? 1
+              const barPct = Math.round((entry.submissionCount / maxCount) * 100)
+              return (
+                <div key={entry.studentName} className="flex items-center justify-between py-2 border-b border-[rgba(255,255,255,0.03)] last:border-b-0">
+                  <span className="text-xs text-[var(--text-muted)] w-6">{i + 1}</span>
+                  <Link
+                    href={`/roster/${encodeURIComponent(entry.studentName)}`}
+                    className="text-[13px] text-[var(--text-secondary)] flex-1 hover:text-[var(--brand-orange)] transition-colors"
+                  >
+                    {entry.studentName}
+                  </Link>
+                  <div className="w-[120px] h-1 bg-[var(--surface-elevated)] rounded-full overflow-hidden mx-3">
+                    <div className="h-full bg-[var(--brand-orange)] rounded-full opacity-50" style={{ width: `${barPct}%` }} />
+                  </div>
+                  <span className="text-[13px] font-semibold text-[var(--brand-orange)] w-20 text-right">
+                    {entry.submissionCount} submission{entry.submissionCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              )
+            })}
           </div>
-        </div>
+        ) : (
+          <p className="text-xs text-[var(--text-muted)]">No submission data yet.</p>
+        )}
+      </CollapsiblePanel>
 
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Cross-Session Patterns</h3>
-          <div className="space-y-2">
-            {topPatterns.map(p => (
-              <div key={p.title} className="text-xs text-[var(--text-secondary)]">
-                <span className="font-medium text-[var(--text-primary)]">{p.title}</span>
-                {' — '}{p.pct}% of sessions ({p.sessionCount} of {data.meta.totalSessions})
+      {/* Drop-off Watch */}
+      <CollapsiblePanel
+        icon="⚠️"
+        title="Drop-off Watch"
+        preview={data.dropoff.length > 0 ? `${data.dropoff.length} student${data.dropoff.length !== 1 ? 's' : ''} absent from recent sessions` : 'No drop-offs detected'}
+      >
+        {data.dropoff.length > 0 ? (
+          <div>
+            {data.dropoff.map(entry => (
+              <div key={entry.studentName} className="flex items-center justify-between py-2 border-b border-[rgba(255,255,255,0.03)] last:border-b-0">
+                <Link
+                  href={`/roster/${encodeURIComponent(entry.studentName)}`}
+                  className="text-[13px] text-[var(--text-secondary)] hover:text-[var(--brand-orange)] transition-colors"
+                >
+                  {entry.studentName}
+                </Link>
+                <span className="text-xs text-[var(--text-muted)]">
+                  Last seen: {entry.lastSeenSpeaker}
+                </span>
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        ) : (
+          <p className="text-xs text-[var(--text-muted)]">All students are active — no drop-offs detected.</p>
+        )}
+      </CollapsiblePanel>
 
-      {/* NL Query */}
-      <QueryBox
-        query={query}
-        setQuery={setQuery}
-        onSubmit={handleQuery}
-        loading={queryLoading}
-        answer={queryAnswer}
-        sql={querySql}
-        error={queryError}
-      />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Shared Components
-// ---------------------------------------------------------------------------
-
-const THEME_COLORS = [
-  { bg: 'rgba(255,107,0,0.15)', border: 'rgba(255,107,0,0.4)', text: '#fb923c' },
-  { bg: 'rgba(130,80,255,0.15)', border: 'rgba(130,80,255,0.4)', text: '#c084fc' },
-  { bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.4)', text: '#4ade80' },
-  { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', text: '#60a5fa' },
-]
-
-function hashString(s: string): number {
-  let hash = 0
-  for (let i = 0; i < s.length; i++) {
-    hash = ((hash << 5) - hash) + s.charCodeAt(i)
-    hash |= 0
-  }
-  return hash
-}
-
-function InsightsBanner({ insights }: { insights: ClassInsights | null }) {
-  if (!insights) {
-    return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[var(--brand-orange)]">✦</span>
-          <h3 className="font-[family-name:var(--font-playfair)] text-sm font-bold text-[var(--text-primary)]">
-            What Students Want to Know
-          </h3>
-        </div>
-        <p className="text-xs text-[var(--text-secondary)]">
-          AI analysis will appear here after your next session upload.
-        </p>
-      </div>
-    )
-  }
-
-  const trendColor =
-    insights.qualityTrend.direction === 'improving'
-      ? 'var(--brand-green)'
-      : insights.qualityTrend.direction === 'declining'
-      ? '#ef4444'
-      : 'var(--text-muted)'
-
-  const trendIcon =
-    insights.qualityTrend.direction === 'improving' ? '▲' :
-    insights.qualityTrend.direction === 'declining' ? '▼' : '◆'
-
-  return (
-    <div className="rounded-xl border border-[var(--border-accent)] bg-[var(--surface)] p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[var(--brand-orange)]">✦</span>
-        <h3 className="font-[family-name:var(--font-playfair)] text-sm font-bold text-[var(--text-primary)]">
-          What Students Want to Know
-        </h3>
-        <span className="ml-auto text-xs text-[var(--text-muted)]">
-          {new Date(insights.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </span>
-      </div>
-      <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3">
-        {insights.narrative}
-      </p>
-      <div className="flex items-center gap-2 text-xs">
-        <span style={{ color: trendColor }} className="font-semibold">
-          {trendIcon} {insights.qualityTrend.direction.charAt(0).toUpperCase() + insights.qualityTrend.direction.slice(1)}
-        </span>
-        <span className="text-[var(--text-muted)]">—</span>
-        <span className="text-[var(--text-secondary)]">{insights.qualityTrend.description}</span>
-      </div>
-    </div>
-  )
-}
-
-function ThemeRow({
-  theme,
-  rank,
-  totalSessions,
-}: {
-  theme: ClassInsights['topThemes'][number]
-  rank: number
-  totalSessions: number
-}) {
-  const pct = totalSessions > 0 ? Math.round((theme.sessionCount / totalSessions) * 100) : 0
-
-  return (
-    <Link
-      href={`/analytics/theme/${encodeURIComponent(theme.title)}`}
-      className="flex items-center gap-3 p-3 -mx-1 rounded-lg hover:bg-[var(--surface-hover)] transition-colors group cursor-pointer"
-    >
-      <span className="text-sm font-medium text-[var(--text-muted)] w-5 text-right shrink-0">{rank}</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm text-[var(--text-primary)] font-medium group-hover:text-[var(--brand-orange)] transition-colors truncate">
-            {theme.title}
-          </span>
-          {theme.isNew && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,107,0,0.1)] text-[#fb923c] border border-[rgba(255,107,0,0.2)] shrink-0">
-              NEW
-            </span>
-          )}
-        </div>
-        <div className="h-1 bg-[var(--surface-elevated)] rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full bg-[var(--brand-orange)] transition-all duration-500"
-            style={{ width: `${pct}%`, opacity: 0.6 }}
-          />
-        </div>
-      </div>
-      <div className="text-right shrink-0">
-        <div className="text-sm font-bold text-[var(--text-primary)]">{pct}%</div>
-        <div className="text-xs text-[var(--text-muted)]">{theme.sessionCount} session{theme.sessionCount !== 1 ? 's' : ''}</div>
-      </div>
-      <span className="text-[var(--brand-orange)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        →
-      </span>
-    </Link>
-  )
-}
-
-function QueryBox({
-  query,
-  setQuery,
-  onSubmit,
-  loading,
-  answer,
-  sql,
-  error,
-}: {
-  query: string
-  setQuery: (q: string) => void
-  onSubmit: () => void
-  loading: boolean
-  answer: string | null
-  sql: string | null
-  error: string | null
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-      <h3 className="text-sm font-bold text-[var(--text-primary)] mb-1">Ask About Your Data</h3>
-      <p className="text-xs text-[var(--text-muted)] mb-3">Ask questions in plain English — AI will query your session data</p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onSubmit()}
-          placeholder="e.g. What themes appear only with tech founders?"
-          className="flex-1 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--brand-orange)]"
-          disabled={loading}
-        />
-        <button
-          onClick={onSubmit}
-          disabled={loading || !query.trim()}
-          className="px-4 py-2 rounded-lg bg-[var(--brand-orange)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+      {/* Theme Evolution Timeline */}
+      {insights && insights.themeEvolution.length > 0 && (
+        <CollapsiblePanel
+          icon="📈"
+          title="Theme Evolution Timeline"
+          preview={`How themes shifted across ${insights.themeEvolution.length} sessions`}
         >
-          {loading ? '...' : 'Ask'}
-        </button>
-      </div>
-      {error && (
-        <div className="mt-3 text-xs text-red-400">{error}</div>
+          <div>
+            {insights.themeEvolution.map((entry, idx) => {
+              const date = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              const subs = submissionMap.get(entry.sessionId)
+              return (
+                <div
+                  key={entry.sessionId}
+                  className={`flex gap-3.5 py-2.5 ${idx < insights.themeEvolution.length - 1 ? 'border-b border-[rgba(255,255,255,0.03)]' : ''}`}
+                >
+                  <div className="w-[90px] shrink-0">
+                    <div className="text-[13px] font-medium text-[var(--text-primary)] truncate">{entry.speakerName}</div>
+                    <div className="text-[11px] text-[var(--text-muted)]">{date}{subs != null ? ` · ${subs} subs` : ''}</div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 flex-1">
+                    {entry.themes.map(theme => (
+                      <Link
+                        key={theme}
+                        href={`/analytics/theme?title=${encodeURIComponent(theme)}`}
+                        className="text-[11px] px-2 py-0.5 rounded-full border bg-[rgba(255,107,0,0.1)] border-[rgba(255,107,0,0.25)] text-[#fb923c] hover:opacity-80 transition-opacity"
+                      >
+                        {theme}
+                      </Link>
+                    ))}
+                    {entry.themes.length === 0 && (
+                      <span className="text-xs text-[var(--text-muted)] italic">No theme data</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </CollapsiblePanel>
       )}
-      {answer && (
-        <div className="mt-3 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] p-3">
-          <p className="text-sm text-[var(--text-primary)] leading-relaxed">{answer}</p>
-          {sql && (
-            <details className="mt-2">
-              <summary className="text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-secondary)]">View SQL</summary>
-              <pre className="mt-1 text-xs text-[var(--text-muted)] bg-[var(--surface)] rounded p-2 overflow-x-auto">{sql}</pre>
-            </details>
-          )}
-        </div>
+
+      {/* Session Effectiveness */}
+      {insights?.sessionEffectiveness && insights.sessionEffectiveness.length > 0 && (
+        <CollapsiblePanel
+          icon="🎯"
+          title="Session Effectiveness"
+          preview="Which speakers resonated most"
+        >
+          <div>
+            {insights.sessionEffectiveness.map(entry => (
+              <div key={entry.speakerName} className="flex items-center justify-between py-2 border-b border-[rgba(255,255,255,0.03)] last:border-b-0">
+                <span className="text-[13px] text-[var(--text-secondary)]">{entry.speakerName}</span>
+                <div className="flex items-center gap-4 text-xs">
+                  <span className="text-[var(--text-muted)]">Rating: <strong className="text-[var(--text-primary)]">{entry.rating}/5</strong></span>
+                  <span className="text-[#4ade80]">🎯 {entry.homeRunCount} home runs</span>
+                  {entry.flatCount > 0 && (
+                    <span className="text-[var(--text-muted)]">{entry.flatCount} flat</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CollapsiblePanel>
       )}
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Utility Components
+// ---------------------------------------------------------------------------
 
 function LoadingSkeleton() {
   return (
     <div className="space-y-6 animate-fade-up">
       <div className="h-10 w-64 rounded-lg bg-[var(--surface-elevated)] animate-pulse" />
-      <div className="flex gap-4">
-        {[0, 1, 2].map(i => (
-          <div key={i} className="h-20 w-36 rounded-xl bg-[var(--surface-elevated)] animate-pulse" />
+      <div className="h-48 rounded-xl bg-[var(--surface-elevated)] animate-pulse" />
+      <div className="flex gap-3">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="h-20 flex-1 rounded-xl bg-[var(--surface-elevated)] animate-pulse" />
         ))}
       </div>
       {[0, 1, 2].map(i => (
-        <div key={i} className="h-48 rounded-xl bg-[var(--surface-elevated)] animate-pulse" />
+        <div key={i} className="h-16 rounded-xl bg-[var(--surface-elevated)] animate-pulse" />
       ))}
     </div>
   )

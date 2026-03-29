@@ -39,4 +39,5 @@ export interface SemesterSummary {
   sessionCount: number
   startDate: string
   endDate: string
+  storyId?: string | null
 }

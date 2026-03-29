@@ -1,14 +1,5 @@
-import { GoogleGenAI } from '@google/genai'
+import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { SpeakerBriefContent } from '@/types'
-
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
-  return {
-    ai: new GoogleGenAI({ apiKey }),
-    model: process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview',
-  }
-}
 
 export interface SanitizedAnalysis {
   theme_clusters: Array<{
@@ -137,7 +128,8 @@ export async function generateSpeakerBrief(params: {
   analysis: SanitizedAnalysis | null
   classInsights: SanitizedClassInsights | null
 }): Promise<SpeakerBriefContent> {
-  const { ai, model } = getGeminiClient()
+  const ai = getGeminiClient()
+  const model = getGeminiModel()
 
   const response = await ai.models.generateContent({
     model,

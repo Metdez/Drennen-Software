@@ -42,6 +42,17 @@ export async function getSemestersByUser(userId: string): Promise<SemesterSummar
     countMap.set(s.semester_id, (countMap.get(s.semester_id) ?? 0) + 1)
   }
 
+  // Fetch story IDs for each semester
+  const { data: stories } = await supabase
+    .from('semester_stories')
+    .select('id, semester_id')
+    .in('semester_id', semesterIds)
+
+  const storyMap = new Map<string, string>()
+  for (const s of stories ?? []) {
+    storyMap.set(s.semester_id, s.id)
+  }
+
   return semesters.map(s => ({
     id: s.id,
     name: s.name,
@@ -49,6 +60,7 @@ export async function getSemestersByUser(userId: string): Promise<SemesterSummar
     sessionCount: countMap.get(s.id) ?? 0,
     startDate: s.start_date,
     endDate: s.end_date,
+    storyId: storyMap.get(s.id) ?? null,
   }))
 }
 

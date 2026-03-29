@@ -173,3 +173,167 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ============================================================
+   Session Preview — Redesigned UI
+   ============================================================ */
+
+/* Hero card — glassmorphism container for session header */
+.session-hero-card {
+  position: relative;
+  padding: 1.5rem 1.75rem;
+  border-radius: 1rem;
+  background: linear-gradient(
+    135deg,
+    rgba(21, 21, 29, 0.95) 0%,
+    rgba(28, 28, 39, 0.85) 100%
+  );
+  border: 1px solid var(--border-accent);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+/* Subtle accent glow in top-left corner */
+.session-hero-card::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: -60px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(243, 111, 33, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Metadata pills — date and file count */
+.session-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 100px;
+  background: rgba(240, 236, 228, 0.04);
+  border: 1px solid rgba(240, 236, 228, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.session-meta-pill:hover {
+  background: rgba(240, 236, 228, 0.07);
+  border-color: rgba(240, 236, 228, 0.14);
+}
+
+/* Session action buttons — secondary actions (Debrief, Portal, Share) */
+.session-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  border: 1px solid var(--border-accent);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.session-action-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.session-action-btn:active {
+  transform: translateY(0);
+}
+
+.session-action-btn--purple {
+  border-color: rgba(84, 39, 133, 0.4);
+  color: #a87dd6;
+}
+
+.session-action-btn--purple:hover {
+  border-color: rgba(84, 39, 133, 0.6);
+  background: rgba(84, 39, 133, 0.1);
+  color: #c49eec;
+}
+
+.session-action-btn--green {
+  border-color: rgba(15, 107, 55, 0.4);
+  color: #5e9e6e;
+}
+
+.session-action-btn--green:hover {
+  border-color: rgba(15, 107, 55, 0.6);
+  background: rgba(15, 107, 55, 0.1);
+  color: #7bbb8a;
+}
+
+/* Tab bar — modern pill/segment style */
+.session-tab-bar {
+  position: relative;
+  padding: 0.25rem;
+  background: rgba(240, 236, 228, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.session-tab-list {
+  display: flex;
+  gap: 0.125rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.session-tab-list::-webkit-scrollbar {
+  display: none;
+}
+
+.session-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.session-tab:hover:not(.session-tab--active) {
+  color: var(--text-primary);
+  background: rgba(240, 236, 228, 0.05);
+}
+
+.session-tab--active {
+  color: #f36f21;
+  background: rgba(243, 111, 33, 0.1);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(243, 111, 33, 0.2);
+}
+
+
+

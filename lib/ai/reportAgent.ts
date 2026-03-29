@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAnalytics } from '@/lib/db/analytics'
 import { getThemeFrequency, type ThemeFrequency } from '@/lib/db/themes'
@@ -30,13 +30,9 @@ import type {
 
 // ── Gemini setup ──
 
-const getAI = () => {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
-  return new GoogleGenAI({ apiKey })
-}
+const getAI = () => getGeminiClient()
 
-const getModel = () => process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview'
+const getModel = () => getGeminiModel()
 
 function cleanJSON(raw: string): string {
   return raw
@@ -494,6 +490,31 @@ Return JSON:
 async function generateStudentGrowthHighlights(data: ReportData): Promise<StudentGrowthSection> {
   const { studentParticipation, analytics, insightsInput } = data
 
+  // Fetch growth profiles for enriched data
+  let growthProfiles: Map<string, { signal: string; highlight: string; progression: string }> = new Map()
+  try {
+    const adminClient = createAdminClient()
+    const studentNames = Array.from(studentParticipation.keys())
+    if (studentNames.length > 0) {
+      const { data: profiles } = await adminClient
+        .from('student_profiles')
+        .select('student_name, growth_signal, analysis')
+        .in('student_name', studentNames)
+      for (const p of profiles ?? []) {
+        const gi = (p.analysis as { growthIntelligence?: { overallSignal?: string; semesterHighlight?: string; thinkingArc?: { progression?: string } } })?.growthIntelligence
+        if (gi) {
+          growthProfiles.set(p.student_name, {
+            signal: gi.overallSignal ?? p.growth_signal ?? '',
+            highlight: gi.semesterHighlight ?? '',
+            progression: gi.thinkingArc?.progression ?? '',
+          })
+        }
+      }
+    }
+  } catch {
+    // Continue without growth profiles if fetch fails
+  }
+
   // Build per-student summary for AI
   const studentSummaries = Array.from(studentParticipation.entries())
     .filter(([, sessions]) => sessions.size >= 2) // Only students with 2+ sessions
@@ -501,12 +522,16 @@ async function generateStudentGrowthHighlights(data: ReportData): Promise<Studen
       const sessionsChronological = analytics.sessions
         .filter(s => sessionSet.has(s.sessionId))
         .map(s => s.speakerName)
+      const gp = growthProfiles.get(name)
       return {
         name,
         sessionCount: sessionSet.size,
         totalSessions: analytics.sessions.length,
         rate: Math.round((sessionSet.size / analytics.sessions.length) * 100),
         speakers: sessionsChronological,
+        ...(gp?.signal ? { growthSignal: gp.signal } : {}),
+        ...(gp?.highlight ? { semesterHighlight: gp.highlight } : {}),
+        ...(gp?.progression ? { thinkingProgression: gp.progression } : {}),
       }
     })
     .sort((a, b) => b.rate - a.rate)
@@ -515,9 +540,9 @@ async function generateStudentGrowthHighlights(data: ReportData): Promise<Studen
   const leaderboardNames = insightsInput.leaderboard.map(l => l.studentName)
   const dropoffNames = insightsInput.dropoff.map(d => d.studentName)
 
-  const prompt = `You are identifying standout student growth and engagement patterns across a semester of guest speaker Q&A sessions.
+  const prompt = `You are identifying standout student growth and intellectual development across a semester of guest speaker Q&A sessions. Focus on development stories, not just participation.
 
-Student participation data (top 20 by rate):
+Student data (top 20 by rate, enriched with AI growth profiles where available):
 ${JSON.stringify(studentSummaries, null, 2)}
 
 Leaderboard (most active): ${leaderboardNames.slice(0, 5).join(', ')}
@@ -526,24 +551,34 @@ Total sessions in semester: ${analytics.sessions.length}
 
 Return JSON:
 {
-  "narrative": "A 1-2 paragraph summary of notable student engagement patterns. Who showed the most consistent engagement? Did anyone notably improve participation over time? Mention specific students by name.",
+  "narrative": "A 2-3 paragraph summary of notable student growth and intellectual development. Weave together participation data with growth signals and thinking progressions. Mention specific students by name.",
   "highlights": [
     {
       "studentName": "Name",
-      "narrative": "1-2 sentences about this student's notable engagement or growth pattern",
-      "sessionsParticipated": number
+      "narrative": "2-3 sentences about this student's intellectual development story",
+      "sessionsParticipated": number,
+      "growthSignal": "their growth signal if available, or empty string",
+      "thinkingProgression": "1 sentence summary of their thinking evolution, or empty string"
     }
   ]
 }
 
 Rules:
-- highlights: max 5 students, focus on most interesting patterns (high consistency, notable improvement, or strong engagement despite late start)
+- highlights: max 5 students, prioritize the most compelling intellectual development stories
+- If growthSignal and semesterHighlight data is available, USE IT
 - Use only names from the provided data
-- sessionsParticipated must match the data provided`
+- sessionsParticipated must match the data provided
+- This is NOT a grading tool — frame growth as intellectual development`
 
   const parsed = await callGemini<{
     narrative: string
-    highlights: Array<{ studentName: string; narrative: string; sessionsParticipated: number }>
+    highlights: Array<{
+      studentName: string
+      narrative: string
+      sessionsParticipated: number
+      growthSignal?: string
+      thinkingProgression?: string
+    }>
   }>(
     prompt,
     'You are an expert educational data analyst. Return valid JSON matching the schema exactly.'
@@ -555,6 +590,8 @@ Rules:
       studentName: h.studentName ?? '',
       narrative: h.narrative ?? '',
       sessionsParticipated: h.sessionsParticipated ?? 0,
+      growthSignal: h.growthSignal || undefined,
+      thinkingProgression: h.thinkingProgression || undefined,
     })),
   }
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
-import { getStudentsWithParticipation } from '@/lib/db/student_submissions'
+import { getStudentsWithParticipation } from '@/lib/db/studentSubmissions'
+import { getGrowthSignalsForUser } from '@/lib/db/studentProfiles'
+import { getStudentsWithFollowupFlags } from '@/lib/db/professorNotes'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,9 +16,19 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const semesterId = searchParams.get('semester') ?? undefined
 
-    const students = await getStudentsWithParticipation(semesterId)
+    const [students, growthSignals, flaggedStudents] = await Promise.all([
+      getStudentsWithParticipation(semesterId),
+      getGrowthSignalsForUser(user.id),
+      getStudentsWithFollowupFlags(user.id),
+    ])
 
-    return NextResponse.json({ students })
+    const enriched = students.map((s) => ({
+      ...s,
+      growthSignal: growthSignals.get(s.studentName) ?? undefined,
+      flaggedForFollowup: flaggedStudents.has(s.studentName) || undefined,
+    }))
+
+    return NextResponse.json({ students: enriched })
 
   } catch (err) {
     console.error('[/api/roster] GET', err)

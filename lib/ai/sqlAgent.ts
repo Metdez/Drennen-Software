@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // ---------------------------------------------------------------------------
@@ -99,11 +99,8 @@ export interface AnalyticsResult {
 }
 
 export async function runAnalyticsQuery(question: string): Promise<AnalyticsResult> {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY env var is not set')
-
-  const ai = new GoogleGenAI({ apiKey })
-  const model = process.env.GEMINI_MODEL ?? 'gemini-3-flash-preview'
+  const ai = getGeminiClient()
+  const model = getGeminiModel()
 
   // Step 1: generate SQL
   const sqlResponse = await ai.models.generateContent({

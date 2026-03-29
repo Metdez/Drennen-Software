@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { CohortComparisonData } from '@/types/comparison'
 
 function buildPrompt(data: CohortComparisonData): string {
@@ -49,16 +49,10 @@ Write a clear, actionable narrative for the professor. Be specific — name actu
 
 export async function generateCohortComparison(data: CohortComparisonData): Promise<string> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY
-    if (!apiKey) {
-      return 'AI narrative unavailable: GEMINI_API_KEY is not configured.'
-    }
-
-    const ai = new GoogleGenAI({ apiKey })
-    const model = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview'
+    const ai = getGeminiClient()
 
     const response = await ai.models.generateContent({
-      model,
+      model: getGeminiModel(),
       contents: buildPrompt(data),
       config: {
         systemInstruction:

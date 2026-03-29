@@ -1,6 +1,6 @@
 import { getCurrentUser } from '@/lib/db/users'
-import { getStudentDetail } from '@/lib/db/student_submissions'
-import { StudentDetailTabs } from '@/components/StudentDetailTabs'
+import { getStudentDetail } from '@/lib/db/studentSubmissions'
+import { StudentDetailTabs } from '@/components/student/StudentDetailTabs'
 import { Badge } from '@/components/ui/Badge'
 import { formatStudentName } from '@/lib/utils/format'
 import { redirect, notFound } from 'next/navigation'

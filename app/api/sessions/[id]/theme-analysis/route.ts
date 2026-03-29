@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
 import { getSessionById } from '@/lib/db/sessions'
-import { getSubmissionsBySession } from '@/lib/db/student_submissions'
+import { getSubmissionsBySession } from '@/lib/db/studentSubmissions'
 import { runSessionAnalysis, runThemeAnalysis } from '@/lib/ai/analysisAgent'
 import { getSessionAnalysis, insertSessionAnalysis } from '@/lib/db/sessionAnalyses'
 

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useSemesterContext } from '@/components/SemesterContext'
-import { SemesterManageModal } from '@/components/SemesterManageModal'
-import { AssignSessionsModal } from '@/components/AssignSessionsModal'
+import { useRouter } from 'next/navigation'
+import { useSemesterContext } from '@/components/semester/SemesterContext'
+import { SemesterManageModal } from '@/components/semester/SemesterManageModal'
+import { AssignSessionsModal } from '@/components/semester/AssignSessionsModal'
 import { BRAND, ROUTES } from '@/lib/constants'
 import type { SemesterSummary } from '@/types'
 
@@ -21,11 +22,13 @@ export default function SemestersPage() {
   const { semesters, loading, hasUnassigned, refreshSemesters } =
     useSemesterContext()
 
+  const router = useRouter()
   const [manageOpen, setManageOpen] = useState(false)
   const [editingSemester, setEditingSemester] =
     useState<SemesterSummary | null>(null)
   const [assignOpen, setAssignOpen] = useState(false)
   const [archivingId, setArchivingId] = useState<string | null>(null)
+  const [generatingStoryId, setGeneratingStoryId] = useState<string | null>(null)
 
   function openCreate() {
     setEditingSemester(null)
@@ -55,6 +58,35 @@ export default function SemestersPage() {
 
   function handleSaved() {
     refreshSemesters()
+  }
+
+  async function handleStory(semester: SemesterSummary) {
+    if (semester.storyId) {
+      router.push(ROUTES.STORY(semester.storyId))
+      return
+    }
+    if (semester.sessionCount === 0) return
+    if (!confirm('Generate a narrative story for this semester? This may take 15-30 seconds.')) return
+    setGeneratingStoryId(semester.id)
+    try {
+      const res = await fetch(ROUTES.API_STORY_GENERATE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ semesterId: semester.id }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Failed to generate story')
+        return
+      }
+      const data = await res.json()
+      await refreshSemesters()
+      router.push(ROUTES.STORY(data.storyId))
+    } catch {
+      alert('Failed to generate story')
+    } finally {
+      setGeneratingStoryId(null)
+    }
   }
 
   return (
@@ -276,6 +308,22 @@ export default function SemestersPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleStory(semester)}
+                      disabled={semester.sessionCount === 0 || generatingStoryId === semester.id}
+                      className="text-xs rounded-lg px-3 py-1.5 transition-opacity hover:opacity-80 disabled:opacity-50"
+                      style={{
+                        color: BRAND.PURPLE,
+                        border: `1px solid ${BRAND.PURPLE}44`,
+                        fontFamily: 'var(--font-dm-sans)',
+                      }}
+                    >
+                      {generatingStoryId === semester.id
+                        ? 'Generating...'
+                        : semester.storyId
+                          ? 'View Story'
+                          : 'Generate Story'}
+                    </button>
                     <button
                       onClick={() => openEdit(semester)}
                       className="text-xs rounded-lg px-3 py-1.5 transition-opacity hover:opacity-80"

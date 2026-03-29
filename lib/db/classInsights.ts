@@ -68,6 +68,8 @@ export interface InsightsInput {
     debriefHomeRunCount: number
     debriefFlatCount: number
     debriefFollowups: string
+    studentReflectionThemes: string[]
+    studentReflectionSummary: string | null
   }>
   leaderboard: Array<{ studentName: string; submissionCount: number }>
   dropoff: Array<{ studentName: string; lastSeenSpeaker: string }>
@@ -114,6 +116,12 @@ export async function fetchInsightsInput(userId: string, semesterId?: string): P
     .in('session_id', sessionIds)
     .eq('status', 'complete')
 
+  // Student debrief analyses (reflection themes + summary)
+  const { data: studentDebriefRows } = await supabase
+    .from('student_debrief_analyses')
+    .select('session_id, analysis')
+    .in('session_id', sessionIds)
+
   // Group themes by session
   const themesBySession = new Map<string, string[]>()
   for (const t of themeRows ?? []) {
@@ -134,8 +142,19 @@ export async function fetchInsightsInput(userId: string, semesterId?: string): P
     })
   }
 
+  // Group student debrief analyses by session
+  const studentDebriefBySession = new Map<string, { themes: string[]; summary: string | null }>()
+  for (const row of studentDebriefRows ?? []) {
+    const analysis = row.analysis as { reflection_themes?: Array<{ name: string }>; summary?: string } | null
+    studentDebriefBySession.set(row.session_id, {
+      themes: (analysis?.reflection_themes ?? []).map(t => t.name),
+      summary: analysis?.summary ?? null,
+    })
+  }
+
   const sessions: InsightsInput['sessions'] = rows.map(s => {
     const db = debriefBySession.get(s.id)
+    const sd = studentDebriefBySession.get(s.id)
     return {
       sessionId: s.id,
       speakerName: s.speaker_name,
@@ -146,6 +165,8 @@ export async function fetchInsightsInput(userId: string, semesterId?: string): P
       debriefHomeRunCount: db?.homeRuns ?? 0,
       debriefFlatCount: db?.flats ?? 0,
       debriefFollowups: db?.followups ?? '',
+      studentReflectionThemes: sd?.themes ?? [],
+      studentReflectionSummary: sd?.summary ?? null,
     }
   })
 

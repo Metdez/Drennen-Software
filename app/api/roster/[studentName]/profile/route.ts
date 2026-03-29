@@ -21,8 +21,10 @@ export async function GET(
 
   let profile = await getStudentProfile(user.id, decodedName)
 
-  // Fallback: generate on-demand if missing (covers new students or prior fire-and-forget failures)
-  if (!profile) {
+  // Regenerate if missing or stale (old format without growthIntelligence)
+  const needsRegeneration = !profile || !profile.growthIntelligence
+
+  if (needsRegeneration) {
     try {
       await generateStudentProfile(user.id, decodedName)
       profile = await getStudentProfile(user.id, decodedName)

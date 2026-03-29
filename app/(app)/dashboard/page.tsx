@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { SpeakerInput } from '@/components/SpeakerInput'
-import { DropZone } from '@/components/DropZone'
-import { ProcessingView } from '@/components/ProcessingView'
-import { PaywallModal } from '@/components/PaywallModal'
-import { ROUTES } from '@/lib/constants'
+import { SpeakerInput } from '@/components/session/SpeakerInput'
+import { DropZone } from '@/components/session/DropZone'
+import { ProcessingView } from '@/components/session/ProcessingView'
+import { PaywallModal } from '@/components/subscription/PaywallModal'
+import { ROUTES, BRAND } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTempZip } from '@/lib/supabase/storage'
-import { useSemesterContext } from '@/components/SemesterContext'
-import { useSubscription } from '@/components/SubscriptionContext'
+import { useSemesterContext } from '@/components/semester/SemesterContext'
+import { useSubscription } from '@/components/subscription/SubscriptionContext'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const { activeSemester } = useSemesterContext()
   const { canGenerate, reason, isLoading: subscriptionLoading, refreshSubscription } = useSubscription()
   const [checkoutSuccess, setCheckoutSuccess] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false)
   const [speakerName, setSpeakerName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -26,20 +27,45 @@ export default function DashboardPage() {
   // Holds the session ID from API response until the completion animation fires
   const pendingSessionIdRef = useRef<string | null>(null)
 
-  // Handle post-checkout redirect
+  // Handle post-checkout redirect — verify with Stripe and sync DB
   useEffect(() => {
     if (searchParams.get('checkout') === 'success') {
-      setCheckoutSuccess(true)
-      refreshSubscription()
+      const sessionId = searchParams.get('session_id')
+
+      async function verifyCheckout() {
+        if (sessionId) {
+          try {
+            await fetch(`/api/stripe/checkout?session_id=${sessionId}`)
+          } catch {
+            // Verification failed — webhook may still handle it
+          }
+        }
+        await refreshSubscription()
+        setCheckoutSuccess(true)
+      }
+
+      verifyCheckout()
+
       // Clean up URL
       const url = new URL(window.location.href)
       url.searchParams.delete('checkout')
+      url.searchParams.delete('session_id')
       router.replace(url.pathname + url.search, { scroll: false })
       // Auto-dismiss after 5 seconds
       const timer = setTimeout(() => setCheckoutSuccess(false), 5000)
       return () => clearTimeout(timer)
     }
   }, [searchParams, refreshSubscription, router])
+
+  // Handle post-signup welcome
+  useEffect(() => {
+    if (searchParams.get('welcome') === 'true') {
+      setShowWelcome(true)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('welcome')
+      router.replace(url.pathname + url.search, { scroll: false })
+    }
+  }, [searchParams, router])
 
   const handleGenerate = async () => {
     if (!speakerName || !file) return
@@ -107,7 +133,7 @@ export default function DashboardPage() {
   }, [])
 
   if (!subscriptionLoading && !canGenerate) {
-    return <PaywallModal reason={reason} />
+    return <PaywallModal reason={reason} onClose={() => router.push(ROUTES.HISTORY)} />
   }
 
   return (
@@ -133,6 +159,31 @@ export default function DashboardPage() {
               }}
             >
               Subscription activated! You&apos;re all set to generate sessions.
+            </div>
+          )}
+
+          {/* Welcome card for first-time signups */}
+          {showWelcome && (
+            <div
+              className="animate-fade-up p-5 rounded-xl border text-sm font-[family-name:var(--font-dm-sans)]"
+              style={{
+                background: 'rgba(84, 39, 133, 0.08)',
+                borderColor: 'rgba(84, 39, 133, 0.25)',
+              }}
+            >
+              <h3 className="font-semibold text-[var(--text-primary)] text-base mb-1 font-[family-name:var(--font-playfair)]">
+                Welcome to MGMT 305!
+              </h3>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                Your 3-day free trial is active. Upload your first Canvas ZIP to generate a question sheet.
+              </p>
+              <button
+                onClick={() => setShowWelcome(false)}
+                className="mt-3 text-xs font-bold hover:underline font-[family-name:var(--font-dm-sans)]"
+                style={{ color: BRAND.PURPLE }}
+              >
+                Got it
+              </button>
             </div>
           )}
 

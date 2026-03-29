@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useParams } from 'next/navigation'
-import { OutputPreview } from '@/components/OutputPreview'
-import { DownloadButtons } from '@/components/DownloadButtons'
-import { AnalysisPanelLeft } from '@/components/AnalysisPanelLeft'
-import { AnalysisPanelRight } from '@/components/AnalysisPanelRight'
+import { OutputPreview } from '@/components/session/OutputPreview'
+import { DownloadButtons } from '@/components/session/DownloadButtons'
+import { AnalysisPanelLeft } from '@/components/analytics/AnalysisPanelLeft'
+import { AnalysisPanelRight } from '@/components/analytics/AnalysisPanelRight'
 import { ROUTES, APP_NAME } from '@/lib/constants'
 import type { SessionAnalysis } from '@/types'
 

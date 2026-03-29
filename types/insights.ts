@@ -15,6 +15,9 @@ export interface ClassInsights {
     title: string
     sessionCount: number
     isNew: boolean
+    summary: string
+    sessions: string[]
+    sampleQuestions: string[]
   }>
   watchlist: Array<{
     studentName: string
