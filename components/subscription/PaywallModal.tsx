@@ -11,6 +11,7 @@ interface PaywallModalProps {
 
 export function PaywallModal({ reason, onClose }: PaywallModalProps) {
   const [loadingPlan, setLoadingPlan] = useState<'monthly' | 'annual' | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const subtext =
     reason === 'free_used'
@@ -21,6 +22,7 @@ export function PaywallModal({ reason, onClose }: PaywallModalProps) {
 
   async function handleCheckout(plan: 'monthly' | 'annual') {
     setLoadingPlan(plan)
+    setError(null)
     try {
       const res = await fetch(ROUTES.API_STRIPE_CHECKOUT, {
         method: 'POST',
@@ -28,10 +30,19 @@ export function PaywallModal({ reason, onClose }: PaywallModalProps) {
         body: JSON.stringify({ plan }),
       })
       const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.')
+        setLoadingPlan(null)
+        return
+      }
       if (data.url) {
         window.location.href = data.url
+      } else {
+        setError('Unable to start checkout. Please try again.')
+        setLoadingPlan(null)
       }
     } catch {
+      setError('Network error. Please check your connection and try again.')
       setLoadingPlan(null)
     }
   }
@@ -156,6 +167,15 @@ export function PaywallModal({ reason, onClose }: PaywallModalProps) {
             )}
           </button>
         </div>
+
+        {error && (
+          <p
+            className="text-center text-xs font-[family-name:var(--font-dm-sans)] relative z-10 mb-3 px-4 py-2 rounded-lg"
+            style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+          >
+            {error}
+          </p>
+        )}
 
         <p
           className="text-center text-xs font-[family-name:var(--font-dm-sans)] relative z-10"
