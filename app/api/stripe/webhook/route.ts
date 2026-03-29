@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { updateSubscriptionFromWebhook } from '@/lib/db/subscription'
 import type Stripe from 'stripe'
 
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
+    event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error(`Webhook signature verification failed: ${message}`)
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
         const customerId = session.customer as string
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+          const subscription = await getStripe().subscriptions.retrieve(subscriptionId)
           const firstItem = subscription.items.data[0]
           await updateSubscriptionFromWebhook(customerId, {
             subscriptionStatus: 'active',

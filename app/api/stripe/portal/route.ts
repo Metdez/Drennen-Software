@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
 import { getSubscriptionProfile } from '@/lib/db/subscription'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: profile.stripeCustomerId,
     return_url: `${origin}/account`,
   })

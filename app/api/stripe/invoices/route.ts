@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/db/users'
 import { getSubscriptionProfile } from '@/lib/db/subscription'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +16,7 @@ export async function GET() {
     return NextResponse.json({ error: 'No billing account found' }, { status: 400 })
   }
 
-  const stripeInvoices = await stripe.invoices.list({
+  const stripeInvoices = await getStripe().invoices.list({
     customer: profile.stripeCustomerId,
     limit: 24,
   })
