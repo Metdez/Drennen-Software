@@ -76,7 +76,7 @@ export function PaywallModal({ reason }: PaywallModalProps) {
               className="text-lg font-bold mb-2 font-[family-name:var(--font-playfair)]"
               style={{ color: BRAND.ORANGE }}
             >
-              $X/mo
+              $25/mo
             </div>
             <div
               className="text-xs font-[family-name:var(--font-dm-sans)]"
@@ -120,13 +120,13 @@ export function PaywallModal({ reason }: PaywallModalProps) {
               className="text-lg font-bold mb-2 font-[family-name:var(--font-playfair)]"
               style={{ color: BRAND.ORANGE }}
             >
-              $X/yr
+              $240/yr
             </div>
             <div
               className="text-xs font-[family-name:var(--font-dm-sans)]"
               style={{ color: 'var(--text-muted)' }}
             >
-              Save with annual billing
+              $20/mo — save $60/yr
             </div>
             {loadingPlan === 'annual' && (
               <div
