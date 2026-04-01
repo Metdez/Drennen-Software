@@ -14,6 +14,7 @@ export async function insertSession(input: CreateSessionInput): Promise<Session>
       output: input.output,
       file_count: input.fileCount,
       semester_id: input.semesterId ?? null,
+      prompt_version_id: input.promptVersionId ?? null,
     })
     .select()
     .single()

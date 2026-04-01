@@ -63,8 +63,34 @@ Rules for formatting:
 9. What's next — vision and future bets
 10. One thing they want this audience to walk away understanding`
 
+export { SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT }
+
 export function buildSystemPrompt(speakerName: string): string {
   return SYSTEM_PROMPT.replace(/\{\{SPEAKER_NAME\}\}/g, speakerName)
+}
+
+export function buildCustomSystemPrompt(customPromptText: string, speakerName: string): string {
+  return customPromptText.replace(/\{\{SPEAKER_NAME\}\}/g, speakerName)
+}
+
+export function validateCustomPrompt(promptText: string): { valid: boolean; warnings: string[] } {
+  const trimmed = promptText.trim()
+  const warnings: string[] = []
+
+  if (!promptText.includes('{{SPEAKER_NAME}}')) {
+    warnings.push("Missing {{SPEAKER_NAME}} placeholder - speaker name won't be inserted.")
+  }
+  if (trimmed.length < 50) {
+    warnings.push('Prompt is very short - it may produce poor results.')
+  }
+  if (trimmed.length > 10000) {
+    warnings.push('Prompt exceeds 10,000 characters.')
+  }
+
+  return {
+    valid: trimmed.length >= 50 && trimmed.length <= 10000,
+    warnings,
+  }
 }
 
 export function buildUserMessage(studentSubmissionsText: string): string {

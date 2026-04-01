@@ -13,6 +13,11 @@ export interface GetSessionsResponse {
 
 export interface GetSessionResponse {
   session: Session
+  promptVersion?: {
+    id: string
+    version: number
+    label: string | null
+  } | null
 }
 
 export interface ApiError {

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSubscription } from '@/components/subscription/SubscriptionContext'
 import { PaywallModal } from '@/components/subscription/PaywallModal'
 import { PortfolioSharePanel } from '@/components/layout/PortfolioSharePanel'
+import { SystemPromptEditor } from '@/components/session/SystemPromptEditor'
 import { BRAND, ROUTES } from '@/lib/constants'
 
 interface Invoice {
@@ -210,6 +211,22 @@ export default function AccountPage() {
           {/* Portfolio Share Panel */}
           <div className="animate-fade-up-delay-2">
             <PortfolioSharePanel />
+          </div>
+
+          <div
+            className="animate-fade-up-delay-2 rounded-3xl p-8"
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border-accent)',
+            }}
+          >
+            <h2 className="font-[family-name:var(--font-playfair)] text-2xl font-bold text-[var(--text-primary)]">
+              AI System Prompt
+            </h2>
+            <p className="mt-2 mb-6 text-sm font-[family-name:var(--font-dm-sans)] text-[var(--text-secondary)]">
+              Customize the prompt used to generate interview sheets from student submissions.
+            </p>
+            <SystemPromptEditor compact={false} defaultExpanded={false} />
           </div>
         </div>
 

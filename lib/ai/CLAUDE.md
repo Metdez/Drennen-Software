@@ -47,7 +47,7 @@ These are triggered by `/api/process` or debrief completion and run in the backg
 - `debriefReflectionAnalysis.ts` — analyzes student post-session reflections
 
 ### Support files
-- `prompt.ts` — system prompt template with `{{SPEAKER_NAME}}` placeholder
+- `prompt.ts` — built-in system prompt template, `DEFAULT_SYSTEM_PROMPT`, custom prompt interpolation, validation helpers
 - `geminiClient.ts` — shared Gemini client singleton
 
 ## Adding a New Agent

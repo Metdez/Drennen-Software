@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { buildSystemPrompt, buildUserMessage } from './prompt'
+import { buildCustomSystemPrompt, buildSystemPrompt, buildUserMessage } from './prompt'
 
 // Lazy initialization — avoids crash at build time when env vars are absent
 let xai: OpenAI | null = null
@@ -20,9 +20,12 @@ export interface GenerationResult {
 
 export async function generateQuestionSheet(
   speakerName: string,
-  studentSubmissionsText: string
+  studentSubmissionsText: string,
+  customPromptText?: string
 ): Promise<GenerationResult> {
-  const systemPrompt = buildSystemPrompt(speakerName)
+  const systemPrompt = customPromptText
+    ? buildCustomSystemPrompt(customPromptText, speakerName)
+    : buildSystemPrompt(speakerName)
   const userMessage = buildUserMessage(studentSubmissionsText)
 
   try {

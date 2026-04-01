@@ -6,7 +6,7 @@ Components are organized by feature domain:
 
 | Directory | Purpose |
 |-----------|---------|
-| `session/` | Session display, upload, download, sharing |
+| `session/` | Session display, upload, download, sharing, prompt customization |
 | `analytics/` | Analysis panels, theme visualization, synthesis, CollapsiblePanel, WhatChangedBanner, ThemeExplorer |
 | `student/` | Roster, profiles, growth, notes, reflections |
 | `speaker/` | Speaker briefs, portals, analysis uploads |

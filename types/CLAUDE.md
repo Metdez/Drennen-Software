@@ -36,6 +36,7 @@ One file per domain entity. Naming uses snake_case to match the domain (e.g., `s
 | `portfolio.ts` | `PortfolioConfig`, `PortfolioShare` |
 | `story.ts` | `SemesterStory`, `StorySection` |
 | `session_synthesis.ts` | `SessionSynthesis` |
+| `system_prompt.ts` | `SystemPrompt`, `SystemPromptRow`, `CreateSystemPromptInput` |
 | `speaker_portal.ts` | `SpeakerPortalContent`, `SpeakerPortal` |
 | `speaker_brief.ts` | `SpeakerBriefContent`, `SpeakerBrief` |
 | `student_debrief.ts` | `StudentDebriefSubmissionRow`, `StudentDebriefAnalysis` |

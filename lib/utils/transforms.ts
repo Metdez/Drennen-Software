@@ -9,6 +9,7 @@ export function rowToSession(row: SessionRow): Session {
     output: row.output,
     fileCount: row.file_count,
     semesterId: row.semester_id ?? null,
+    promptVersionId: row.prompt_version_id ?? null,
   }
 }
 

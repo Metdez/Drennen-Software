@@ -8,6 +8,14 @@ export interface ParsedSubmission {
   text: string
 }
 
+export function formatSubmissionsForAi(
+  submissions: Array<{ studentName: string; filename: string; text: string }>
+): string {
+  return submissions
+    .map((sub) => `---\nSTUDENT: ${sub.studentName}\nFILE: ${sub.filename}\n\n${sub.text}`)
+    .join('\n\n')
+}
+
 function toTitleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
@@ -89,13 +97,8 @@ export async function buildSubmissionsText(zipBuffer: Buffer): Promise<{
   )
   const submissions = results.filter((s): s is ParsedSubmission => s !== null)
 
-  // Build the formatted string for the AI
-  const sections = submissions.map(sub =>
-    `---\nSTUDENT: ${sub.studentName}\nFILE: ${sub.filename}\n\n${sub.text}`
-  )
-
   return {
-    text: sections.join('\n\n'),
+    text: formatSubmissionsForAi(submissions),
     fileCount: submissions.length,
     submissions,
   }

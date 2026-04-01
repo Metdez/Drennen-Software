@@ -12,6 +12,7 @@ import { generateStudentProfiles } from '@/lib/ai/studentProfile'
 import { classifyAndStoreTiers } from '@/lib/ai/tierClassifier'
 import { getActiveSemester } from '@/lib/db/semesters'
 import { checkSubscriptionAccess, decrementFreeSession } from '@/lib/db/subscription'
+import { getActivePrompt } from '@/lib/db/systemPrompts'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +50,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No readable student files found in ZIP' }, { status: 400 })
     }
 
-    const { output } = await generateQuestionSheet(speakerName.trim(), text)
+    const activePrompt = await getActivePrompt(user.id)
+    const customPromptText = activePrompt?.promptText ?? undefined
+
+    const { output } = await generateQuestionSheet(speakerName.trim(), text, customPromptText)
 
     const activeSemester = await getActiveSemester(user.id)
     const semesterId = activeSemester?.id ?? null
@@ -60,6 +64,7 @@ export async function POST(request: Request) {
       output,
       fileCount,
       semesterId,
+      promptVersionId: activePrompt?.id ?? null,
     })
 
     if (access.reason === 'free_session') {

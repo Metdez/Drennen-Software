@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { OutputPreview } from '@/components/session/OutputPreview'
 import { DownloadButtons } from '@/components/session/DownloadButtons'
 import { ShareButton } from '@/components/session/ShareButton'
+import { SystemPromptEditor } from '@/components/session/SystemPromptEditor'
 import { GeneratePortalButton } from '@/components/speaker/GeneratePortalButton'
 import { AnalysisPanelLeft } from '@/components/analytics/AnalysisPanelLeft'
 import { AnalysisPanelRight } from '@/components/analytics/AnalysisPanelRight'
@@ -20,6 +21,7 @@ import type { Session, SessionAnalysis, SessionDebrief, StudentSpeakerAnalysis, 
 type Tab = 'questions' | 'analysis' | 'insights' | 'debrief' | 'speaker-analysis' | 'reflections'
 
 function PreviewContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('sessionId')
 
@@ -46,6 +48,8 @@ function PreviewContent() {
   const [hasStudentDebriefs, setHasStudentDebriefs] = useState(false)
   const [studentDebriefLoading, setStudentDebriefLoading] = useState(false)
   const [studentDebriefFetched, setStudentDebriefFetched] = useState(false)
+  const [promptEditorOpen, setPromptEditorOpen] = useState(false)
+  const [promptVersion, setPromptVersion] = useState<{ id: string; version: number; label: string | null } | null>(null)
 
   const fetchAnalysis = useCallback(async () => {
     if (!sessionId) return
@@ -203,6 +207,7 @@ function PreviewContent() {
 
         const data = await res.json()
         setSession(data.session)
+        setPromptVersion(data.promptVersion ?? null)
         if (!storedOutput && data.session?.output) {
           setOutput(data.session.output)
         }
@@ -321,6 +326,12 @@ function PreviewContent() {
                   </svg>
                   {session.fileCount} {session.fileCount === 1 ? 'file' : 'files'}
                 </span>
+                <span className="session-meta-pill">
+                  <svg className="h-3.5 w-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-2.122-.707A4.5 4.5 0 014.5 13.5V6A1.5 1.5 0 016 4.5h12A1.5 1.5 0 0119.5 6v7.5a4.5 4.5 0 01-2.378 4.043L15 18.75l-.813-2.846A3 3 0 0011.25 13.5h1.5a3 3 0 00-2.937 2.404Z" />
+                  </svg>
+                  {promptVersion ? `Custom prompt v${promptVersion.version}` : 'Default prompt'}
+                </span>
               </div>
             </div>
 
@@ -343,11 +354,35 @@ function PreviewContent() {
                   </svg>
                   <span className="hidden sm:inline">Debrief</span>
                 </button>
+                <button
+                  onClick={() => setPromptEditorOpen((value) => !value)}
+                  className="session-action-btn"
+                  title="Customize system prompt"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.592c.55 0 1.02.398 1.11.94l.213 1.278c.066.395.33.728.69.871a7.03 7.03 0 011.265.672.75.75 0 001.026-.145l.83-.996a1.125 1.125 0 011.59-.104l1.832 1.832c.39.39.435 1.01.104 1.59l-.996.83a.75.75 0 00-.145 1.026c.265.39.49.814.672 1.265.143.36.476.624.87.69l1.279.213c.542.09.94.56.94 1.11v2.592c0 .55-.398 1.02-.94 1.11l-1.278.213a1.125 1.125 0 00-.871.69 7.03 7.03 0 01-.672 1.265.75.75 0 00.145 1.026l.996.83c.331.58.286 1.2-.104 1.59l-1.832 1.832a1.125 1.125 0 01-1.59-.104l-.83-.996a.75.75 0 00-1.026-.145 7.03 7.03 0 01-1.265.672 1.125 1.125 0 00-.69.87l-.213 1.279c-.09.542-.56.94-1.11.94h-2.592c-.55 0-1.02-.398-1.11-.94l-.213-1.278a1.125 1.125 0 00-.69-.871 7.03 7.03 0 01-1.265-.672.75.75 0 00-1.026.145l-.83.996a1.125 1.125 0 01-1.59.104L2.62 19.484a1.125 1.125 0 01-.104-1.59l.996-.83a.75.75 0 00.145-1.026 7.03 7.03 0 01-.672-1.265 1.125 1.125 0 00-.87-.69l-1.279-.213A1.125 1.125 0 010 13.296v-2.592c0-.55.398-1.02.94-1.11l1.278-.213c.395-.066.728-.33.871-.69a7.03 7.03 0 01.672-1.265.75.75 0 00-.145-1.026l-.996-.83a1.125 1.125 0 01.104-1.59L4.556 2.148a1.125 1.125 0 011.59.104l.83.996a.75.75 0 001.026.145 7.03 7.03 0 011.265-.672 1.125 1.125 0 00.69-.87l.213-1.279Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0Z" />
+                  </svg>
+                  <span className="hidden sm:inline">Prompt</span>
+                </button>
                 <GeneratePortalButton sessionId={sessionId} speakerName={session.speakerName} />
                 <ShareButton sessionId={sessionId} />
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {session && promptEditorOpen && (
+        <div className="mb-6 animate-fade-up">
+          <SystemPromptEditor
+            defaultExpanded
+            sessionId={sessionId ?? undefined}
+            onRerun={(newSessionId) => {
+              setActiveTab('questions')
+              router.push(`${ROUTES.PREVIEW}?sessionId=${newSessionId}`)
+            }}
+          />
         </div>
       )}
 

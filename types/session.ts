@@ -6,6 +6,7 @@ export interface SessionRow {
   output: string
   file_count: number
   semester_id: string | null
+  prompt_version_id: string | null
 }
 
 export interface Session {
@@ -16,6 +17,7 @@ export interface Session {
   output: string
   fileCount: number
   semesterId: string | null
+  promptVersionId: string | null
 }
 
 export interface CreateSessionInput {
@@ -24,6 +26,7 @@ export interface CreateSessionInput {
   output: string
   fileCount: number
   semesterId?: string | null
+  promptVersionId?: string | null
 }
 
 export interface SessionSummary {

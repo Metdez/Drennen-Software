@@ -21,6 +21,7 @@ The `sessions` table has **no UPDATE or DELETE policies** by design. Sessions ar
 |------|----------|---------------|
 | `users.ts` | `profiles` (via auth) | `getCurrentUser()` |
 | `sessions.ts` | `sessions` | `insertSession()`, `getSessionById()`, `listSessions()` |
+| `systemPrompts.ts` | `custom_system_prompts` | `getActivePrompt()`, `getPromptVersions()`, `createPromptVersion()`, `activatePromptVersion()`, `resetToDefault()` |
 | `studentSubmissions.ts` | `student_submissions` | `getStudentsWithParticipation()`, `getStudentDetail()` |
 | `studentProfiles.ts` | `student_profiles` | `getStudentProfile()`, `upsertStudentProfile()`, `getGrowthSignalsForUser()` |
 | `professorNotes.ts` | `professor_student_notes` | `getProfessorNotes()`, `addProfessorNote()`, `deleteProfessorNote()` |

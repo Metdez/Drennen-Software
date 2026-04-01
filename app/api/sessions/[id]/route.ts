@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getPromptById } from '@/lib/db/systemPrompts'
 import { getCurrentUser } from '@/lib/db/users'
 import { getSessionById } from '@/lib/db/sessions'
 
@@ -23,7 +24,20 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ session })
+    const promptVersion = session.promptVersionId
+      ? await getPromptById(session.promptVersionId)
+      : null
+
+    return NextResponse.json({
+      session,
+      promptVersion: promptVersion
+        ? {
+            id: promptVersion.id,
+            version: promptVersion.version,
+            label: promptVersion.label,
+          }
+        : null,
+    })
 
   } catch (err) {
     console.error('[/api/sessions/[id]]', err)

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { SpeakerInput } from '@/components/session/SpeakerInput'
 import { DropZone } from '@/components/session/DropZone'
 import { ProcessingView } from '@/components/session/ProcessingView'
+import { SystemPromptEditor } from '@/components/session/SystemPromptEditor'
 import { PaywallModal } from '@/components/subscription/PaywallModal'
 import { ROUTES, BRAND } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/client'
@@ -202,6 +203,10 @@ export default function DashboardPage() {
                 Uploading to: {activeSemester.name}
               </div>
             )}
+          </div>
+
+          <div className="animate-fade-up-delay-1">
+            <SystemPromptEditor compact defaultExpanded={false} />
           </div>
 
           {/* Error */}
