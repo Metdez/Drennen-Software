@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { searchNaicsByKeyword } from './naics-client';
 import { getIndustryBucket, type IndustryBucket } from '../constants/industry-buckets';
 import { logger, IngestionError } from '../utils/logger';
@@ -10,32 +10,32 @@ import { logger, IngestionError } from '../utils/logger';
  * Example: A holding company classified under "Management of Companies" (551)
  * but whose primary operations are fossil fuel extraction.
  */
-const MANUAL_OVERRIDES: Record<string, { naicsCode: string; bucket: IndustryBucket }> = {
-  'koch industries': { naicsCode: '211110', bucket: 'fossil_fuel' },
-  'exxonmobil': { naicsCode: '211120', bucket: 'fossil_fuel' },
-  'chevron': { naicsCode: '211120', bucket: 'fossil_fuel' },
-  'bp': { naicsCode: '211120', bucket: 'fossil_fuel' },
-  'shell': { naicsCode: '211120', bucket: 'fossil_fuel' },
-  'raytheon': { naicsCode: '336411', bucket: 'defense' },
-  'rtx corporation': { naicsCode: '336411', bucket: 'defense' },
-  'lockheed martin': { naicsCode: '336411', bucket: 'defense' },
-  'northrop grumman': { naicsCode: '336411', bucket: 'defense' },
-  'general dynamics': { naicsCode: '336411', bucket: 'defense' },
-  'boeing': { naicsCode: '336411', bucket: 'defense' },
-  'the boeing company': { naicsCode: '336411', bucket: 'defense' },
-  'bae systems': { naicsCode: '336411', bucket: 'defense' },
-  'jpmorgan chase': { naicsCode: '522110', bucket: 'finance' },
-  'goldman sachs': { naicsCode: '523110', bucket: 'finance' },
-  'carlyle group': { naicsCode: '523910', bucket: 'finance' },
-  'blackrock': { naicsCode: '523920', bucket: 'finance' },
-  'google': { naicsCode: '519130', bucket: 'tech' },
-  'alphabet': { naicsCode: '519130', bucket: 'tech' },
-  'meta platforms': { naicsCode: '519130', bucket: 'tech' },
-  'microsoft': { naicsCode: '511210', bucket: 'tech' },
-  'amazon': { naicsCode: '454110', bucket: 'tech' },
-  'pfizer': { naicsCode: '325412', bucket: 'healthcare' },
-  'johnson & johnson': { naicsCode: '325412', bucket: 'healthcare' },
-  'unitedhealth': { naicsCode: '524114', bucket: 'healthcare' },
+const MANUAL_OVERRIDES: Record<string, { naicsCode: string; industryBucket: IndustryBucket }> = {
+  'koch industries': { naicsCode: '211110', industryBucket: 'fossil_fuel' },
+  'exxonmobil': { naicsCode: '211120', industryBucket: 'fossil_fuel' },
+  'chevron': { naicsCode: '211120', industryBucket: 'fossil_fuel' },
+  'bp': { naicsCode: '211120', industryBucket: 'fossil_fuel' },
+  'shell': { naicsCode: '211120', industryBucket: 'fossil_fuel' },
+  'raytheon': { naicsCode: '336411', industryBucket: 'defense' },
+  'rtx corporation': { naicsCode: '336411', industryBucket: 'defense' },
+  'lockheed martin': { naicsCode: '336411', industryBucket: 'defense' },
+  'northrop grumman': { naicsCode: '336411', industryBucket: 'defense' },
+  'general dynamics': { naicsCode: '336411', industryBucket: 'defense' },
+  'boeing': { naicsCode: '336411', industryBucket: 'defense' },
+  'the boeing company': { naicsCode: '336411', industryBucket: 'defense' },
+  'bae systems': { naicsCode: '336411', industryBucket: 'defense' },
+  'jpmorgan chase': { naicsCode: '522110', industryBucket: 'finance' },
+  'goldman sachs': { naicsCode: '523110', industryBucket: 'finance' },
+  'carlyle group': { naicsCode: '523910', industryBucket: 'finance' },
+  'blackrock': { naicsCode: '523920', industryBucket: 'finance' },
+  'google': { naicsCode: '519130', industryBucket: 'tech' },
+  'alphabet': { naicsCode: '519130', industryBucket: 'tech' },
+  'meta platforms': { naicsCode: '519130', industryBucket: 'tech' },
+  'microsoft': { naicsCode: '511210', industryBucket: 'tech' },
+  'amazon': { naicsCode: '454110', industryBucket: 'tech' },
+  'pfizer': { naicsCode: '325412', industryBucket: 'healthcare' },
+  'johnson & johnson': { naicsCode: '325412', industryBucket: 'healthcare' },
+  'unitedhealth': { naicsCode: '524114', industryBucket: 'healthcare' },
 };
 
 /**
@@ -62,7 +62,7 @@ export async function tagIndustry(
       logger.debug('Industry tag via manual override', {
         companyName,
         naicsCode: override.naicsCode,
-        bucket: override.bucket,
+        bucket: override.industryBucket,
       });
       return override;
     }
@@ -113,7 +113,8 @@ export async function tagIndustry(
  * looks up the donor entity name, tags it, and updates the donations.
  */
 export async function tagUntaggedDonations(
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
   batchSize: number = 50,
 ): Promise<{ tagged: number; failed: number }> {
   // Fetch donations that are resolved (have donor_id) but untagged

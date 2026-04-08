@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { searchCompanies } from './opencorporates-client';
 import { logger, IngestionError } from '../utils/logger';
 import type { DonorResolutionResult } from '../types/donor-resolution';
@@ -113,7 +113,8 @@ export function pickBestMatch(
  */
 export async function resolveDonorName(
   rawName: string,
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
 ): Promise<DonorResolutionResult> {
   const normalized = normalizeName(rawName);
 
