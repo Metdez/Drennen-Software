@@ -61,3 +61,5 @@
 | [mini-visualizations.md](mini-visualizations.md) | Compact viz components for entity profiles | 2026-04-07 |
 | [OptimizedImage.md](OptimizedImage.md) | Next/image wrapper with blur placeholder | 2026-04-07 |
 | [seo.md](seo.md) | SEO module: metadata, OG images, JSON-LD structured data | 2026-04-07 |
+| [refresh-orchestrator.md](refresh-orchestrator.md) | Data refresh orchestrator and trigger script | 2026-04-07 |
+| [health-checks.md](health-checks.md) | Health check utilities, /api/health endpoint, /status page | 2026-04-07 |

@@ -1,6 +1,7 @@
 import { Playfair_Display, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import { siteMetadata } from '@/lib/seo/metadata';
 import { SkipToContent } from '@/components/ui/SkipToContent';
+import { Analytics } from '@/components/Analytics';
 import './globals.css';
 
 const playfairDisplay = Playfair_Display({
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body>
         <SkipToContent />
         {children}
+        <Analytics />
       </body>
     </html>
   );

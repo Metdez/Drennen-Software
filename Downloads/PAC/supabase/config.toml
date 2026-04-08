@@ -1,0 +1,23 @@
+# Supabase local development configuration
+# See: https://supabase.com/docs/guides/cli/config
+
+# project_id = "pac-influence-tracker"
+
+# ─── Cron Scheduling ────────────────────────────────────────────────────────
+# Supabase config.toml does not support cron job definitions.
+# Weekly data refresh should be configured via one of:
+#
+#   1. Supabase Dashboard → Database → Extensions → pg_cron
+#      SELECT cron.schedule(
+#        'weekly-data-refresh',
+#        '0 3 * * 0',  -- Every Sunday at 3:00 AM UTC
+#        $$SELECT net.http_post(
+#          url := 'https://your-app.vercel.app/api/refresh',
+#          headers := '{"Authorization": "Bearer YOUR_CRON_SECRET"}'::jsonb
+#        )$$
+#      );
+#
+#   2. External scheduler (GitHub Actions, cron server) running:
+#      npx tsx scripts/trigger-refresh.ts
+#
+# See docs/refresh-orchestrator.md for details.

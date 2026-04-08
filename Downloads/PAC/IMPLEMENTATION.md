@@ -249,6 +249,7 @@ Built the full entity profile system: composite `EntityProfile` type (`lib/profi
 
 - [ ] Performance audit (Core Web Vitals)
 - [x] SEO: meta tags, OG images, structured data (lib/seo/*, components/StructuredData, OG route)
+- [x] Health check API (`/api/health`) and status page (`/status`)
 - [ ] Error boundaries and loading states
 - [ ] Deploy to Vercel
 - [ ] Set up Supabase cron for periodic data refresh
