@@ -63,3 +63,4 @@
 | [seo.md](seo.md) | SEO module: metadata, OG images, JSON-LD structured data | 2026-04-07 |
 | [refresh-orchestrator.md](refresh-orchestrator.md) | Data refresh orchestrator and trigger script | 2026-04-07 |
 | [health-checks.md](health-checks.md) | Health check utilities, /api/health endpoint, /status page | 2026-04-07 |
+| [deploy.md](deploy.md) | Pre-deploy checklist script | 2026-04-07 |

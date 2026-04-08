@@ -4,6 +4,7 @@ import type { NextConfig } from 'next';
 // Or use the npm script: pnpm analyze
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.supabase.co' },

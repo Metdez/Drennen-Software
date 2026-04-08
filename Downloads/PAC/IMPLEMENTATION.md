@@ -251,7 +251,7 @@ Built the full entity profile system: composite `EntityProfile` type (`lib/profi
 - [x] SEO: meta tags, OG images, structured data (lib/seo/*, components/StructuredData, OG route)
 - [x] Health check API (`/api/health`) and status page (`/status`)
 - [ ] Error boundaries and loading states
-- [ ] Deploy to Vercel
+- [x] Vercel deployment config (vercel.json, standalone output, deploy.ts checklist)
 - [ ] Set up Supabase cron for periodic data refresh
 - [ ] Write README.md for the GitHub repo
 
