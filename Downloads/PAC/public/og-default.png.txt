@@ -1,0 +1,13 @@
+OG Default Image Specification
+==============================
+Dimensions: 1200 x 630 px
+Background: #0a0a0f (dark)
+Font: Serif for title, sans-serif for tagline
+
+Layout:
+- Center-aligned vertically
+- Title: "Think Tank Influence Tracker" in white (#f9fafb), ~48px serif
+- Tagline: "Follow the Money" in gray (#9ca3af), ~24px
+- Bottom: "thinktanktracker.org" in dim gray (#6b7280), ~18px
+
+Replace this file with a proper PNG image before production deployment.
