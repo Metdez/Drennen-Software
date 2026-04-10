@@ -1,6 +1,68 @@
+/**
+ * @file lib/db/classInsights.ts
+ *
+ * Persists and retrieves the Gemini-generated cross-session class analysis
+ * stored in the `class_insights` table. Each professor has at most one row per
+ * "scope" — either one global row (semester_id IS NULL) or one row per
+ * semester.
+ *
+ * `upsertClassInsights` uses a manual check-then-insert/update pattern because
+ * Supabase JS's `.upsert()` does not support partial unique indexes (the index
+ * is on (user_id) WHERE semester_id IS NULL, and (user_id, semester_id)
+ * otherwise).
+ *
+ * `fetchInsightsInput` is a multi-table aggregation query that assembles all
+ * the data Gemini needs: sessions, themes, debrief ratings, and student
+ * reflection analyses. It is called from `lib/ai/classInsights.ts` as a
+ * fire-and-forget background job after each session upload and debrief
+ * completion.
+ *
+ * Table(s):
+ *   - `class_insights` (primary)
+ *   - `sessions`, `session_themes`, `student_submissions`,
+ *     `session_debriefs`, `student_debrief_analyses` (read-only in fetchInsightsInput)
+ *
+ * Client: createAdminClient() — all functions here run in background jobs
+ *   that do not have a request cookie context.
+ */
+
 import { createAdminClient } from '@/lib/supabase/server'
 import type { ClassInsights, ThemeEvolutionEntry, QuestionFeedback, DebriefStatus } from '@/types'
 
+/**
+ * Retrieves the cached Gemini class analysis for a professor, scoped to a
+ * semester or global (no semester filter).
+ *
+ * Returns `null` rather than throwing when no analysis exists yet — callers
+ * should treat null as "not yet generated" and trigger generation if needed.
+ *
+ * @param userId - The professor's user ID.
+ * @param semesterId - Optional semester UUID. When omitted, the global
+ *   (semester_id IS NULL) row is returned.
+ * @returns The `ClassInsights` JSONB blob, or `null` if not yet generated.
+ * @throws Error if the DB query fails.
+ *
+ * Called by: app/api/analytics/insights/route.ts (GET)
+ * Table: class_insights
+ * Client: createAdminClient() — bypasses RLS (background job context)
+ */
+/**
+ * Retrieves the cached Gemini class analysis for a professor, scoped to a
+ * semester or global (no semester filter).
+ *
+ * Returns `null` rather than throwing when no analysis exists yet — callers
+ * should treat null as "not yet generated" and trigger generation if needed.
+ *
+ * @param userId - The professor's user ID.
+ * @param semesterId - Optional semester UUID. When omitted, the global
+ *   (semester_id IS NULL) row is returned.
+ * @returns The `ClassInsights` JSONB blob, or `null` if not yet generated.
+ * @throws Error if the DB query fails.
+ *
+ * Called by: app/api/analytics/insights/route.ts (GET)
+ * Table: class_insights
+ * Client: createAdminClient() — bypasses RLS (background job context)
+ */
 export async function getClassInsights(userId: string, semesterId?: string): Promise<ClassInsights | null> {
   const supabase = createAdminClient()
   let query = supabase
@@ -17,6 +79,50 @@ export async function getClassInsights(userId: string, semesterId?: string): Pro
   return data ? (data.analysis as ClassInsights) : null
 }
 
+/**
+ * Saves (or replaces) the Gemini class analysis for a professor's scope.
+ *
+ * Uses a manual check-then-insert/update pattern because Supabase JS's
+ * `.upsert()` cannot resolve partial unique indexes. The check and the
+ * subsequent write are NOT in a transaction, which is acceptable here because
+ * class insights are regenerated frequently and the worst case is two nearly
+ * simultaneous writes overwriting each other (idempotent outcome).
+ *
+ * @param userId - The professor's user ID.
+ * @param analysis - The fully generated `ClassInsights` object to persist.
+ * @param sessionCount - The number of sessions included in this analysis
+ *   (stored for display/staleness checks).
+ * @param semesterId - Optional semester UUID. When omitted, writes to the
+ *   global (semester_id IS NULL) row.
+ * @returns void — throws if any DB operation fails.
+ *
+ * Called by: lib/ai/classInsights.ts (fire-and-forget after session upload
+ *   and debrief completion)
+ * Table: class_insights
+ * Client: createAdminClient() — bypasses RLS (background job context)
+ */
+/**
+ * Saves (or replaces) the Gemini class analysis for a professor's scope.
+ *
+ * Uses a manual check-then-insert/update pattern because Supabase JS's
+ * `.upsert()` cannot resolve partial unique indexes. The check and the
+ * subsequent write are NOT in a transaction, which is acceptable here because
+ * class insights are regenerated frequently and the worst case is two nearly
+ * simultaneous writes overwriting each other (idempotent outcome).
+ *
+ * @param userId - The professor's user ID.
+ * @param analysis - The fully generated `ClassInsights` object to persist.
+ * @param sessionCount - The number of sessions included in this analysis
+ *   (stored for display/staleness checks).
+ * @param semesterId - Optional semester UUID. When omitted, writes to the
+ *   global (semester_id IS NULL) row.
+ * @returns void — throws if any DB operation fails.
+ *
+ * Called by: lib/ai/classInsights.ts (fire-and-forget after session upload
+ *   and debrief completion)
+ * Table: class_insights
+ * Client: createAdminClient() — bypasses RLS (background job context)
+ */
 export async function upsertClassInsights(
   userId: string,
   analysis: ClassInsights,
@@ -25,7 +131,8 @@ export async function upsertClassInsights(
 ): Promise<void> {
   const supabase = createAdminClient()
 
-  // Partial unique indexes don't work with Supabase JS upsert, so check-then-insert/update
+  // Partial unique indexes don't work with Supabase JS upsert, so use
+  // check-then-insert/update. See file-level comment for rationale.
   let query = supabase
     .from('class_insights')
     .select('id')
@@ -57,6 +164,22 @@ export async function upsertClassInsights(
   }
 }
 
+/**
+ * Shape of the aggregated input passed to `lib/ai/classInsights.ts` for
+ * Gemini class analysis generation.
+ */
+/**
+ * Shape of the aggregated input passed to `lib/ai/classInsights.ts` for
+ * Gemini class analysis generation.
+ *
+ * It provides a comprehensive view of a professor's sessions, including details like
+ * speaker name, date, submission counts, identified themes, professor's debrief ratings
+ * and follow-ups, and student reflection summaries and themes. Additionally, it includes
+ * a student leaderboard and a list of students potentially dropping off.
+ *
+ * Each field is specifically designed to provide context for the AI to generate rich,
+ * narrative class insights.
+ */
 export interface InsightsInput {
   sessions: Array<{
     sessionId: string
@@ -75,10 +198,48 @@ export interface InsightsInput {
   dropoff: Array<{ studentName: string; lastSeenSpeaker: string }>
 }
 
+/**
+ * Assembles all data needed by the Gemini class analysis agent in a single
+ * multi-table fetch across sessions, themes, student submissions, professor
+ * debriefs, and student debrief analyses.
+ *
+ * Debrief and student-debrief queries are best-effort (errors are swallowed)
+ * so that missing debrief data does not block class insights generation.
+ *
+ * @param userId - The professor's user ID.
+ * @param semesterId - Optional semester UUID to scope the analysis.
+ * @returns `InsightsInput` with per-session enriched data, a top-10
+ *   leaderboard, and a list of recently absent students.
+ * @throws Error if the primary sessions, themes, or submissions queries fail.
+ *
+ * Called by: lib/ai/classInsights.ts (generateClassInsights)
+ * Table: sessions, session_themes, student_submissions, session_debriefs,
+ *        student_debrief_analyses
+ * Client: createAdminClient() — bypasses RLS (background job context)
+ */
+/**
+ * Assembles all data needed by the Gemini class analysis agent in a single
+ * multi-table fetch across sessions, themes, student submissions, professor
+ * debriefs, and student debrief analyses.
+ *
+ * Debrief and student-debrief queries are best-effort (errors are swallowed)
+ * so that missing debrief data does not block class insights generation.
+ *
+ * @param userId - The professor's user ID.
+ * @param semesterId - Optional semester UUID to scope the analysis.
+ * @returns `InsightsInput` with per-session enriched data, a top-10
+ *   leaderboard, and a list of recently absent students.
+ * @throws Error if the primary sessions, themes, or submissions queries fail.
+ *
+ * Called by: lib/ai/classInsights.ts (generateClassInsights)
+ * Table: sessions, session_themes, student_submissions, session_debriefs,
+ *         student_debrief_analyses
+ * Client: createAdminClient() — bypasses RLS (background job context)
+ */
 export async function fetchInsightsInput(userId: string, semesterId?: string): Promise<InsightsInput> {
   const supabase = createAdminClient()
 
-  // Sessions oldest-first
+  // Sessions oldest-first so the AI sees chronological progression
   let sessQuery = supabase
     .from('sessions')
     .select('id, speaker_name, created_at, file_count')
@@ -190,7 +351,9 @@ export async function fetchInsightsInput(userId: string, semesterId?: string): P
     .sort((a, b) => b.submissionCount - a.submissionCount)
     .slice(0, 10)
 
-  // Students missing from recent sessions (potential dropoff)
+  // Simplified drop-off heuristic for AI context: absent from the last 2 sessions.
+  // This is intentionally looser than the analytics page's 60/33 algorithm —
+  // the AI uses it for narrative context, not precise reporting.
   const recentSessions = sessions.slice(-2)
   const recentStudents = new Set(
     (studentRows ?? [])

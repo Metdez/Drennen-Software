@@ -1,12 +1,35 @@
+/**
+ * Public portfolio sessions list page (`/portfolio/[token]/sessions`).
+ *
+ * Route group: `(public)` — no auth required.
+ * Only reachable when the professor has enabled the `sessions` section in
+ * the portfolio config (enforced at the nav level by `PortfolioNav`).
+ *
+ * Reads the full session list from `PortfolioContext` (pre-fetched by the
+ * portfolio layout via `GET /api/portfolio/[token]`). Each session links to
+ * its detail page at `/portfolio/[token]/sessions/[sessionId]`.
+ *
+ * Components: inline render (no extracted components)
+ */
 'use client'
 
 import Link from 'next/link'
 import { usePortfolio } from '@/components/portfolio/PortfolioContext'
 
+/**
+ * 1. Formats an ISO date string into a localized, human-readable format.
+ * 2. It is used to present dates to the user in a consistent and easy-to-understand format (e.g., "Jan 1, 2023") rather than a raw ISO string.
+ * 3. It uses `Date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })` to achieve the desired output, specifically showing a three-letter month, day, and four-digit year.
+ */
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+/**
+ * 1. Renders the page for displaying all sessions associated with a specific portfolio.
+ * 2. This page serves as an entry point for users to view a list of sessions within a portfolio and navigate to individual session details. It provides an overview of the portfolio's sessions.
+ * 3. This is a client-side component (`'use client'`). It utilizes the `usePortfolio` hook from `PortfolioContext` to fetch and access portfolio-specific data. It handles loading and error states by rendering appropriate messages. The component displays a header, a summary of session and semester counts, and then iterates through the `data.sessions` array to render a clickable `Link` for each session. Each link navigates to the detailed view of that session (`/portfolio/[token]/sessions/[sessionId]`). Styling is applied using Tailwind CSS classes and CSS variables, and includes fade-up animations for UI elements.
+ */
 export default function PortfolioSessionsPage() {
   const { data, loading, error } = usePortfolio()
 

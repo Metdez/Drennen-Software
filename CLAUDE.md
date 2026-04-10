@@ -219,6 +219,7 @@ app/
 - `lib/parse/unzip.ts` — ZIP extraction with MAC directory filtering
 - `lib/parse/pdf.ts` — PDF text extraction
 - `lib/parse/docx.ts` — DOCX text extraction
+- `lib/parse/html.ts` — HTML text extraction (Canvas text-entry submissions saved as Chrome HTML Documents)
 - `lib/parse/parseQuestions.ts` — `parseSections()`, `parseQuestionsFromOutput()`: shared question parser used by OutputPreview and DebriefPanel
 
 **AI agents (`lib/ai/`)**
@@ -257,6 +258,7 @@ app/
 **Utilities**
 - `lib/utils/transforms.ts` — `rowToSession()`, `rowToSessionSummary()`, `rowToDebrief()` (snake_case → camelCase)
 - `lib/utils/format.ts` — `formatStudentName()`, `formatDate()`, `formatFileCount()`, `slugifySpeakerName()`
+- `lib/utils/errors.ts` — `extractErrorMessage()`: sanitizes raw AI/Gemini error JSON into human-readable strings; use in API route catch blocks
 - `lib/stripe/index.ts` — Stripe SDK lazy singleton (`apiVersion: '2026-03-25.dahlia'`)
 - `lib/constants/` — barrel at `index.ts` re-exports from:
   - `routes.ts` — `ROUTES` object with all route paths (static and dynamic)
@@ -367,6 +369,7 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 - **Never add UPDATE or DELETE queries for the `sessions` table.** Sessions are immutable by design.
 - **Never use `createAdminClient()` for user-scoped reads.** Use `createClient()` (cookie-based, RLS-enforced) unless you specifically need to bypass RLS for background jobs or cross-user queries.
 - **Never skip the type barrel.** All new types in `types/` must be re-exported from `types/index.ts`.
+- **Never use `alert()` for errors.** All error feedback must be inline (component `error` state rendered in the UI). API routes that call Gemini must use `extractErrorMessage()` from `lib/utils/errors.ts` in catch blocks so raw AI JSON never reaches the client.
 
 ### Decision log
 
@@ -402,7 +405,15 @@ When adding a new feature, follow this order. **Step 8 is mandatory — your wor
 Key directories have their own CLAUDE.md with local conventions:
 - `lib/ai/CLAUDE.md` — dual-AI system, agent catalog, client usage
 - `lib/db/CLAUDE.md` — naming conventions, client choice, table mapping
+- `lib/CLAUDE.md` — shared utility layer, import boundaries, directory map
+- `lib/constants/CLAUDE.md` — shared constants and route/brand barrel rules
+- `lib/parse/CLAUDE.md` — ZIP → text parsing pipeline and output parsers
+- `lib/supabase/CLAUDE.md` — browser/server/storage client split
+- `lib/utils/CLAUDE.md` — formatting, transforms, and error normalization
+- `lib/stripe/CLAUDE.md` — Stripe singleton and server-only usage
 - `components/CLAUDE.md` — directory structure, brand colors, component patterns
+- `app/CLAUDE.md` — app router shell, route groups, and page/route conventions
+- `app/api/CLAUDE.md` — route handler conventions, auth/RLS, and response rules
 - `lib/export/CLAUDE.md` — PDF/DOCX export patterns
 - `types/CLAUDE.md` — barrel export rules, Row vs Domain types
 ## Working Style & Preferences

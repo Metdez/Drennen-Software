@@ -1,3 +1,18 @@
+/**
+ * SemesterOnboardingBanner — First-time banner prompting professors to create semesters.
+ *
+ * Appears when: no semesters exist yet AND there are unassigned sessions AND the user
+ * has not dismissed it. Dismissal state is persisted to localStorage under
+ * `semester_onboarding_dismissed`. On dismiss or when hidden, still renders the
+ * create/assign modals as portals so they can be triggered programmatically.
+ *
+ * Clicking "Set Up Semesters" opens SemesterManageModal; on save it automatically
+ * opens AssignSessionsModal to immediately assign existing sessions.
+ *
+ * Rendered by: app/(app)/dashboard/page.tsx (or history page),
+ *              typically at the top of protected pages that list sessions
+ * Reads: SemesterContext (semesters, hasUnassigned, loading, refreshSemesters)
+ */
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -6,11 +21,23 @@ import { SemesterManageModal } from '@/components/semester/SemesterManageModal'
 import { AssignSessionsModal } from '@/components/semester/AssignSessionsModal'
 import { BRAND } from '@/lib/constants'
 
+/** localStorage key used to persist the user's one-time dismissal of this banner. */
+/**
+ * What it does: Defines the key used to store the dismissal status of the semester onboarding banner in local storage.
+ * Why it is used: To persist the user's decision to dismiss the banner, ensuring it only appears once unless explicitly reset.
+ * Important implementation details: It's a simple string constant, 'semester_onboarding_dismissed', used with `localStorage.getItem` and `localStorage.setItem`.
+ */
 const LS_KEY = 'semester_onboarding_dismissed'
 
+/**
+ * What it does: Displays a prominent banner to users who have unassigned sessions and no existing semesters, encouraging them to set up semesters.
+ * Why it is used: To guide new or unorganized users towards leveraging the semester organization feature, which unlocks advanced analytics and comparisons.
+ * Important implementation details: The banner's visibility is controlled by several factors: loading state, whether it has been dismissed (stored in `localStorage`), if semesters already exist, and if there are any unassigned sessions. It uses `useState` and `useEffect` for managing its own dismissal state and the open/closed state of associated modals. Clicking 'Set Up Semesters' opens `SemesterManageModal`, and upon successful creation, automatically opens `AssignSessionsModal`. The banner can also be dismissed via an 'x' button, which persists the dismissal in local storage.
+ */
 export function SemesterOnboardingBanner() {
   const { semesters, hasUnassigned, loading, refreshSemesters } =
     useSemesterContext()
+  // Watches the semester list + unassigned flag so onboarding modals open in the same flow as the selector/context.
 
   const [dismissed, setDismissed] = useState(true) // default hidden to avoid flash
   const [createOpen, setCreateOpen] = useState(false)

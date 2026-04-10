@@ -1,7 +1,64 @@
+/**
+ * @file lib/ai/classInsights.ts
+ *
+ * Generates cross-session class-level insights by feeding all of a professor's
+ * session data into Gemini and asking it to identify recurring themes, quality
+ * trends, and at-risk students across the entire semester.
+ *
+ * This is the "zoom out" complement to per-session analysis: where
+ * `lib/ai/analysisAgent.ts` analyzes a single session in depth, this module
+ * synthesizes patterns across ALL sessions for the professor's account.
+ *
+ * ## Where it fits
+ * - Called by: app/api/process/route.ts (fire-and-forget after session upload)
+ * - Called by: app/api/sessions/[id]/debrief/complete/route.ts (fire-and-forget
+ *              after professor marks debrief complete, so post-session ratings
+ *              can inform the cross-session analysis)
+ * - Persists to: `class_insights` via lib/db/classInsights.ts (one row per professor,
+ *                upserted — previous insights are overwritten each time)
+ *
+ * ## Fire-and-forget pattern
+ * Callers do NOT await this function. If it throws, the error is silently swallowed
+ * by the caller to avoid blocking the response. This function only logs internally.
+ *
+ * ## Ground-truth vs. AI data
+ * The `themeEvolution` and `sessionEffectiveness` fields in the output are built
+ * from ground-truth DB data (not from the AI response) to avoid hallucination.
+ * Only the narrative, qualityTrend, topThemes, and watchlist come from Gemini.
+ *
+ * Uses: lib/ai/geminiClient.ts, lib/db/classInsights.ts
+ */
+
 import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import { fetchInsightsInput, upsertClassInsights } from '@/lib/db/classInsights'
 import type { ClassInsights, ThemeEvolutionEntry } from '@/types'
 
+/**
+ * Builds the Gemini prompt for class-wide insight generation.
+ *
+ * The prompt is assembled from the aggregated `InsightsInput` struct returned by
+ * `fetchInsightsInput()`. Conditionally appends debrief and reflection context
+ * when that data is available — the AI is instructed to use debrief ratings as
+ * "ground truth" about which questions actually resonated in the room, and to
+ * compare pre-session question themes vs. post-session reflection themes to surface
+ * expectation/reality gaps.
+ *
+ * @param input - The aggregated session data from lib/db/classInsights.ts
+ * @returns The full prompt string to send to Gemini
+ */
+/**
+ * What it does:
+ * Builds the Gemini prompt string used for generating class-wide insights based on aggregated session data.
+ *
+ * Why it is used:
+ * To meticulously prepare the input query for the Gemini AI model. This prompt guides the AI to analyze student questions, debrief feedback, and reflection themes comprehensively, ultimately producing high-quality insights for a professor.
+ *
+ * Important implementation details:
+ * 1. Assembles a detailed `sessionSummary` object for the prompt, including speaker, date, submission counts, pre-session themes, debrief ratings, and student reflection data.
+ * 2. Conditionally appends specific instructions and context about debrief and reflection data if available. The AI is directed to use debrief ratings as "ground truth" about question resonance and to compare pre-session question themes with post-session reflection themes to identify expectation/reality gaps.
+ * 3. Clearly specifies the exact JSON output structure expected from Gemini, along with detailed rules for populating each field (e.g., `narrative`, `qualityTrend`, `topThemes`, `watchlist`, `themeEvolution`).
+ * 4. Establishes the AI's persona as an "expert curriculum analyst" to ensure the desired analytical tone and focus.
+ */
 function buildPrompt(input: Awaited<ReturnType<typeof fetchInsightsInput>>): string {
   const lastSession = input.sessions.at(-1)
   const sessionsWithDebriefs = input.sessions.filter(s => s.debriefRating !== null)
@@ -67,6 +124,43 @@ Rules:
 - generatedAt: current ISO timestamp`
 }
 
+/**
+ * Generates and persists cross-session class insights for a professor.
+ *
+ * Flow:
+ * 1. Fetch aggregated session data via `fetchInsightsInput()` (themes, debrief
+ *    ratings, reflection summaries, leaderboard, drop-off list)
+ * 2. Early-exit if no sessions exist (nothing to analyze)
+ * 3. Call Gemini with the full prompt; parse the JSON response
+ * 4. Overwrite `themeEvolution` and `sessionEffectiveness` with ground-truth DB
+ *    data to prevent hallucination of session ordering or debrief ratings
+ * 5. Enrich `topThemes[].sessions` by joining against the per-theme session map
+ *    built from ground-truth data (Gemini's sessionCount may be approximate)
+ * 6. Persist the assembled `ClassInsights` via `upsertClassInsights()`
+ *
+ * Fire-and-forget: does not block the caller.
+ * Persists to: `class_insights` via lib/db/classInsights.ts
+ *
+ * @param userId - The professor's user ID
+ * @param semesterId - Optional semester filter; if omitted, analyzes ALL sessions
+ *                     for the professor (used by the main analytics view)
+ */
+/**
+ * What it does:
+ * Orchestrates the end-to-end process of generating and persisting cross-session class insights for a given professor, potentially filtered by a specific semester.
+ *
+ * Why it is used:
+ * To provide professors with an AI-powered, synthetic overview of student learning patterns, emerging themes, and engagement trends across multiple class sessions. This helps them understand student interests, identify areas for curriculum adjustment, and gain deeper insights into class dynamics. It operates as a fire-and-forget asynchronous process, persisting results to the database rather than returning them directly.
+ *
+ * Important implementation details:
+ * 1. Fetches aggregated `InsightsInput` data using `fetchInsightsInput` and gracefully exits if no sessions are available for analysis.
+ * 2. Initializes the Gemini client and sends the meticulously constructed prompt (via `buildPrompt`) to the AI model, requesting a JSON response.
+ * 3. Includes a `systemInstruction` to the Gemini model, reinforcing the requirement for valid JSON output matching the specified schema.
+ * 4. Parses the raw AI response, including a cleanup step to strip any Markdown code fences (e.g., ```json) that Gemini might occasionally add.
+ * 5. **Critical Implementation Detail**: To prevent AI hallucination and ensure data accuracy, it explicitly overrides certain AI-generated fields with ground-truth data from the database. Specifically, `themeEvolution` is rebuilt based on the actual chronological session order, `sessionEffectiveness` is derived from real debrief ratings, and `topThemes[].sessions` are enriched/corrected using a ground-truth map of themes to speaker names.
+ * 6. Constructs the final `ClassInsights` object by merging the parsed AI data with the corrected ground-truth information.
+ * 7. Persists the complete `ClassInsights` object to the `class_insights` table using `upsertClassInsights`, along with the total number of sessions analyzed. The analysis can be scoped to a specific semester or cover all sessions for a professor.
+ */
 export async function generateClassInsights(userId: string, semesterId?: string): Promise<void> {
   const input = await fetchInsightsInput(userId, semesterId)
   if (input.sessions.length === 0) return
@@ -83,6 +177,7 @@ export async function generateClassInsights(userId: string, semesterId?: string)
     },
   })
 
+  // Strip markdown fences — Gemini occasionally wraps JSON in ```json blocks
   const raw = (response.text ?? '').trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '')
@@ -90,7 +185,9 @@ export async function generateClassInsights(userId: string, semesterId?: string)
 
   const parsed = JSON.parse(raw) as Partial<ClassInsights>
 
-  // Build themeEvolution from input (ground-truth session order) to avoid hallucination
+  // Build themeEvolution from ground-truth session order to avoid hallucination.
+  // Gemini tends to reorder sessions or misremember session IDs; we override its
+  // themeEvolution output entirely with the correct data from the DB.
   const themeEvolution: ThemeEvolutionEntry[] = input.sessions.map(s => ({
     sessionId: s.sessionId,
     speakerName: s.speakerName,
@@ -98,7 +195,8 @@ export async function generateClassInsights(userId: string, semesterId?: string)
     themes: s.themes,
   }))
 
-  // Build sessionEffectiveness from ground-truth debrief data
+  // Build sessionEffectiveness from ground-truth debrief data.
+  // Only sessions with completed debriefs (debriefRating !== null) are included.
   const sessionEffectiveness = input.sessions
     .filter(s => s.debriefRating !== null)
     .map(s => ({
@@ -108,7 +206,9 @@ export async function generateClassInsights(userId: string, semesterId?: string)
       flatCount: s.debriefFlatCount,
     }))
 
-  // Build sessions list per theme from ground-truth data
+  // Build a ground-truth map of theme title → speaker names for enriching topThemes.
+  // This lets us show "which sessions this theme appeared in" without trusting Gemini's
+  // session attribution.
   const sessionsByTheme = new Map<string, string[]>()
   for (const s of input.sessions) {
     for (const theme of s.themes) {
@@ -127,11 +227,13 @@ export async function generateClassInsights(userId: string, semesterId?: string)
       sessionCount: t.sessionCount,
       isNew: t.isNew ?? false,
       summary: t.summary ?? '',
+      // Prefer ground-truth session list; fall back to whatever Gemini returned
       sessions: sessionsByTheme.get(t.title.toLowerCase()) ?? t.sessions ?? [],
       sampleQuestions: t.sampleQuestions ?? [],
     })),
     watchlist: parsed.watchlist ?? [],
     themeEvolution,
+    // Only include sessionEffectiveness if there is at least one completed debrief
     ...(sessionEffectiveness.length > 0 ? { sessionEffectiveness } : {}),
     generatedAt: new Date().toISOString(),
   }

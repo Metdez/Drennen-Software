@@ -1,12 +1,46 @@
+/**
+ * ComparisonShareButton — Share / revoke share token button for a saved comparison.
+ *
+ * POSTs to /api/compare/share to create a share token and copies the resulting URL
+ * to the clipboard. Once shared, toggles to show a "Stop sharing" revoke action
+ * that sends a DELETE to the same endpoint.
+ *
+ * Rendered by: app/(app)/compare/page.tsx (toolbar)
+ * Calls: POST /api/compare/share, DELETE /api/compare/share
+ */
 'use client'
 
 import { useState } from 'react'
 import { ROUTES } from '@/lib/constants'
 
+/**
+ * Props for ComparisonShareButton.
+ * @prop comparisonId - ID of the saved comparison to share.
+ *                     Renders nothing (null) when not yet saved.
+ */
+/**
+ * Defines the shape of properties expected by the ComparisonShareButton component.
+ *
+ * It ensures type safety for the `comparisonId` prop, which is crucial for the component's functionality. The `comparisonId` dictates whether the sharing functionality is available and which comparison is being shared.
+ */
 interface ComparisonShareButtonProps {
   comparisonId: string | null
 }
 
+/**
+ * A client-side React component that provides functionality to share or revoke a saved comparison via a unique URL.
+ *
+ * It is used to enable users to easily share a specific comparison state with others or persist it. The component handles the entire sharing lifecycle, including initiating the share, copying the URL, providing user feedback, and revoking access.
+ *
+ * Key implementation details:
+ * - Uses React's `useState` hook to manage the sharing state, the generated share URL, and whether the link has been copied.
+ * - Renders `null` if `comparisonId` is not provided, meaning the component will only appear for already saved comparisons.
+ * - `handleShare` asynchronously sends a POST request to a defined API route (`ROUTES.API_COMPARE_SHARE`) to generate a shareable URL. On success, it copies the URL to the user's clipboard and updates the UI.
+ * - `handleRevoke` asynchronously sends a DELETE request to the same API route to invalidate an existing share URL, resetting the component's state.
+ * - Includes basic error handling and UI feedback (e.g., 'Sharing...', 'Link copied!').
+ * - The UI conditionally renders either a 'Share' button or a 'Stop sharing' button based on the `shareUrl` state.
+ */
+// Manages share token creation/revocation so collaborators can open the public compare link.
 export function ComparisonShareButton({ comparisonId }: ComparisonShareButtonProps) {
   const [sharing, setSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)

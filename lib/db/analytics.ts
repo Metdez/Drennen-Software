@@ -1,6 +1,70 @@
+/**
+ * @file lib/db/analytics.ts
+ *
+ * Aggregated analytics for a professor's session history. All computation is
+ * performed in the application layer (not via SQL aggregates) so that the
+ * logic is easy to test and modify without DB migrations.
+ *
+ * Produces three views:
+ *   1. Session trend — one row per session with a relative submission rate
+ *      (normalized to the highest-submission session = 100%), used for the
+ *      bar chart on the analytics page.
+ *   2. Leaderboard — top-10 students ranked by total submission count.
+ *   3. Drop-off analysis — students present in the earliest ~60% of sessions
+ *      but absent from the most recent ~33%. Requires >= 3 sessions with
+ *      student data to produce meaningful results.
+ *
+ * Table(s): `sessions`, `student_submissions`
+ * Client: createClient() — RLS enforced; a professor only sees their own rows.
+ */
+
 import { createClient } from '@/lib/supabase/server'
 import type { AnalyticsData, SessionAnalyticsRow, LeaderboardEntry, DropoffEntry } from '@/types'
 
+/**
+ * Fetches and assembles all analytics data for the professor's dashboard,
+ * optionally scoped to a single semester.
+ *
+ * Two queries run sequentially (session IDs are needed before filtering
+ * submissions). All aggregation — leaderboard ranking, drop-off detection,
+ * relative rate normalization — happens in memory after the queries complete.
+ *
+ * @param userId - The authenticated professor's user ID.
+ * @param semesterId - Optional semester UUID to scope all results. When
+ *   omitted, all sessions for the professor are included.
+ * @returns `AnalyticsData` containing:
+ *   - `sessions`: per-session rows with relative submission rates
+ *   - `leaderboard`: top-10 students by submission count
+ *   - `dropoff`: students who stopped submitting in recent sessions
+ *   - `meta`: summary counts (totalSessions, totalUniqueStudents, etc.)
+ * @throws Error if either Supabase query fails.
+ *
+ * Called by: app/api/analytics/route.ts (GET)
+ * Table: sessions, student_submissions
+ * Client: createClient() — RLS enforced
+ */
+/**
+ * Fetches and assembles all analytics data for the professor's dashboard,
+ * optionally scoped to a single semester.
+ *
+ * Two queries run sequentially (session IDs are needed before filtering
+ * submissions). All aggregation — leaderboard ranking, drop-off detection,
+ * relative rate normalization — happens in memory after the queries complete.
+ *
+ * @param userId - The authenticated professor's user ID.
+ * @param semesterId - Optional semester UUID to scope all results. When
+ *   omitted, all sessions for the professor are included.
+ * @returns `AnalyticsData` containing:
+ *   - `sessions`: per-session rows with relative submission rates
+ *   - `leaderboard`: top-10 students by submission count
+ *   - `dropoff`: students who stopped submitting in recent sessions
+ *   - `meta`: summary counts (totalSessions, totalUniqueStudents, etc.)
+ * @throws Error if either Supabase query fails.
+ *
+ * Called by: app/api/analytics/route.ts (GET)
+ * Table: sessions, student_submissions
+ * Client: createClient() — RLS enforced
+ */
 export async function getAnalytics(userId: string, semesterId?: string): Promise<AnalyticsData> {
   const supabase = createClient()
 
@@ -15,7 +79,7 @@ export async function getAnalytics(userId: string, semesterId?: string): Promise
 
   const sessionIds = (sessionRows ?? []).map(s => s.id)
 
-  // Student submissions for this user's sessions
+  // Guard: an empty .in() array would match ALL rows, so short-circuit here
   const { data: studentRows, error: stuErr } = sessionIds.length
     ? await supabase
         .from('student_submissions')
@@ -24,7 +88,7 @@ export async function getAnalytics(userId: string, semesterId?: string): Promise
     : { data: [], error: null }
   if (stuErr) throw new Error(stuErr.message)
 
-  // --- sessions with relative rate ---
+  // --- Build per-session student maps (needed for hasStudentData flag) ---
   const studentsBySession = new Map<string, string[]>()
   for (const row of studentRows ?? []) {
     const list = studentsBySession.get(row.session_id) ?? []
@@ -32,6 +96,7 @@ export async function getAnalytics(userId: string, semesterId?: string): Promise
     studentsBySession.set(row.session_id, list)
   }
 
+  // Clamp to 1 so sessions with 0 submissions don't divide-by-zero below
   const maxCount = Math.max(1, ...(sessionRows ?? []).map(s => s.file_count))
 
   const sessions: SessionAnalyticsRow[] = (sessionRows ?? []).map(s => ({
@@ -53,9 +118,11 @@ export async function getAnalytics(userId: string, semesterId?: string): Promise
     .sort((a, b) => b.submissionCount - a.submissionCount)
     .slice(0, 10)
 
-  // --- drop-off ---
-  // Definition: appeared in earliest 60% of sessions-with-data, absent from most recent 33%
-  // Requires >= 3 sessions with student data to produce meaningful results
+  // --- Drop-off detection ---
+  // Definition: appeared in earliest 60% of sessions-with-data, absent from most recent 33%.
+  // Requires >= 3 sessions with student data to produce meaningful results.
+  // The neutral middle zone (between cutEarly and cutRecent) reduces false positives
+  // from mid-course absences (illness, exam weeks, etc.).
   const sessionsWithStudents = sessions.filter(s => s.hasStudentData)
   let dropoff: DropoffEntry[] = []
 

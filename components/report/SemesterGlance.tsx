@@ -1,3 +1,12 @@
+/**
+ * SemesterGlance — "Semester at a Glance" stats section of the semester report.
+ *
+ * Renders four stat cards, a submissions-over-time bar chart (BRAND.ORANGE bars),
+ * and a tier distribution bar chart with percentage annotations.
+ *
+ * Rendered by: app/(app)/reports/[id]/page.tsx (semester at a glance section)
+ * Data source: SemesterGlanceSection from SemesterReport type
+ */
 'use client'
 
 import type { SemesterGlanceSection } from '@/types'
@@ -12,11 +21,37 @@ import {
   Cell,
 } from 'recharts'
 
+/**
+ * Props for SemesterGlance.
+ * @prop data - Semester glance section with stats, sessionsOverTime, tierDistribution.
+ */
+/**
+ * Defines the shape of the props accepted by the SemesterGlance component.
+ *
+ * What it does: It ensures that the `SemesterGlance` component receives the necessary data structure to render its content.
+ * Why it is used: It provides type safety and clarity for the component's input, making the component easier to use and maintain.
+ * Important implementation details: It contains a single property, `data`, which is of type `SemesterGlanceSection`.
+ */
 interface Props {
   data: SemesterGlanceSection
 }
 
+/**
+ * A React functional component that displays an "Semester at a Glance" section, providing a summary of key statistics, a bar chart of submissions over time, and a distribution of tiers.
+ *
+ * What it does: It takes `SemesterGlanceSection` data as input and renders various visual components to present a comprehensive overview of a semester's performance. This includes summary stat cards, a bar chart visualizing submissions per session over time, and a progress bar visualization for tier distribution.
+ * Why it is used: This component is crucial for providing administrators or instructors with a quick, high-level understanding of activity and performance metrics within a given semester, serving as a key part of a larger report page.
+ * Important implementation details:
+ * - It's a client-side component (`'use client'`) due to interactive elements like tooltips in the chart.
+ * - It processes raw `data` into derived states like `stats`, `timelineData`, and `tierEntries` for easier rendering.
+ * - It uses `recharts` for the `Submissions Over Time` bar chart, including `ResponsiveContainer`, `BarChart`, `XAxis`, `YAxis`, `Tooltip`, `Bar`, and `Cell`.
+ * - Custom tooltips are implemented for the bar chart to show full speaker names and dates.
+ * - Tier distribution is rendered using progress bars, dynamically calculating percentages.
+ * - All sections are conditionally rendered based on whether there is data available (`timelineData.length > 0` and `tierEntries.length > 0`).
+ * - It leverages utility constants like `BRAND` for consistent styling (e.g., bar colors).
+ */
 export function SemesterGlance({ data }: Props) {
+  // Derive the stat cards directly from the totals so the display mirrors the provided aggregate numbers.
   const stats = [
     { label: 'Sessions', value: String(data.totalSessions) },
     { label: 'Submissions', value: String(data.totalSubmissions) },
@@ -24,6 +59,7 @@ export function SemesterGlance({ data }: Props) {
     { label: 'Avg / Session', value: data.avgSubmissionsPerSession.toFixed(1) },
   ]
 
+  // Build the bar chart data with shortened speaker names and formatted dates for readability.
   const timelineData = data.sessionsOverTime.map((s) => ({
     name: s.speakerName.length > 12 ? s.speakerName.slice(0, 12) + '...' : s.speakerName,
     fullName: s.speakerName,
@@ -31,6 +67,7 @@ export function SemesterGlance({ data }: Props) {
     date: new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
   }))
 
+  // Sort the tier distribution buckets for a stable order and capture the total for percentage bars.
   const tierEntries = Object.entries(data.tierDistribution).sort(([a], [b]) => a.localeCompare(b))
   const tierTotal = tierEntries.reduce((sum, [, v]) => sum + v, 0)
 

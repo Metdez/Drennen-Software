@@ -1,11 +1,44 @@
+/**
+ * BlindSpots — Semester report section for AI-identified curricular blind spots.
+ *
+ * Renders two groups: blind spot cards (topics students consistently avoided or
+ * missed) and actionable recommendations to address them. Uses BRAND.PURPLE for
+ * the blind spot warning icon and BRAND.GREEN for recommendation numbering.
+ *
+ * Rendered by: app/(app)/reports/[id]/page.tsx (blind spots section)
+ * Data source: BlindSpotsSection from SemesterReport type
+ */
 'use client'
 
 import type { BlindSpotsSection } from '@/types'
 
+/**
+ * Props for BlindSpots.
+ * @prop data - Blind spots section data with blindSpots array and recommendations.
+ */
+/**
+ * Props for BlindSpots.
+ * @prop data - Blind spots section data with blindSpots array and recommendations.
+ */
 interface Props {
   data: BlindSpotsSection
 }
 
+/**
+ * Renders a section dedicated to displaying "Blind Spots" and associated "Recommendations" within a report.
+ * It dynamically renders cards for each blind spot and a list for recommendations, providing a structured overview of potential issues and actionable advice.
+ *
+ * Why it is used:
+ * This component is used to visually present a user's identified blind spots and personalized recommendations, enhancing the report's value by offering clear insights and guidance.
+ *
+ * Important implementation details:
+ * - The component is marked with `'use client'`, indicating it's a client-side component, typically used in a Next.js application.
+ * - It accepts a `data` prop of type `BlindSpotsSection`, which contains arrays for `blindSpots` and `recommendations`.
+ * - It conditionally renders the blind spot cards and recommendation list only if the respective arrays contain data, ensuring no empty sections are displayed.
+ * - Styling is handled using Tailwind CSS classes, leveraging CSS variables for consistent branding and theming (`--font-playfair`, `--text-primary`, `--brand-orange`, etc.).
+ * - Each blind spot is rendered as a distinct card with an icon, title, and description.
+ * - Recommendations are listed with an index, main text, and a reason, formatted to be easily readable.
+ */
 export function BlindSpots({ data }: Props) {
   return (
     <section id="blind-spots" className="space-y-5">

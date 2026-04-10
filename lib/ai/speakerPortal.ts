@@ -1,7 +1,49 @@
+/**
+ * lib/ai/speakerPortal.ts
+ *
+ * Generates the PRE-SESSION content for a speaker's self-service preparation portal.
+ *
+ * While the speaker brief (`lib/ai/speakerBrief.ts`) is a downloadable document
+ * for offline reading, the portal is a live web experience at `/speaker/[token]`
+ * that gives the speaker a skimmable, interactive view of what to expect. It
+ * includes actual (lightly-edited) student questions, audience profiles, and
+ * optionally data from past speaker sessions to help the speaker understand
+ * what resonates with this particular class.
+ *
+ * The portal has TWO phases:
+ *  1. Pre-session (this file): Generated before the speaker visits; provides
+ *     student interests, sample questions, talking points, and audience profile.
+ *  2. Post-session (lib/ai/speakerPortalPostSession.ts): Generated after the
+ *     debrief is completed; shows the speaker the impact their session had.
+ *
+ * Inputs:
+ *  - Session metadata (speaker name, professor name, date, file count)
+ *  - Full AI interview sheet output (sessionOutput) — the actual student questions
+ *  - Session themes from the session_themes table
+ *  - Per-session Gemini analysis (SanitizedAnalysis from session_analyses table)
+ *  - Class-wide insights (SanitizedClassInsights from class_insights table)
+ *  - Debrief history from past sessions (used to generate pastSpeakerInsights)
+ *
+ * Output (SpeakerPortalContent) is persisted to the `speaker_portals` table via
+ * lib/db/speakerPortals.ts, triggered from app/api/sessions/[id]/portal/route.ts.
+ *
+ * Uses: lib/ai/geminiClient.ts, lib/ai/speakerBrief.ts (SanitizedAnalysis/ClassInsights types)
+ * Called by: app/api/sessions/[id]/portal/route.ts (POST handler)
+ * Persists to: speaker_portals table via lib/db/speakerPortals.ts
+ */
+
 import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { SpeakerPortalContent } from '@/types'
 import type { SanitizedAnalysis, SanitizedClassInsights } from '@/lib/ai/speakerBrief'
 
+/**
+ * A single entry from the professor's post-session debrief history.
+ * When 2+ completed debriefs exist, this data is fed to the portal prompt
+ * so Gemini can generate the `pastSpeakerInsights` section — actionable tips
+ * about what works with this particular class, grounded in real feedback.
+ *
+ * Sourced by: app/api/sessions/[id]/portal/route.ts (queries session_debriefs table)
+ */
 export interface DebriefHistoryEntry {
   speakerName: string
   rating: number
@@ -10,6 +52,24 @@ export interface DebriefHistoryEntry {
   surpriseMoments: string
 }
 
+/**
+ * Constructs the Gemini prompt for pre-session speaker portal content generation.
+ *
+ * Unlike the brief prompt (which sanitizes away student questions), the portal
+ * prompt deliberately includes actual student questions from `sessionOutput` so
+ * that Gemini can surface lightly-edited real questions in the `sampleQuestions`
+ * section. The speaker should see what students genuinely asked.
+ *
+ * The debrief history section is only included when 2+ completed debriefs exist;
+ * below that threshold there isn't enough signal to generate reliable insights.
+ *
+ * @param params - Full session data including raw output and optional history
+ * @returns A fully-formed prompt string ready for Gemini content generation
+ * @remarks
+ * The past debrief history section is gated behind a minimum of 2 completed
+ * debriefs. Below that threshold the sample size is too small to surface reliable
+ * patterns about what works with this audience.
+ */
 function buildPortalPrompt(params: {
   speakerName: string
   professorName: string
@@ -69,6 +129,9 @@ Recurring Themes Across the Semester:
 ${classInsights.topThemes.map(t => `- "${t.title}" (appeared in ${t.sessionCount} sessions)`).join('\n')}`
   }
 
+  // Only include past debrief data when there are at least 2 completed sessions.
+  // Below that threshold the sample is too small to draw reliable patterns,
+  // so we omit the section rather than surface potentially misleading insights.
   let debriefSection = ''
   const completedDebriefs = debriefHistory?.filter(d => d.rating > 0) ?? []
   if (completedDebriefs.length >= 2) {
@@ -161,6 +224,39 @@ Rules:
 - Return ONLY valid JSON. No markdown fences, no explanation text.`
 }
 
+/**
+ * Generates the pre-session content for a guest speaker's preparation portal.
+ *
+ * Calls Gemini with the full session context (including raw student questions)
+ * and returns a structured SpeakerPortalContent JSON document containing:
+ *  - welcome: speaker/course greeting and session metadata
+ *  - studentInterests: top themes and a narrative summary
+ *  - sampleQuestions: real (lightly-edited) student questions grouped by theme
+ *  - talkingPoints: specific preparation areas with student-grounded rationale
+ *  - audienceProfile: demographic/intellectual profile of the class
+ *  - pastSpeakerInsights: optional section drawn from historical debrief data
+ *
+ * The Gemini system instruction forbids student names and enforces the HWS
+ * student reference convention ("HWS students", not "your students").
+ *
+ * Caller is responsible for persisting the returned content to the
+ * `speaker_portals` table via `upsertSpeakerPortal` in lib/db/speakerPortals.ts.
+ *
+ * @param params - Full session context including professor name and debrief history
+ * @returns Parsed SpeakerPortalContent JSON object ready for storage and rendering
+ *
+ * Uses: lib/ai/geminiClient.ts
+ * Called by: app/api/sessions/[id]/portal/route.ts (POST handler)
+ * @remarks
+ * Unlike `generateSpeakerBrief`, this function intentionally includes real (lightly-
+ * edited) student questions in the `sampleQuestions` section of the output. The
+ * portal is a web experience designed for the speaker — seeing actual student
+ * questions helps them calibrate the conversation depth and vocabulary level.
+ * The system instruction still forbids attributing questions to specific students.
+ * @see app/api/sessions/[id]/portal/route.ts — POST handler that calls this function
+ * @see lib/db/speakerPortals.ts — upsertSpeakerPortal persists the returned content
+ * @see lib/ai/speakerPortalPostSession.ts — generates the post-session phase of the portal
+ */
 export async function generateSpeakerPortalContent(params: {
   speakerName: string
   professorName: string
@@ -172,6 +268,7 @@ export async function generateSpeakerPortalContent(params: {
   classInsights: SanitizedClassInsights | null
   debriefHistory: DebriefHistoryEntry[] | null
 }): Promise<SpeakerPortalContent> {
+  // Uses: lib/ai/geminiClient.ts
   const ai = getGeminiClient()
   const model = getGeminiModel()
 
@@ -181,10 +278,12 @@ export async function generateSpeakerPortalContent(params: {
     config: {
       systemInstruction:
         'You are an expert at creating warm, personalized preparation experiences for guest speakers. Always respond with valid JSON only. Never include student names or raw question text. Your output should feel like a trusted colleague helping the speaker prepare.',
+      // Force JSON response to avoid markdown fences or prose wrapping the output
       responseMimeType: 'application/json',
     },
   })
 
+  // response.text is the raw JSON string; trim and parse directly
   const raw = (response.text ?? '').trim()
   return JSON.parse(raw) as SpeakerPortalContent
 }

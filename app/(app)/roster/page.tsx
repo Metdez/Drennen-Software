@@ -1,3 +1,16 @@
+/**
+ * Student roster page (`/roster`).
+ *
+ * Lists all students who have submitted across the professor's sessions,
+ * filtered to the active semester when one is selected.
+ *
+ * Data: fetched from `GET /api/roster` (or `GET /api/roster?semester=...`).
+ * Each row shows student name, submission count, and participation rate.
+ * Clicking a row navigates to `/roster/[studentName]`.
+ *
+ * Includes a `ClearDataButton` (admin utility) in the header.
+ * Components: RosterTable, ClearDataButton, RosterLoadingSkeleton (inline)
+ */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -6,6 +19,21 @@ import { ClearDataButton } from '@/components/layout/ClearDataButton'
 import { useSemesterContext } from '@/components/semester/SemesterContext'
 import type { StudentSummary } from '@/types'
 
+/**
+ * This client-side component renders the main student roster page.
+ * It is used to display a list of all students who have submitted across various sessions, allowing educators to view and navigate to individual student submissions.
+ *
+ * Important implementation details:
+ * - It uses the `'use client'` directive, indicating it's a client-side rendered component.
+ * - Manages state for `students`, `loading`, and `error` using React's `useState` hook.
+ * - Fetches student data from `/api/roster` via a `useEffect` hook, triggered by changes in `activeSemesterId` or `semesterLoading`.
+ * - The API request includes a `semester` query parameter if an `activeSemesterId` is present, allowing filtering by semester.
+ * - Implements a cleanup function in `useEffect` to prevent state updates on unmounted components after asynchronous operations.
+ * - Integrates `useSemesterContext` to access the currently active semester ID.
+ * - Conditionally renders a `RosterLoadingSkeleton` during data fetching, an error message if the fetch fails, or the `RosterTable` with student data.
+ * - Includes a `ClearDataButton` for data management actions.
+ * - Provides a message when no students are found, explaining data recording scope.
+ */
 export default function RosterPage() {
   const { activeSemesterId, loading: semesterLoading } = useSemesterContext()
   const [students, setStudents] = useState<StudentSummary[]>([])
@@ -84,6 +112,15 @@ export default function RosterPage() {
   )
 }
 
+/**
+ * This component renders a visual loading skeleton for the student roster table.
+ * It is used to improve the user experience by providing immediate visual feedback that content is being loaded, preventing a blank page and indicating an active process while student data is being fetched.
+ *
+ * Important implementation details:
+ * - It displays a series of `div` elements styled with Tailwind CSS to mimic the layout of the `RosterTable` rows.
+ * - Uses the `animate-pulse` Tailwind class to create a shimmering loading animation.
+ * - Applies conditional `border-t` styling to separate the skeleton rows, making them visually distinct like table rows.
+ */
 function RosterLoadingSkeleton() {
   return (
     <div className="rounded-2xl border border-[var(--border-accent)] overflow-hidden" style={{ background: 'var(--surface)' }}>

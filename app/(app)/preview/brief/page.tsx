@@ -1,3 +1,23 @@
+/**
+ * Speaker brief preview page (`/preview/brief?sessionId=...`).
+ *
+ * Displays and allows editing of the AI-generated speaker prep brief for a session.
+ * The brief contains: narrative, top themes, suggested talking points, class context,
+ * and "what to expect" sections.
+ *
+ * Data: fetched from `GET /api/sessions/[id]/brief`. If no brief exists yet,
+ * the caller should generate one via `POST /api/sessions/[id]/brief` first
+ * (triggered by `GenerateBriefButton` on the preview page).
+ *
+ * Edit flow: each section can be toggled into edit mode independently.
+ * `handleSave` sends `PUT /api/sessions/[id]/brief` with `editedContent`.
+ * `handleReset` sends the same endpoint with `editedContent: null` to revert to original.
+ *
+ * Export: PDF via `GET /api/sessions/[id]/brief/download`, plain text via
+ * `formatBriefAsText` copied to clipboard.
+ *
+ * Components: SectionCard (inline), BriefContent (inner client component wrapped in Suspense)
+ */
 "use client"
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
@@ -85,6 +105,7 @@ function BriefContent() {
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sessionId) {
@@ -153,6 +174,7 @@ function BriefContent() {
   async function handleSave() {
     if (!sessionId || !editedContent) return
     setSaving(true)
+    setActionError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_BRIEF(sessionId), {
         method: 'PUT',
@@ -165,7 +187,7 @@ function BriefContent() {
       )
       setEditingSections(new Set())
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save')
+      setActionError(err instanceof Error ? err.message : 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -174,6 +196,7 @@ function BriefContent() {
   async function handleReset() {
     if (!sessionId || !brief) return
     setSaving(true)
+    setActionError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_BRIEF(sessionId), {
         method: 'PUT',
@@ -185,7 +208,7 @@ function BriefContent() {
       setBrief((prev) => (prev ? { ...prev, editedContent: null } : prev))
       setEditingSections(new Set())
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to reset')
+      setActionError(err instanceof Error ? err.message : 'Failed to reset')
     } finally {
       setSaving(false)
     }
@@ -193,19 +216,21 @@ function BriefContent() {
 
   async function handleCopyText() {
     if (!activeContent) return
+    setActionError(null)
     try {
       const text = formatBriefAsText(activeContent)
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      alert('Failed to copy to clipboard')
+      setActionError('Failed to copy to clipboard')
     }
   }
 
   async function handleDownloadPdf() {
     if (!sessionId) return
     setDownloading(true)
+    setActionError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_BRIEF_DOWNLOAD(sessionId))
       if (!res.ok) throw new Error('Failed to generate PDF')
@@ -219,7 +244,7 @@ function BriefContent() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to download PDF')
+      setActionError(err instanceof Error ? err.message : 'Failed to download PDF')
     } finally {
       setDownloading(false)
     }
@@ -249,6 +274,11 @@ function BriefContent() {
 
   return (
     <div className="flex flex-col gap-6">
+      {actionError && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-[family-name:var(--font-dm-sans)]">
+          {actionError}
+        </div>
+      )}
       {/* Back link */}
       <Link
         href={`${ROUTES.PREVIEW}?sessionId=${sessionId}`}

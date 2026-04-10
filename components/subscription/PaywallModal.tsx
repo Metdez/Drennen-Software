@@ -1,14 +1,43 @@
 'use client'
 
+/**
+ * @file PaywallModal.tsx
+ * Full-screen subscription upgrade modal shown when a user exhausts free access.
+ *
+ * Rendered by:
+ *   - components/subscription/SubscriptionBanner.tsx (via "Upgrade" / "Subscribe Now" CTA)
+ *   - app/(app)/dashboard/page.tsx (when canGenerate=false after upload attempt)
+ *
+ * Reads: SubscriptionAccess['reason'] to set context-appropriate copy.
+ * Calls: POST /api/stripe/checkout — creates a Stripe Checkout Session, then redirects
+ *        to the returned `url` for secure off-site payment.
+ *
+ * Plans offered: monthly ($25/mo) and annual ($240/yr billed as $20/mo).
+ * Backdrop click and the × button both invoke `onClose` if provided.
+ */
+
 import { useState } from 'react'
 import { BRAND, ROUTES } from '@/lib/constants'
 import type { SubscriptionAccess } from '@/types'
 
 interface PaywallModalProps {
+  /** Why the paywall is being shown — drives the context-specific subtext copy. */
   reason: SubscriptionAccess['reason'] | null
+  /** If provided, renders an × button and calls this handler on backdrop/button click. */
   onClose?: () => void
 }
 
+/**
+ * Full-screen upgrade modal offering monthly and annual Stripe plans.
+ *
+ * `subtext` is derived from `reason` to give users context on why they hit the paywall:
+ * - `free_used`     → "Thank you for being an early user..."
+ * - `trial_expired` → "Your free trial has ended..."
+ * - anything else  → generic subscription-required message
+ *
+ * Calls: POST /api/stripe/checkout → redirects to Stripe Checkout on success.
+ * Errors surface inline; `alert()` is never used.
+ */
 export function PaywallModal({ reason, onClose }: PaywallModalProps) {
   const [loadingPlan, setLoadingPlan] = useState<'monthly' | 'annual' | null>(null)
   const [error, setError] = useState<string | null>(null)

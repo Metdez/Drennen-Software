@@ -1,15 +1,49 @@
 'use client'
 
+/**
+ * @file SessionsTable.tsx
+ * Sortable table of session summaries used on the History and Compare pages.
+ *
+ * Rendered by:
+ *   - app/(app)/history/page.tsx (normal mode — row click navigates to /preview)
+ *   - app/(app)/compare/page.tsx (compareMode — row click selects up to 2 sessions)
+ *
+ * In normal mode each row is a link to `/preview?sessionId=<id>`.
+ * In compareMode rows become selectable checkboxes; a FIFO strategy caps
+ * selection at 2 — selecting a third item drops the oldest selection.
+ */
+
+/**
+ * Modes of operation:
+ * - Normal: clicking a row routes to `/preview?sessionId=...` via `router.push`.
+ * - Compare: rows act like checkboxes and maintain a FIFO queue capped at 2 selections.
+ */
 import { useRouter } from 'next/navigation'
 import type { SessionSummary } from '@/types'
 
 interface SessionsTableProps {
+  /** List of session summaries to display; an empty array renders an empty-state message. */
   sessions: SessionSummary[]
+  /**
+   * When `true` the table switches to multi-select mode for session comparison.
+   * Row clicks toggle selection instead of navigating.
+   */
   compareMode?: boolean
+  /** Currently selected session IDs (max 2) when `compareMode` is active. */
   selectedIds?: string[]
+  /** Called with the new selection array whenever the user toggles a row in compareMode. */
   onSelectionChange?: (ids: string[]) => void
 }
 
+/**
+ * Renders a bordered table of past sessions with speaker name, date, file count,
+ * and debrief status columns.
+ *
+ * Debrief status badge variants:
+ * - `complete` — green pill with star rating (e.g. "★ 4/5")
+ * - `draft`    — orange pill labeled "Draft"
+ * - absent    — no badge rendered
+ */
 export function SessionsTable({
   sessions,
   compareMode = false,
@@ -18,6 +52,7 @@ export function SessionsTable({
 }: SessionsTableProps) {
   const router = useRouter()
 
+  // Empty-state guard: show a gentle message when no sessions exist yet.
   if (sessions.length === 0) {
     return (
       <div className="rounded-2xl border border-[var(--border-accent)] overflow-hidden" style={{ background: 'var(--surface)' }}>
@@ -28,6 +63,16 @@ export function SessionsTable({
     )
   }
 
+  /**
+   * Handles a row click in both normal and compare modes.
+   *
+   * Normal mode: navigates to the preview page for the clicked session.
+   * Compare mode: toggles the session in/out of `selectedIds`.
+   *   - If deselecting: removes the session from the array.
+   *   - If selecting with < 2 already selected: appends.
+   *   - If selecting with 2 already selected: FIFO replacement — drops the
+   *     oldest (index 0) and appends the new session at the end.
+   */
   function handleRowClick(sessionId: string) {
     if (!compareMode) {
       router.push(`/preview?sessionId=${sessionId}`)
@@ -41,7 +86,7 @@ export function SessionsTable({
     } else if (selectedIds.length < 2) {
       onSelectionChange([...selectedIds, sessionId])
     } else {
-      // FIFO: drop the oldest, add the new one
+      // FIFO: the selection cap is 2; drop the first (oldest) entry to make room.
       onSelectionChange([selectedIds[1], sessionId])
     }
   }
@@ -64,6 +109,7 @@ export function SessionsTable({
         <tbody>
           {sessions.map(session => {
             const isSelected = selectedIds.includes(session.id)
+            // Selection array preserves order so FIFO can drop the oldest when needed.
             return (
               <tr
                 key={session.id}

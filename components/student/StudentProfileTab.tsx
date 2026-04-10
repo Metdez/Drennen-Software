@@ -1,14 +1,43 @@
 'use client'
 
+/**
+ * StudentProfileTab — Profile tab for the per-student detail page.
+ *
+ * Fetches the student's AI-generated profile on mount and renders three
+ * side-by-side cards:
+ *  - Interests (observations + tag pills)
+ *  - Career Direction (observations + field pills)
+ *  - Personality (observations + trait pills)
+ *
+ * If the professor has added notes, they appear in a full-width card below
+ * the grid.  Shows skeleton cards while loading and an inline error with retry
+ * on failure.
+ *
+ * Rendered by: components/student/StudentDetailTabs.tsx (Profile tab)
+ * Calls: GET /api/roster/[studentName]/profile
+ */
+
 import { useEffect, useState, useCallback } from 'react'
 import { Card } from '@/components/ui/Card'
 import { ROUTES } from '@/lib/constants'
 import type { StudentProfile } from '@/types'
 
+/**
+ * Defines the shape of properties expected by the StudentProfileTab component.
+ * 1. What it does: Specifies the input interface for the StudentProfileTab component.
+ * 2. Why it is used: Ensures type safety and clarity for the data passed into StudentProfileTab, making the component's API clear.
+ * 3. Important implementation details: Currently, it only contains a single property, `studentName`, which is crucial for identifying the student whose profile needs to be fetched.
+ */
 interface Props {
   studentName: string
 }
 
+/**
+ * Renders a placeholder UI that mimics a loading card, providing visual feedback during data fetching.
+ * 1. What it does: Displays an animated skeleton card composed of placeholder shapes, simulating where content will eventually appear.
+ * 2. Why it is used: Enhances user experience by indicating that content is being loaded, reducing perceived wait times and preventing sudden layout shifts.
+ * 3. Important implementation details: It utilizes the `Card` component for its base structure and applies Tailwind's `animate-pulse` class to create a shimmering effect. Various `div` elements with `bg-[var(--border-accent)]` and rounded corners are used to represent text lines and tags.
+ */
 function SkeletonCard() {
   return (
     <Card padding="md">
@@ -26,6 +55,12 @@ function SkeletonCard() {
   )
 }
 
+/**
+ * Renders a small, styled, pill-shaped tag with a label and a customizable color.
+ * 1. What it does: Displays a text label within a visually distinct, rounded pill element, with color variations.
+ * 2. Why it is used: Provides a consistent and aesthetically pleasing way to categorize or highlight specific pieces of information, such as interests, career fields, or personality traits, within the student profile.
+ * 3. Important implementation details: Accepts `label` (string) and an optional `variant` ('purple', 'orange', 'green') props. The `colors` object maps these variants to specific Tailwind CSS classes for background, text, and border styling, ensuring uniformity. It uses `inline-block` for proper display and sizing.
+ */
 function TagPill({ label, variant = 'purple' }: { label: string; variant?: 'purple' | 'orange' | 'green' }) {
   const colors = {
     purple: 'bg-[#542785]/20 text-[#c9a0ff] border-[#542785]/40',
@@ -39,6 +74,12 @@ function TagPill({ label, variant = 'purple' }: { label: string; variant?: 'purp
   )
 }
 
+/**
+ * Renders a consistent, stylized heading for different content sections within the student profile.
+ * 1. What it does: Displays a heading with a specific font style, color, and capitalization for content sections.
+ * 2. Why it is used: Ensures a uniform and clear structure for various parts of the student profile (e.g., "Interests", "Career Direction"), improving readability and navigability.
+ * 3. Important implementation details: Renders an `h4` HTML element. It applies specific Tailwind CSS classes to achieve a distinct look: `text-[11px]`, `font-semibold`, `text-[var(--text-muted)]`, `uppercase`, `tracking-widest`, and a custom font family.
+ */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <h4 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-widest font-[family-name:var(--font-dm-sans)] mb-3">
@@ -47,6 +88,12 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * Renders an unordered list of strings, each item prefixed with a stylized bullet point.
+ * 1. What it does: Displays an array of strings as a bulleted list, where each bullet is a custom right-pointing triangle.
+ * 2. Why it is used: Provides a clean and easily scannable format for presenting descriptive text, such as student observations or professor notes, within the profile sections.
+ * 3. Important implementation details: It takes an `items` array of strings. If the array is empty or `null`, it gracefully returns `null` to prevent rendering an empty list. Each list item (`li`) includes a custom `&#x25B8;` character styled as a bullet point.
+ */
 function ObservationList({ items }: { items: string[] }) {
   if (!items?.length) return null
   return (
@@ -61,6 +108,12 @@ function ObservationList({ items }: { items: string[] }) {
   )
 }
 
+/**
+ * A client-side React component that fetches, displays, and manages the view of a student's comprehensive profile.
+ * 1. What it does: Fetches detailed profile information for a given student from an API, handles loading and error states, and then renders the profile data, including interests, career direction, personality traits, and professor notes.
+ * 2. Why it is used: Serves as the primary interface for viewing a student's collected insights, integrating various data points into a cohesive and user-friendly display within a larger application context.
+ * 3. Important implementation details: Uses `useState` to manage `profile` data, `loading` status, and `error` messages. The `fetchProfile` function, memoized with `useCallback`, handles the API call and subsequent state updates, including robust error handling. `useEffect` triggers data fetching on component mount. It conditionally renders `SkeletonCard`s during loading, an error message with a retry button on failure, or the full profile content using composed sub-components like `Card`, `SectionLabel`, `ObservationList`, and `TagPill`. The component is marked with `'use client'` to indicate it's a client-side component.
+ */
 export function StudentProfileTab({ studentName }: Props) {
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -164,7 +217,7 @@ export function StudentProfileTab({ studentName }: Props) {
         </Card>
       </div>
 
-      {/* Professor Notes — full width */}
+      {/* Professor Notes — full width. These entries mirror what the Growth tab editor reads/writes so the shared notes stay synced across tabs. */}
       {profile.professorNotes.length > 0 && (
         <Card padding="md" elevated className="border-[#0f6b37]/20 bg-[#0f6b37]/5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">

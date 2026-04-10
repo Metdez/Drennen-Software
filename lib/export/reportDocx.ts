@@ -1,3 +1,27 @@
+/**
+ * @file reportDocx.ts
+ * Exports a SemesterReport as a DOCX document using the `docx` library.
+ *
+ * Called by: app/api/reports/[id]/download/route.ts (?format=docx)
+ *
+ * Library: docx — class-based Office Open XML builder. No browser required.
+ *
+ * Document structure:
+ *   1. Title page  (course label, report title, date range, generated date)
+ *   2. One section renderer per report section (executive summary through appendix roster)
+ *      — each section is conditionally rendered only if present in report.content
+ *
+ * All section renderers return `(Paragraph | Table)[]` arrays that are spread into
+ * a single flat children array passed to the Document constructor.
+ *
+ * Helper constants:
+ *   - BORDER_NONE — used for borderless layout tables
+ *   - BORDER_THIN — used for data tables with light gray borders
+ *
+ * @see lib/export/reportPdf.ts for the branded PDF variant of this same report
+ * @see types/report.ts for the SemesterReport type and all section subtypes
+ */
+
 import {
   Document,
   Packer,
@@ -27,6 +51,7 @@ import type {
 
 // ── Helpers ──
 
+/** Zero-width transparent borders — used for layout tables that should have no visible border. */
 const BORDER_NONE = {
   top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
   bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
@@ -34,6 +59,7 @@ const BORDER_NONE = {
   right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
 } as const
 
+/** Light gray single-pixel borders — used on all data tables. */
 const BORDER_THIN = {
   top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
   bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
@@ -41,6 +67,7 @@ const BORDER_THIN = {
   right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
 } as const
 
+/** Creates a HEADING_1 paragraph for a top-level report section. */
 function sectionHeading(text: string): Paragraph {
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
@@ -49,6 +76,7 @@ function sectionHeading(text: string): Paragraph {
   })
 }
 
+/** Creates a HEADING_2 paragraph for a sub-section within a report section. */
 function subHeading(text: string): Paragraph {
   return new Paragraph({
     heading: HeadingLevel.HEADING_2,
@@ -57,6 +85,7 @@ function subHeading(text: string): Paragraph {
   })
 }
 
+/** Creates a standard body-text paragraph at 10pt (20 half-points). */
 function bodyText(text: string): Paragraph {
   return new Paragraph({
     children: [new TextRun({ text, size: 20 })],
@@ -64,6 +93,7 @@ function bodyText(text: string): Paragraph {
   })
 }
 
+/** Creates a bullet-list item at level 0. */
 function bulletItem(text: string): Paragraph {
   return new Paragraph({
     children: [new TextRun({ text, size: 20 })],
@@ -72,6 +102,7 @@ function bulletItem(text: string): Paragraph {
   })
 }
 
+/** Creates a bold, light-gray-shaded table header cell. */
 function headerCell(text: string): TableCell {
   return new TableCell({
     children: [
@@ -85,6 +116,10 @@ function headerCell(text: string): TableCell {
   })
 }
 
+/**
+ * Creates a standard data table cell.
+ * @param alignment - Defaults to LEFT; pass AlignmentType.RIGHT or CENTER for numeric columns.
+ */
 function dataCell(text: string, alignment: typeof AlignmentType[keyof typeof AlignmentType] = AlignmentType.LEFT): TableCell {
   return new TableCell({
     children: [
@@ -114,7 +149,11 @@ function formatPercent(value: number): string {
 }
 
 // ── Section renderers ──
+// Each renderer takes its typed section data and returns a flat array of Paragraph | Table
+// elements. They are called conditionally from generateReportDocx() — sections absent from
+// report.content are skipped entirely.
 
+/** Renders the Executive Summary section: narrative, highlights bullet list, key metrics table. */
 function renderExecutiveSummary(section: ExecutiveSummarySection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Executive Summary'))
@@ -164,6 +203,7 @@ function renderExecutiveSummary(section: ExecutiveSummarySection): (Paragraph | 
   return elements
 }
 
+/** Renders the Semester at a Glance section: summary stats, sessions-over-time table, tier distribution. */
 function renderSemesterGlance(section: SemesterGlanceSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Semester at a Glance'))
@@ -245,6 +285,7 @@ function renderSemesterGlance(section: SemesterGlanceSection): (Paragraph | Tabl
   return elements
 }
 
+/** Renders the Session Summaries section: one row per session with speaker, date, themes, submissions, rating. */
 function renderSessionSummaries(section: SessionSummariesSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Session Summaries'))
@@ -288,6 +329,7 @@ function renderSessionSummaries(section: SessionSummariesSection): (Paragraph | 
   return elements
 }
 
+/** Renders the Theme Evolution section: AI narrative, dominant themes table, theme timeline table. */
 function renderThemeEvolution(section: ThemeEvolutionSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Theme Evolution'))
@@ -350,6 +392,7 @@ function renderThemeEvolution(section: ThemeEvolutionSection): (Paragraph | Tabl
   return elements
 }
 
+/** Renders the Student Engagement section: participation tier counts, top contributors, drop-off students. */
 function renderStudentEngagement(section: StudentEngagementSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Student Engagement'))
@@ -451,6 +494,7 @@ function renderStudentEngagement(section: StudentEngagementSection): (Paragraph 
   return elements
 }
 
+/** Renders the Student Growth section: AI narrative plus per-student highlight blocks. */
 function renderStudentGrowth(section: StudentGrowthSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Student Growth'))
@@ -479,6 +523,10 @@ function renderStudentGrowth(section: StudentGrowthSection): (Paragraph | Table)
   return elements
 }
 
+/**
+ * Renders the Question Quality section: AI narrative, trend badge, overall tier distribution,
+ * and a per-session tier breakdown table with dynamic columns (one per tier name).
+ */
 function renderQuestionQuality(section: QuestionQualitySection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Question Quality'))
@@ -564,6 +612,7 @@ function renderQuestionQuality(section: QuestionQualitySection): (Paragraph | Ta
   return elements
 }
 
+/** Renders the Blind Spots section: identified blind spots and corresponding recommendations. */
 function renderBlindSpots(section: BlindSpotsSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Blind Spots'))
@@ -597,6 +646,7 @@ function renderBlindSpots(section: BlindSpotsSection): (Paragraph | Table)[] {
   return elements
 }
 
+/** Renders the Speaker Effectiveness section: AI narrative and speaker ranking table. */
 function renderSpeakerEffectiveness(section: SpeakerEffectivenessSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Speaker Effectiveness'))
@@ -639,6 +689,7 @@ function renderSpeakerEffectiveness(section: SpeakerEffectivenessSection): (Para
   return elements
 }
 
+/** Renders the Appendix Roster section: full student list with participation stats. */
 function renderAppendixRoster(section: AppendixRosterSection): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   elements.push(sectionHeading('Appendix: Full Roster'))
@@ -680,6 +731,10 @@ function renderAppendixRoster(section: AppendixRosterSection): (Paragraph | Tabl
 
 // ── Title page elements ──
 
+/**
+ * Builds centered title-page paragraphs: course label, report title,
+ * optional date range, and generated-at timestamp.
+ */
 function buildTitlePage(report: SemesterReport): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
 
@@ -736,6 +791,15 @@ function buildTitlePage(report: SemesterReport): (Paragraph | Table)[] {
 
 // ── Main export ──
 
+/**
+ * Generates a DOCX buffer for a semester report.
+ *
+ * @param report - Fully-populated SemesterReport object from the semester_reports table
+ * @returns      - DOCX as a Uint8Array, ready to stream as a Word document
+ *
+ * Each report section is rendered only if it exists in report.content — the
+ * AI agent (lib/ai/reportAgent.ts) may omit sections when data is insufficient.
+ */
 export async function generateReportDocx(report: SemesterReport): Promise<Uint8Array> {
   const children: (Paragraph | Table)[] = []
 

@@ -1,3 +1,23 @@
+/**
+ * Public portfolio report detail page (`/portfolio/[token]/reports/[reportId]`).
+ *
+ * Route group: `(public)` — no auth required.
+ * Fetches `GET /api/portfolio/[token]/reports/[reportId]` on mount.
+ *
+ * Renders a condensed read-only view of the semester report content.
+ * Not all sections available in the authenticated report viewer are shown here —
+ * this page surfaces the most shareable sections:
+ * - Executive Summary (narrative)
+ * - Semester at a Glance (session/student/submission counts, avg per session)
+ * - Session Summaries (speaker name, file count, top themes)
+ * - Theme Evolution (narrative)
+ * - Blind Spots (title + description per item)
+ *
+ * For the full report with all sections and download options, the professor
+ * uses the authenticated `/reports/[id]` page.
+ *
+ * Components: inline render (no extracted components)
+ */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -5,6 +25,11 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { ReportContent } from '@/types'
 
+/**
+ * Defines the structure for a detailed report object.
+ * It is used to ensure type safety and consistency when handling report data fetched from the API.
+ * Includes unique identifier (`id`), a `title`, structured `content` of type `ReportContent`, and a `createdAt` timestamp.
+ */
 interface ReportData {
   id: string
   title: string
@@ -12,6 +37,11 @@ interface ReportData {
   createdAt: string
 }
 
+/**
+ * Renders the detailed view for a specific portfolio report.
+ * This page is used to display comprehensive information about a chosen report, dynamically fetched based on the URL parameters.
+ * It is a client component, utilizing `useEffect` to fetch report data from `/api/portfolio/${params.token}/reports/${params.reportId}` when mounted or when `token`/`reportId` changes. It manages loading and `report not found` states, and conditionally renders various sections of the report's content such as Executive Summary, Semester at a Glance, Session Summaries, Theme Evolution, and Blind Spots. Includes breadcrumb navigation for user convenience.
+ */
 export default function PortfolioReportDetailPage() {
   const params = useParams<{ token: string; reportId: string }>()
   const [report, setReport] = useState<ReportData | null>(null)

@@ -227,3 +227,17 @@ Key directories have their own CLAUDE.md with local conventions:
 - `components/CLAUDE.md` — directory structure, brand colors, component patterns
 - `lib/export/CLAUDE.md` — PDF/DOCX export patterns
 - `types/CLAUDE.md` — barrel export rules, Row vs Domain types
+
+## Working Style & Preferences
+
+- **Execute, don't explain.** If you have tools to make a change, make it. Don't describe what to do.
+- **Local-first.** When working on localhost, never suggest Supabase Dashboard, Vercel, or cloud fixes. Use CLI and local files only unless explicitly told otherwise.
+- **Action-oriented prompts.** Treat feature requests as implementation tickets — plan phases, then execute end-to-end.
+- **Commit frequently.** After completing each phase of multi-file work, stage and commit to prevent loss from stash/linter/external reverts.
+- **Verify after git ops.** After any stash, merge, or branch switch, run `git diff --stat` and confirm no files were accidentally reverted.
+- **Typecheck before reporting done.** Always run `npx tsc --noEmit` and `npm run build` after multi-file changes. Don't report completion until clean.
+- **Multi-phase feature pattern:** Types → Migration → DB layer → AI agent → API route → UI → Typecheck/Build → CLAUDE.md update.
+- **No production config changes during local dev.** Never modify remote/production Supabase config when working on localhost.
+- **Parallel agents welcome.** For large features (10+ files), spawn sub-agents for independent workstreams (DB, API, UI) when possible.
+- **Migrations reminder.** If migrations were created, remind to push them (`supabase db push`).
+- **Wrong approach = most common friction.** When unsure, outline the plan and confirm before coding rather than diving in.

@@ -1,3 +1,32 @@
+/**
+ * GET /api/shared/compare/[token]
+ *
+ * Public endpoint for fetching a shared session comparison by its share token.
+ * No authentication required — the token acts as the access credential.
+ * Assembles the full SessionComparisonData payload for the public
+ * /shared/compare/[token] page.
+ *
+ * Auth: NONE — this is a fully public route
+ *
+ * Route params:
+ *   - token (string) — the saved_comparisons share token
+ *
+ * Note: uses createAdminClient() to fetch both session rows because RLS
+ *   blocks unauthenticated cookie-based reads. Scoped strictly to the two
+ *   session IDs stored on the comparison row — never a full table scan.
+ *
+ * Response (200): SessionComparisonData — both sessions with themes, analyses,
+ *   tier data, student names, theme overlap, participation delta, and the
+ *   saved AI comparison narrative.
+ *
+ * Error responses:
+ *   404 — token not found or sessions missing
+ *   500 — unexpected error
+ *
+ * DB functions: getComparisonByShareToken(), getThemesBySessionId(),
+ *               getStudentNamesBySession(), getSessionAnalysis(), getTierData()
+ * Helpers: computeThemeOverlap(), computeParticipationDelta() (local)
+ */
 import { NextResponse } from 'next/server'
 import { getComparisonByShareToken } from '@/lib/db/savedComparisons'
 import { getThemesBySessionId } from '@/lib/db/themes'
@@ -11,6 +40,12 @@ import type { SessionComparisonData, ThemeOverlapResult, ParticipationDelta, Ses
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Computes the theme overlap between two sessions' theme arrays.
+ * Uses fuzzy matching via `themesOverlap()` to handle minor title variations.
+ * Returns shared theme pairs, themes unique to A, and themes unique to B.
+ * Each theme in B is matched at most once (first match wins).
+ */
 function computeThemeOverlap(themesA: string[], themesB: string[]): ThemeOverlapResult {
   const shared: ThemeOverlapResult['shared'] = []
   const matchedB = new Set<number>()
@@ -31,6 +66,11 @@ function computeThemeOverlap(themesA: string[], themesB: string[]): ThemeOverlap
   }
 }
 
+/**
+ * Computes the student participation overlap and delta between two sessions.
+ * Returns which students attended both, only A, or only B — all sorted alphabetically.
+ * Also includes the total unique student count across both sessions.
+ */
 function computeParticipationDelta(namesA: string[], namesB: string[]): ParticipationDelta {
   const setA = new Set(namesA)
   const setB = new Set(namesB)
@@ -42,6 +82,31 @@ function computeParticipationDelta(namesA: string[], namesB: string[]): Particip
   }
 }
 
+/**
+ * GET /api/shared/compare/[token]
+ *
+ * Public endpoint that returns the full comparison payload for a saved session
+ * comparison, identified by its share token. No authentication is required.
+ *
+ * @param _request - Not used; token comes from the route segment.
+ * @param params.token - Comparison share token generated via `POST /api/compare/share`.
+ * @returns `SessionComparisonData` — both sessions with themes, Gemini analyses,
+ *   tier classification data, student names, computed theme overlap, participation
+ *   delta, and the saved AI comparison narrative.
+ * @remarks
+ *   - **Auth**: Public route — no authentication required. Token acts as the
+ *     access credential.
+ *   - Uses `createAdminClient()` to fetch session rows because the cookie-based
+ *     RLS client would block unauthenticated reads. Strictly scoped to the two
+ *     session IDs stored on the comparison row — never a full table scan.
+ *   - All eight supporting data sources (themes, analyses, tier data, student names
+ *     for both sessions) are fetched in parallel via a single `Promise.all`.
+ *   - Theme overlap and participation delta are computed locally via
+ *     `computeThemeOverlap()` and `computeParticipationDelta()`.
+ * @see {@link lib/db/savedComparisons.ts} — `getComparisonByShareToken()`
+ * @see {@link lib/db/sessionAnalyses.ts} — `getSessionAnalysis()`
+ * @see {@link lib/db/themes.ts} — `getThemesBySessionId()`
+ */
 export async function GET(
   _request: Request,
   { params }: { params: { token: string } }

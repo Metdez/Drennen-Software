@@ -1,11 +1,54 @@
+/**
+ * Analytics cross-session theme drilldown page (`/analytics/theme?title=...`).
+ *
+ * Server component. Given a theme title (from the analytics class insights),
+ * finds all sessions where that theme appears and runs `runCrossSessionThemeAnalysis`
+ * (Gemini) across their student submissions.
+ *
+ * Auth: getCurrentUser() — redirects to /login if not authenticated.
+ *
+ * Theme matching strategy (cascading fallback to maximise coverage):
+ *   1. Exact match on `session_themes.theme_title`
+ *   2. Case-insensitive match (ILIKE)
+ *   3. Partial containment match
+ *   4. Keyword overlap (significant words extracted, stop words filtered)
+ *   5. Last resort: all sessions for the user (AI can still analyze)
+ *
+ * Calls: lib/ai/analysisAgent — runCrossSessionThemeAnalysis()
+ * Calls: lib/db/users — getCurrentUser()
+ * Uses: createClient() (cookie-based) for all DB queries — RLS enforced
+ *
+ * Renders AI synthesis narrative, relevant questions, emerging patterns, and missed angles.
+ */
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/db/users'
 import { runCrossSessionThemeAnalysis } from '@/lib/ai/analysisAgent'
 
+/**
+ * What it does: Specifies the rendering behavior for this Next.js page.
+ * Why it is used: Forces the page to be dynamically rendered on each request.
+ * Important implementation details:
+ * - This ensures that the page always reflects the latest user-specific data, such as authenticated user state, their sessions, and freshly generated AI analysis based on search parameters.
+ * - It prevents static generation (SSG) of this page, which would not be appropriate given its highly dynamic and user-dependent content.
+ */
 export const dynamic = 'force-dynamic'
 
+/**
+ * What it does: Renders a detailed analytics page for a specific theme, showing AI-generated synthesis, patterns, missed angles, and relevant student questions across multiple user sessions.
+ * Why it is used: To provide users with deep insights into how a particular theme has been discussed and understood by students across various teaching sessions, leveraging AI for comprehensive analysis.
+ * Important implementation details:
+ * - Authentication and Authorization: It first checks if a user is logged in; otherwise, it redirects them to the login page, ensuring only authenticated users can access their analytics.
+ * - Dynamic Theme Retrieval: The page retrieves the theme title from URL search parameters, handling missing titles gracefully by returning a 404.
+ * - Robust Theme Matching: It employs a multi-strategy approach to identify relevant sessions for a given theme, starting with exact matches and progressively broadening to case-insensitive, partial, and keyword-based searches. This accounts for variations in how theme titles might be stored or searched.
+ * - Fallback Data Fetching: As a last resort, if no specific theme sessions are found, it fetches all user sessions to ensure the AI analysis can still run, providing a broader context.
+ * - AI Integration: It uses `runCrossSessionThemeAnalysis` to process student submissions related to the identified theme, generating a narrative, emerging patterns, missed angles, and relevant questions.
+ * - Data Preparation: Student submissions are carefully prepared with relevant metadata (student name, speaker name, session ID) before being passed to the AI model.
+ * - Error Handling: Gracefully handles errors during Supabase data fetching and AI analysis, displaying user-friendly error messages without crashing the application.
+ * - UI Presentation: Displays AI-generated insights in a structured and readable format, including a synthesis narrative, bulleted patterns/angles, and individual student questions, enhanced with Tailwind CSS for visual appeal.
+ * - Dynamic Rendering: Marked as `export const dynamic = 'force-dynamic'` to ensure fresh data and analysis on every request, suitable for highly personalized content.
+ */
 export default async function ThemeDrilldownPage({ searchParams }: { searchParams: { title?: string } }) {
   const user = await getCurrentUser()
   if (!user) redirect('/login')

@@ -1,6 +1,65 @@
+/**
+ * lib/ai/speakerAnalysisEvaluation.ts
+ *
+ * Evaluates student speaker analysis submissions using Gemini AI.
+ *
+ * After a guest speaker session, students submit formal analytical assignments
+ * evaluating the speaker's message, leadership style, communication approach,
+ * and connections to course concepts. This is distinct from debrief reflections
+ * (lib/ai/debriefReflectionAnalysis.ts) — these are structured academic
+ * evaluations assessing critical thinking skills, not personal reflections.
+ *
+ * The evaluation produces a `StudentSpeakerAnalysis` object that gives the
+ * professor a synthesized view of:
+ *  - How students evaluated the speaker across key dimensions (evaluation_themes)
+ *  - Which leadership qualities students identified in the speaker
+ *  - How students connected the session to course concepts and frameworks
+ *  - Where students agreed and diverged in their assessments
+ *  - The overall analytical sophistication of the cohort (high/moderate/surface)
+ *  - Notable observations demonstrating advanced critical thinking
+ *
+ * This analysis feeds into:
+ *  1. The synthesis agent (lib/ai/synthesisAgent.ts) as the `speakerAnalysis` input
+ *  2. The post-session portal feedback (lib/ai/speakerPortalPostSession.ts) indirectly
+ *     via student reflection themes stored in student_speaker_analyses table
+ *
+ * Data flow:
+ *  - Submissions come from the student_speaker_analysis_submissions table
+ *  - Results are stored in the student_speaker_analyses table
+ *  - Triggered from app/api/sessions/[id]/speaker-analyses/route.ts (POST handler)
+ *
+ * Uses: lib/ai/geminiClient.ts
+ * Called by: app/api/sessions/[id]/speaker-analyses/route.ts (POST handler)
+ * Persists to: student_speaker_analyses table (caller's responsibility)
+ */
+
 import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { StudentSpeakerAnalysis } from '@/types'
 
+/**
+ * Constructs the Gemini prompt for evaluating student speaker analysis submissions.
+ *
+ * Formats all student submissions with their names as attribution markers so
+ * Gemini can produce named quotes. The student names are included deliberately
+ * here (unlike the speaker-facing brief/portal) because the output is private
+ * to the professor — it's a professor-facing analytical report.
+ *
+ * @param speakerName - The name of the evaluated speaker
+ * @param submissions - Array of student name + submission text pairs
+ * @returns A fully-formed prompt string ready for Gemini content generation
+ */
+/**
+ * Constructs the Gemini prompt for evaluating student speaker analysis submissions.
+ *
+ * Formats all student submissions with their names as attribution markers so
+ * Gemini can produce named quotes. The student names are included deliberately
+ * here (unlike the speaker-facing brief/portal) because the output is private
+ * to the professor — it's a professor-facing analytical report.
+ *
+ * @param speakerName - The name of the evaluated speaker
+ * @param submissions - Array of student name + submission text pairs
+ * @returns A fully-formed prompt string ready for Gemini content generation
+ */
 function buildSpeakerAnalysisPrompt(
   speakerName: string,
   submissions: Array<{ student_name: string; submission_text: string }>
@@ -92,10 +151,69 @@ Rules:
 - Return ONLY valid JSON. No markdown fences, no explanation text.`
 }
 
+/**
+ * Evaluates a cohort's student speaker analysis submissions using Gemini.
+ *
+ * Analyzes all student submissions holistically (not one at a time) to surface
+ * cross-student patterns, consensus points, disagreements, and standout critical
+ * thinking. The analysis is designed to help the professor understand the
+ * cohort's analytical depth and provide tailored feedback at scale.
+ *
+ * Returns a structured `StudentSpeakerAnalysis` object with:
+ *  - evaluation_themes: 4-8 major evaluation dimensions with representative quotes
+ *  - leadership_qualities: traits students identified in the speaker
+ *  - course_concept_connections: frameworks students explicitly referenced
+ *  - areas_of_agreement: points where the majority converged
+ *  - areas_of_disagreement: aspects where students diverged meaningfully
+ *  - analytical_sophistication: high/moderate/surface breakdown (must sum to 100)
+ *  - notable_observations: up to 5 standout observations with why_notable context
+ *  - summary: 2-3 paragraph professor briefing narrative
+ *
+ * Caller is responsible for persisting the result to the
+ * `student_speaker_analyses` table via the API route handler.
+ *
+ * @param speakerName - The name of the speaker being evaluated
+ * @param submissions - Array of student name + submission text pairs
+ * @returns Parsed StudentSpeakerAnalysis JSON object
+ *
+ * Uses: lib/ai/geminiClient.ts
+ * Called by: app/api/sessions/[id]/speaker-analyses/route.ts (POST handler)
+ * Persists to: student_speaker_analyses table (caller's responsibility)
+ */
+/**
+ * Evaluates a cohort's student speaker analysis submissions using Gemini.
+ *
+ * Analyzes all student submissions holistically (not one at a time) to surface
+ * cross-student patterns, consensus points, disagreements, and standout critical
+ * thinking. The analysis is designed to help the professor understand the
+ * cohort's analytical depth and provide tailored feedback at scale.
+ *
+ * Returns a structured `StudentSpeakerAnalysis` object with:
+ *  - evaluation_themes: 4-8 major evaluation dimensions with representative quotes
+ *  - leadership_qualities: traits students identified in the speaker
+ *  - course_concept_connections: frameworks students explicitly referenced
+ *  - areas_of_agreement: points where the majority converged
+ *  - areas_of_disagreement: aspects where students diverged meaningfully
+ *  - analytical_sophistication: high/moderate/surface breakdown (must sum to 100)
+ *  - notable_observations: up to 5 standout observations with why_notable context
+ *  - summary: 2-3 paragraph professor briefing narrative
+ *
+ * Caller is responsible for persisting the result to the
+ * `student_speaker_analyses` table via the API route handler.
+ *
+ * @param speakerName - The name of the speaker being evaluated
+ * @param submissions - Array of student name + submission text pairs
+ * @returns Parsed StudentSpeakerAnalysis JSON object
+ *
+ * Uses: lib/ai/geminiClient.ts
+ * Called by: app/api/sessions/[id]/speaker-analyses/route.ts (POST handler)
+ * Persists to: student_speaker_analyses table (caller's responsibility)
+ */
 export async function runSpeakerAnalysisEvaluation(
   speakerName: string,
   submissions: Array<{ student_name: string; submission_text: string }>
 ): Promise<StudentSpeakerAnalysis> {
+  // Uses: lib/ai/geminiClient.ts
   const ai = getGeminiClient()
   const model = getGeminiModel()
 
@@ -104,10 +222,12 @@ export async function runSpeakerAnalysisEvaluation(
     contents: buildSpeakerAnalysisPrompt(speakerName, submissions),
     config: {
       systemInstruction: 'You are an expert at analyzing student analytical evaluations of guest speakers for university professors. Always respond with valid JSON only.',
+      // Force JSON response to avoid markdown fences or prose wrapping the output
       responseMimeType: 'application/json',
     },
   })
 
+  // response.text is the raw JSON string; trim and parse directly
   const raw = (response.text ?? '').trim()
   return JSON.parse(raw) as StudentSpeakerAnalysis
 }

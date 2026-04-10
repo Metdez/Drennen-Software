@@ -1,15 +1,38 @@
 'use client'
 
+/**
+ * @file AuthForm.tsx
+ * Email/password + Google OAuth authentication form used on the login page.
+ *
+ * Rendered by: app/(auth)/login/page.tsx
+ * Uses: lib/supabase/client.ts (browser Supabase client for auth)
+ * Calls: Supabase Auth — signInWithPassword, signUp, signInWithOAuth
+ * Redirects to: ROUTES.DASHBOARD on successful sign-in or auto-confirm signup
+ */
+
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ROUTES } from '@/lib/constants'
 
 interface AuthFormProps {
+  /** Controls which tab (Sign In / Sign Up) is active. */
   mode: 'signin' | 'signup'
+  /** Called when the user clicks the opposing tab to switch modes. */
   onModeChange: (mode: 'signin' | 'signup') => void
 }
 
+/**
+ * Renders a tabbed email/password form and a Google OAuth button.
+ *
+ * Behavior:
+ * - Sign-in: calls `supabase.auth.signInWithPassword`, then navigates to /dashboard.
+ * - Sign-up: calls `supabase.auth.signUp`. If auto-confirm is enabled (session returned)
+ *   it navigates to /dashboard?welcome=true; otherwise it shows an email-confirmation prompt.
+ * - Google OAuth: calls `supabase.auth.signInWithOAuth`, redirecting back via
+ *   ROUTES.API_AUTH_CALLBACK after the provider flow completes.
+ * - Errors are surfaced inline; `alert()` is never used.
+ */
 export function AuthForm({ mode, onModeChange }: AuthFormProps) {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -18,6 +41,7 @@ export function AuthForm({ mode, onModeChange }: AuthFormProps) {
   const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  /** Initiates a Google OAuth redirect flow via Supabase. */
   async function handleGoogleLogin() {
     setError(null)
     setSuccess(null)
@@ -33,6 +57,11 @@ export function AuthForm({ mode, onModeChange }: AuthFormProps) {
     }
   }
 
+  /**
+   * Handles email/password form submission for both sign-in and sign-up modes.
+   * Normalizes provider-specific error messages into user-friendly text before
+   * surfacing them in the inline error state.
+   */
   async function handleEmailSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
@@ -63,7 +92,7 @@ export function AuthForm({ mode, onModeChange }: AuthFormProps) {
         }
 
         if (data?.session) {
-          // Auto-confirm enabled: user is signed in, redirect to dashboard
+          // Auto-confirm is enabled in Supabase: the user was immediately signed in.
           router.push(ROUTES.DASHBOARD + '?welcome=true')
         } else {
           // Email confirmation required
@@ -93,6 +122,7 @@ export function AuthForm({ mode, onModeChange }: AuthFormProps) {
     }
   }
 
+  /** Switches between sign-in and sign-up tabs, clearing any stale error/success state. */
   function toggleMode() {
     onModeChange(mode === 'signin' ? 'signup' : 'signin')
     setError(null)

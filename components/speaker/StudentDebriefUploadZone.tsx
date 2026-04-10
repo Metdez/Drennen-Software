@@ -1,15 +1,59 @@
 'use client'
 
+/**
+ * StudentDebriefUploadZone — ZIP upload zone for student post-session reflection files.
+ *
+ * Handles the full upload pipeline for a Canvas ZIP of student debriefs:
+ *  1. Client-side drag-and-drop / file selection (ZIP only)
+ *  2. Supabase Auth check (surfaces session-expiry errors inline)
+ *  3. Browser-side upload to `temp-uploads` bucket via `uploadTempZip`
+ *  4. POST to /api/sessions/[id]/student-debriefs with the storage path
+ *  5. 1.2 s success delay then calls `onUploadComplete` to trigger parent refresh
+ *
+ * Errors surface inline (never `alert()`).  Progress messages update during
+ * each stage.  Purple brand color (#542785) is used throughout.
+ *
+ * Rendered by: app/(app)/preview/page.tsx (debrief tab — debriefs empty state)
+ * Calls: POST /api/sessions/[id]/student-debriefs
+ */
+
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTempZip } from '@/lib/supabase/storage'
 import { ROUTES } from '@/lib/constants'
 
+/**
+ * Defines the shape of properties expected by the StudentDebriefUploadZone component.
+ * 1. What it does: Specifies the required data to be passed into the StudentDebriefUploadZone component.
+ * 2. Why it is used: Ensures type safety and provides a clear contract for how to interact with the component, documenting the data it needs to function correctly.
+ * 3. Important implementation details: It requires a `sessionId` to associate the uploaded debriefs with a specific session and an `onUploadComplete` callback function to notify the parent component when the upload and processing workflow has finished.
+ */
 interface Props {
   sessionId: string
   onUploadComplete: () => void
 }
 
+/**
+ * A React functional component that provides a user interface for educators to upload student debriefs, typically in a ZIP file format.
+ * 1. What it does: It presents a drag-and-drop zone and a file input for selecting a .zip file containing student reflections. It manages the entire upload process, including client-side validation, uploading the file to Supabase storage, triggering a backend API for processing, and providing visual feedback on progress and errors.
+ * 2. Why it is used: This component is crucial for ingesting student reflection data into the system, enabling subsequent AI analysis of the debriefs. It simplifies a complex multi-step process into a single, intuitive UI element for the user.
+ * 3. Important implementation details:
+ *     - State Management: Uses `useState` hooks to manage UI states such as drag activity (`isDragActive`), selected file (`file`), error messages (`error`), upload status (`uploading`), and progress messages (`progress`).
+ *     - File Input Reference: Employs `useRef` to programmatically trigger the hidden file input element, enhancing user experience.
+ *     - Drag & Drop: Implements handlers (`handleDrag`, `handleDrop`) for standard drag-and-drop events to provide an interactive upload area.
+ *     - File Handling & Validation: The `handleFile` function validates that only `.zip` files are accepted, setting an error if an incorrect file type is selected.
+ *     - Upload Workflow (`handleUpload`): This asynchronous function orchestrates the entire upload:
+ *         - Fetches the current user session using Supabase client.
+ *         - Uploads the selected ZIP file to a temporary location in Supabase storage via `uploadTempZip`.
+ *         - Calls a backend API endpoint (`ROUTES.API_SESSION_STUDENT_DEBRIEFS`) to process the uploaded file, sending the storage path.
+ *         - Handles both successful API responses (displaying file count and student names) and error responses, updating the UI accordingly.
+ *         - Introduces a small delay via `setTimeout` after successful upload before calling `onUploadComplete` to ensure the success message is visible to the user.
+ *         - Includes robust error handling using a `try...catch` block.
+ *     - Dynamic UI: The component's appearance (border, background, displayed content) changes dynamically based on the drag state, whether a file is selected, and the upload/processing status.
+ *     - Accessibility: The underlying file input is hidden and triggered by clicking the custom drag-and-drop area.
+ *     - Dependencies: Relies on Supabase client utilities for authentication and storage, and an internal API route for backend processing of the debrief data.
+ */
+// Captures student debrief uploads that seed the portal's reflection analytics and comparison data.
 export function StudentDebriefUploadZone({ sessionId, onUploadComplete }: Props) {
   const [isDragActive, setIsDragActive] = useState(false)
   const [file, setFile] = useState<File | null>(null)

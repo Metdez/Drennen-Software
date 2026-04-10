@@ -7,9 +7,23 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/stripe/checkout?session_id=cs_xxx
- * Verifies a completed Stripe Checkout session and syncs subscription status.
- * Called client-side after returning from Stripe checkout to ensure the DB
- * is updated even if the webhook hasn't fired yet (e.g. localhost dev).
+ *
+ * Verifies a completed Stripe Checkout session and syncs subscription status to the
+ * `profiles` table. Called client-side after the professor returns from the Stripe
+ * hosted checkout page. Acts as a fast-path sync so the UI shows subscribed state
+ * immediately, particularly in local dev where webhooks cannot reach localhost.
+ *
+ * @param request - Query param: `?session_id=cs_xxx` — Stripe Checkout Session ID.
+ * @returns
+ *   - `{ status: "synced", subscriptionStatus: string }` — paid and DB updated.
+ *   - `{ status: "not_paid", paymentStatus: string }` — payment not confirmed.
+ * @remarks
+ *   - **Auth**: Requires a valid session cookie. Returns 401 if unauthenticated.
+ *   - Ownership check: the Stripe session customer must match the user's stored
+ *     `stripeCustomerId`. Returns 403 on mismatch.
+ *   - Only writes to the DB when `payment_status === 'paid'` and a subscription ID
+ *     is present on the checkout session.
+ * @see {@link lib/db/subscription.ts} - `getSubscriptionProfile()`, `updateSubscriptionFromWebhook()`
  */
 export async function GET(request: Request) {
   const user = await getCurrentUser()

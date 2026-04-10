@@ -1,15 +1,48 @@
 'use client'
 
+/**
+ * @file ProcessingView.tsx
+ * Animated progress screen shown while the ZIP → AI pipeline is running.
+ *
+ * Rendered by: app/(app)/dashboard/page.tsx (replaces the upload form during processing)
+ *
+ * Displays the speaker's name with a glow animation, a fake progress bar that
+ * advances through pre-set stages, and a status message.
+ *
+ * Fake progress design: real API latency is unpredictable, so timed stage
+ * transitions give users a sense of forward motion. When `done` becomes true,
+ * pending stage timers are cancelled and the bar fills to 100%.
+ * When `error` arrives, the view fades out and calls `onExited` after 300 ms.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 
 interface ProcessingViewProps {
+  /** Name of the speaker being processed — displayed prominently in the center. */
   speakerName: string
+  /** Set to `true` by the parent when the API call succeeds. Triggers bar fill + redirect. */
   done: boolean
+  /** Non-null when the API call fails. Triggers fade-out and calls `onExited`. */
   error: string | null
+  /** Called ~700 ms after `done` becomes true, giving the bar time to reach 100%. */
   onComplete: () => void
+  /** Called ~300 ms after `error` is set, once the fade-out transition completes. */
   onExited: () => void
 }
 
+/**
+ * Full-screen animated processing view.
+ *
+ * Stage timeline (approximate):
+ * - 0 s:    "Extracting files..." at 0%
+ * - 1.5 s:  "Reading student submissions..." at 20%
+ * - 5.5 s:  "Generating question sheet..." at 50%
+ * - 13.5 s: "Finalizing..." at 88%
+ * - on done: "Done — redirecting..." at 100%
+ *
+ * All stage timers are stored in `stageTimersRef` so they can be cancelled
+ * atomically when `done` or `error` arrives, preventing stale updates.
+ */
 export function ProcessingView({
   speakerName,
   done,
@@ -21,15 +54,16 @@ export function ProcessingView({
   const [message, setMessage] = useState('Extracting files...')
   const [visible, setVisible] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
+  // Holds all pending stage setTimeout IDs so they can be batch-cancelled on done/error.
   const stageTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
-  // Fade in on first paint
+  // Tiny delay before setting visible=true triggers the CSS fade-in transition.
   useEffect(() => {
     const id = setTimeout(() => setVisible(true), 10)
     return () => clearTimeout(id)
   }, [])
 
-  // Schedule fake progress stages on mount
+  // Schedule fake progress stages on mount — these run only if the API hasn't finished yet.
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = []
 
@@ -62,6 +96,7 @@ export function ProcessingView({
     stageTimersRef.current = []
     setProgress(100)
     setMessage('Done — redirecting...')
+    // Give the progress animation a moment to reach 100% before notifying the parent.
     const id = setTimeout(onComplete, 700)
     return () => clearTimeout(id)
   }, [done, onComplete])
@@ -72,6 +107,7 @@ export function ProcessingView({
     stageTimersRef.current.forEach(clearTimeout)
     stageTimersRef.current = []
     setIsExiting(true)
+    // Delay ensures the fade-out transition has time to run before exiting.
     const id = setTimeout(onExited, 300)
     return () => clearTimeout(id)
   }, [error, onExited])

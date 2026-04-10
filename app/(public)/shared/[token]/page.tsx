@@ -1,3 +1,20 @@
+/**
+ * Public shared session page (`/shared/[token]`).
+ *
+ * No-auth read-only view of a single session, accessed via a share token.
+ * Displays the session output across three tabs: Questions, Analysis, and Insights.
+ *
+ * Data:
+ * - Session content: `GET /api/shared/[token]` — returns speakerName, createdAt,
+ *   fileCount, and output. 404 = link revoked.
+ * - Analysis: `GET /api/shared/[token]/analysis` — optional; silently ignored on failure.
+ *
+ * Download: `DownloadButtons` is passed a custom `downloadUrl` pointing to
+ * `GET /api/shared/[token]/download?format=...` (no auth required).
+ *
+ * Components: OutputPreview, DownloadButtons, AnalysisPanelLeft, AnalysisPanelRight
+ * Wrapped in Suspense because it reads from `useParams`.
+ */
 "use client"
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
@@ -9,8 +26,18 @@ import { AnalysisPanelRight } from '@/components/analytics/AnalysisPanelRight'
 import { ROUTES, APP_NAME } from '@/lib/constants'
 import type { SessionAnalysis } from '@/types'
 
+/**
+ * Defines a union type representing the possible active tabs within the shared session view.
+ * It is used to ensure type safety and provide a clear, restricted set of values for managing the current active tab state in the UI.
+ * This is a string literal union type, explicitly listing 'questions', 'analysis', and 'insights' as the valid tab identifiers.
+ */
 type Tab = 'questions' | 'analysis' | 'insights'
 
+/**
+ * Defines the structure of a shared session object, as expected to be received from the API.
+ * It is used to type the `session` state variable in the `SharedContent` component, ensuring type safety and predictability when accessing shared session data properties.
+ * It includes `speakerName` (string), `createdAt` (string, expected to be an ISO date string), `fileCount` (number), and `output` (string) which holds the main processed content of the session.
+ */
 interface SharedSession {
   speakerName: string
   createdAt: string
@@ -18,6 +45,11 @@ interface SharedSession {
   output: string
 }
 
+/**
+ * This is the primary client-side React component responsible for fetching and displaying the details of a shared session based on a unique token.
+ * It is used to provide a public, read-only interface for users to access and review specific session data, including processed output, analysis, and insights, without requiring authentication. It allows sharing of session results via a unique URL.
+ * It uses `useParams` to extract the session `token` from the URL. Manages several state variables for loading, error handling, session data, analysis data, and the active tab. It employs `useEffect` to fetch session and analysis data concurrently on component mount or token change. The `fetchAnalysis` callback is memoized using `useCallback`. It gracefully handles loading and error states by rendering appropriate UI messages. The component renders session metadata, provides download options, and presents a tabbed interface using `OutputPreview`, `AnalysisPanelLeft`, and `AnalysisPanelRight` components. Analysis fetching is designed to 'silently fail' if data is unavailable, as it is optional for shared views.
+ */
 function SharedContent() {
   const params = useParams<{ token: string }>()
   const token = params.token
@@ -191,6 +223,11 @@ function SharedContent() {
   )
 }
 
+/**
+ * This is the Next.js page component for the shared session view, acting as the entry point for the dynamic route `app/(public)/shared/[token]/page.tsx`.
+ * It is used to wrap the `SharedContent` component within a `Suspense` boundary, providing a loading fallback UI during the initial rendering and data fetching phases of the `SharedContent` component. This improves the user experience by showing an immediate loading indicator.
+ * It renders a simple 'Loading...' message as a fallback while the `SharedContent` component, marked with "use client", performs its initial client-side operations, including data fetching.
+ */
 export default function SharedSessionPage() {
   return (
     <Suspense

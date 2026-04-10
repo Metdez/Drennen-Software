@@ -1,3 +1,23 @@
+/**
+ * Session preview page (`/preview?sessionId=...`).
+ *
+ * Displays a processed session's AI output across six tabs:
+ * - Questions: the raw 10-section markdown output via `OutputPreview`
+ * - Analysis: theme clusters and tensions via `AnalysisPanelLeft`
+ * - Insights: suggestions, blind spots, sentiment via `AnalysisPanelRight`
+ * - Debrief: post-session capture form via `DebriefPanel` (lazy-loaded on tab select)
+ * - Reflections: student debrief submissions and AI analysis; upload zone if none exist
+ * - Speaker Analysis: student speaker analysis submissions and AI evaluation
+ *
+ * Data loading strategy:
+ * - Output and overlapping themes: read from `sessionStorage` cache first
+ *   (set by `/dashboard` after generation), then falls back to `GET /api/sessions/[id]`.
+ * - Gemini analysis: reads from `sessionStorage` cache (`analysis_sessionId`) or fetches
+ *   `GET /api/sessions/[id]/analysis`.
+ * - Debrief, student debriefs, speaker analyses: lazy-fetched when each tab is first opened.
+ *
+ * Action buttons: DownloadButtons, ShareButton, GeneratePortalButton, SystemPromptEditor (rerun).
+ */
 "use client"
 
 import { useEffect, useState, useCallback, Suspense } from 'react'

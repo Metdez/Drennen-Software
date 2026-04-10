@@ -1,8 +1,29 @@
+/**
+ * @file StudentSessionCard.tsx
+ * Card displaying a student's full submission history for a single session.
+ *
+ * Rendered by: app/(app)/roster/[studentName]/page.tsx (Submissions tab)
+ *
+ * Displays up to three submission types per session (all rendered as `<pre>` blocks):
+ * - Pre-session questions (always present when `submissionText` is non-empty)
+ * - Post-session reflection (`debriefText`) — orange-accented, shown only if present
+ * - Speaker analysis (`speakerAnalysisText`) — green-accented, shown only if present
+ *
+ * Uses: components/ui/Card, components/ui/Badge
+ */
+
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import type { SessionWithSubmission } from '@/types'
 
+/**
+ * Renders a session card for a student's profile page showing all submission types.
+ * The date badge uses the `purple` variant. Each text block is scrollable with `max-h-48`.
+ *
+ * @param session - Session data merged with the student's submission texts.
+ */
 export function StudentSessionCard({ session }: { session: SessionWithSubmission }) {
+  // Format the stored timestamp into a user-friendly string for the badge.
   const date = new Date(session.createdAt).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',

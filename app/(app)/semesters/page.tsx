@@ -1,3 +1,22 @@
+/**
+ * Semesters management page (`/semesters`).
+ *
+ * Lets professors create, edit, archive, and assign sessions to semesters.
+ * Each semester shows its status (active/archived), session count, and date range.
+ *
+ * Key actions:
+ * - Create: opens `SemesterManageModal` (creates via `POST /api/semesters`)
+ * - Edit: same modal pre-populated with existing data (`PATCH /api/semesters/[id]`)
+ * - Archive: sends `PATCH /api/semesters/[id]` with `{ status: 'archived' }`
+ * - Generate Story: POSTs to `POST /api/stories/generate` for the selected semester;
+ *   if a `storyId` already exists, navigates to `/stories/[id]` instead
+ * - Assign Sessions: opens `AssignSessionsModal` for bulk-assigning unassigned sessions
+ *
+ * An "unassigned sessions" banner appears when sessions exist without a semester.
+ * Semester data comes from `SemesterContext` (pre-loaded at layout level).
+ *
+ * Components: SemesterManageModal, AssignSessionsModal
+ */
 'use client'
 
 import { useState } from 'react'
@@ -8,6 +27,18 @@ import { AssignSessionsModal } from '@/components/semester/AssignSessionsModal'
 import { BRAND, ROUTES } from '@/lib/constants'
 import type { SemesterSummary } from '@/types'
 
+/**
+ * What it does:
+ * Formats a start and end date string into a user-friendly, localized date range string.
+ *
+ * Why it is used:
+ * To display semester date ranges consistently and readably across the application, providing a clear overview of a semester's duration.
+ *
+ * Important implementation details:
+ * - It takes two string arguments, `start` and `end`, which are expected to be valid date strings parseable by `new Date()`.
+ * - It uses `toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })` to format individual dates, ensuring a consistent short-form date (e.g., "Jan 1, 2023").
+ * - The formatted dates are joined by an en-dash (`–`) to represent a range.
+ */
 function formatDateRange(start: string, end: string) {
   const fmt = (d: string) =>
     new Date(d).toLocaleDateString('en-US', {
@@ -18,6 +49,23 @@ function formatDateRange(start: string, end: string) {
   return `${fmt(start)} \u2013 ${fmt(end)}`
 }
 
+/**
+ * What it does:
+ * This is the main page component for the Semesters section of the application. It displays a list of all available semesters, provides functionality to create, edit, and archive semesters, manage unassigned sessions, and initiate AI-powered story generation for semesters.
+ *
+ * Why it is used:
+ * It serves as the central user interface for users to organize their academic or project sessions into defined semesters. This page enables efficient management of semester details, provides insights into session counts, and offers advanced features like AI story generation for comprehensive semester overviews.
+ *
+ * Important implementation details:
+ * - It is a Next.js client component, indicated by `'use client'`.
+ * - It leverages `useSemesterContext` to access global semester data, including the list of semesters, loading state, and whether there are unassigned sessions, ensuring data consistency and real-time updates.
+ * - State management for UI elements (e.g., modal visibility, the semester currently being edited/archived/story-generated, and story generation errors) is handled using `useState` hooks.
+ * - It integrates `SemesterManageModal` for creating and editing semesters and `AssignSessionsModal` for linking unassigned sessions.
+ * - The `handleArchive` function sends a PATCH request to the API to change a semester's status to 'archived', providing immediate feedback with a loading indicator.
+ * - The `handleStory` function handles AI story generation. If a story already exists, it navigates to that story. Otherwise, it prompts the user, makes a POST request to the story generation API, and navigates to the newly created story upon success, including robust error handling and loading states.
+ * - The UI dynamically renders different sections based on loading state, the presence of semesters (empty state), and the existence of unassigned sessions (banner).
+ * - Styling is applied using Tailwind CSS classes and inline styles, referencing constants from `BRAND` for consistent theming.
+ */
 export default function SemestersPage() {
   const { semesters, loading, hasUnassigned, refreshSemesters } =
     useSemesterContext()
@@ -29,6 +77,7 @@ export default function SemestersPage() {
   const [assignOpen, setAssignOpen] = useState(false)
   const [archivingId, setArchivingId] = useState<string | null>(null)
   const [generatingStoryId, setGeneratingStoryId] = useState<string | null>(null)
+  const [storyError, setStoryError] = useState<string | null>(null)
 
   function openCreate() {
     setEditingSemester(null)
@@ -68,6 +117,7 @@ export default function SemestersPage() {
     if (semester.sessionCount === 0) return
     if (!confirm('Generate a narrative story for this semester? This may take 15-30 seconds.')) return
     setGeneratingStoryId(semester.id)
+    setStoryError(null)
     try {
       const res = await fetch(ROUTES.API_STORY_GENERATE, {
         method: 'POST',
@@ -76,14 +126,14 @@ export default function SemestersPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        alert(data.error || 'Failed to generate story')
+        setStoryError(data.error || 'Failed to generate story')
         return
       }
       const data = await res.json()
       await refreshSemesters()
       router.push(ROUTES.STORY(data.storyId))
     } catch {
-      alert('Failed to generate story')
+      setStoryError('Failed to generate story')
     } finally {
       setGeneratingStoryId(null)
     }
@@ -91,6 +141,11 @@ export default function SemestersPage() {
 
   return (
     <div>
+      {storyError && (
+        <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-[family-name:var(--font-dm-sans)]">
+          {storyError}
+        </div>
+      )}
       {/* Header */}
       <div className="mb-8 animate-fade-up">
         <div className="flex items-start justify-between gap-4">

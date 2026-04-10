@@ -1,5 +1,17 @@
 'use client'
 
+/**
+ * StudentDetailTabs — Three-tab shell (Profile / Growth / Submissions) for the student detail page.
+ *
+ * Manages the active tab in local state. Only the active tab's content is mounted;
+ * inactive tabs are not rendered (lazy mounting). Passes studentName and sessions
+ * down to each tab component.
+ *
+ * Rendered by: app/(app)/roster/[studentName]/page.tsx,
+ *              app/(public)/portfolio/[token]/roster/[studentName]/page.tsx
+ * Calls: None (delegates to StudentProfileTab, StudentGrowthTab, StudentSessionCard)
+ */
+
 import { useState } from 'react'
 import { StudentSessionCard } from '@/components/session/StudentSessionCard'
 import { StudentProfileTab } from '@/components/student/StudentProfileTab'
@@ -8,6 +20,13 @@ import type { SessionWithSubmission } from '@/types'
 
 type Tab = 'profile' | 'growth' | 'submissions'
 
+/**
+ * Describes the tabs available inside a selected student's detail view.
+ * This layout mirrors the journey from the roster into the student profile,
+ * growth+notes workspace, and the reflection/submission stream so that each
+ * panel can reach back to the same `studentName` and `sessions` data pulled
+ * when the roster row is clicked.
+ */
 const tabs: { key: Tab; label: string }[] = [
   { key: 'profile', label: 'Profile' },
   { key: 'growth', label: 'Growth' },
@@ -19,6 +38,11 @@ interface Props {
   sessions: SessionWithSubmission[]
 }
 
+/**
+ * Bridges the roster selection to the student detail surface.
+ * The same `studentName` used here feeds the profile and growth tabs (alongside the shared notes editor)
+ * while the `sessions` list powers the submissions feed and reflection/analysis badges that the roster hints at.
+ */
 export function StudentDetailTabs({ studentName, sessions }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('profile')
 
@@ -41,6 +65,7 @@ export function StudentDetailTabs({ studentName, sessions }: Props) {
               {tab.key === 'submissions' && (
                 <span className="ml-1.5 text-xs opacity-60">
                   ({sessions.length})
+                  {/* Sessions drive reflections + analyses badges so the tab can show how many files produced reflections */}
                   {sessions.some(s => s.debriefText) && (
                     <span className="ml-1 text-[#542785]">
                       + {sessions.filter(s => s.debriefText).length} reflections

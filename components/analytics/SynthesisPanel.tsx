@@ -1,13 +1,72 @@
+/**
+ * SynthesisPanel — Session Intelligence Synthesis view.
+ *
+ * Renders the AI-generated cross-data synthesis that connects what students
+ * asked (questions), observed (speaker analyses), and reflected on (debriefs).
+ * Requires at least two submission types to be present; shows a gated empty
+ * state otherwise.
+ *
+ * Sections rendered when synthesis is available:
+ *  - Executive narrative
+ *  - Curiosity resolution (did the speaker address student themes?)
+ *  - Theme evolution before → after the session
+ *  - Emergent themes (unexpected post-session discoveries)
+ *  - Emotional tone shift
+ *  - Gaps across data sources
+ *
+ * Rendered by: app/(app)/preview/page.tsx (synthesis tab)
+ * Data source: SessionSynthesis type, fetched by parent from /api/sessions/[id]/synthesis
+ */
 'use client'
 
 import type { SessionSynthesis } from '@/types'
 
+/**
+ * Tracks which of the three submission types have been uploaded for this session.
+ * Used to determine whether synthesis can be generated and to display data badges.
+ */
+/**
+ * Tracks which of the three submission types have been uploaded for this session.
+ * Used to determine whether synthesis can be generated and to display data badges.
+ *
+ * What it does: Defines the structure to track the presence of three specific submission types.
+ * Why it is used: To determine if enough data is available for synthesis generation and to visually represent the uploaded data types with badges.
+ * Important implementation details: Uses boolean flags for `has_questions`, `has_debriefs`, and `has_speaker_analyses`.
+ */
 interface DataCompleteness {
   has_questions: boolean
   has_debriefs: boolean
   has_speaker_analyses: boolean
 }
 
+/**
+ * Props for SynthesisPanel.
+ * @prop synthesis        - Synthesis result; null until generated.
+ * @prop loading          - True while synthesis generation is in progress.
+ * @prop error            - Error message if generation failed.
+ * @prop insufficient     - True when fewer than two submission types exist; shows
+ *                          data-type badge gate rather than a generate button.
+ * @prop pending          - True when individual analyses are still being processed;
+ *                          the user is prompted to refresh.
+ * @prop dataCompleteness - Which of the three submission types are present.
+ * @prop onRetry          - Callback to re-fetch or retry synthesis generation.
+ */
+/**
+ * Props for SynthesisPanel.
+ * @prop synthesis        - Synthesis result; null until generated.
+ * @prop loading          - True while synthesis generation is in progress.
+ * @prop error            - Error message if generation failed.
+ * @prop insufficient     - True when fewer than two submission types exist; shows
+ *                           data-type badge gate rather than a generate button.
+ * @prop pending          - True when individual analyses are still being processed;
+ *                           the user is prompted to refresh.
+ * @prop dataCompleteness - Which of the three submission types are present.
+ * @prop onRetry          - Callback to re-fetch or retry synthesis generation.
+ *
+ * What it does: Defines the properties expected by the `SynthesisPanel` component.
+ * Why it is used: To pass all necessary data and state information (`synthesis` data, `loading` status, `error` messages, `insufficient` data flag, `pending` analysis status, `dataCompleteness` details, and `onRetry` callback) from a parent component to `SynthesisPanel` for rendering.
+ * Important implementation details: Includes a `SessionSynthesis` type (which is imported), boolean flags for various states, string for error messages, and a callback function.
+ */
 interface Props {
   synthesis: SessionSynthesis | null
   loading: boolean
@@ -18,12 +77,35 @@ interface Props {
   onRetry: () => void
 }
 
+/**
+ * Badge config for each of the three data submission types.
+ * Colors map to BRAND.ORANGE (questions), BRAND.GREEN (analyses), BRAND.PURPLE (debriefs).
+ * Present badges are fully opaque; absent badges are dimmed.
+ */
+/**
+ * Badge config for each of the three data submission types.
+ * Colors map to BRAND.ORANGE (questions), BRAND.GREEN (analyses), BRAND.PURPLE (debriefs).
+ * Present badges are fully opaque; absent badges are dimmed.
+ *
+ * What it does: Configuration array for displaying data type badges.
+ * Why it is used: Provides a centralized and consistent definition for the labels, full labels, colors, and background colors associated with each data submission type. This ensures uniform styling and text across the UI where these badges are used.
+ * Important implementation details: An array of objects, each containing `key` (for mapping to `DataCompleteness`), `label` (short display), `fullLabel` (for titles), `color`, and `bg` (background color with transparency). It uses `as const` to make it a tuple of readonly objects. The colors are tied to specific brand colors.
+ */
 const DATA_TYPE_BADGES = [
   { key: 'has_questions', label: 'Q', fullLabel: 'Questions', color: '#f36f21', bg: 'rgba(243,111,33,0.12)' },
   { key: 'has_speaker_analyses', label: 'A', fullLabel: 'Speaker Analyses', color: '#0f6b37', bg: 'rgba(15,107,55,0.12)' },
   { key: 'has_debriefs', label: 'D', fullLabel: 'Debriefs', color: '#542785', bg: 'rgba(84,39,133,0.12)' },
 ] as const
 
+/**
+ * What it does: Renders a group of badges indicating the completeness of different data types for a session.
+ * Why it is used: To visually communicate which data submission types (questions, speaker analyses, debriefs) have been uploaded for a session. This helps users understand the status of their data for synthesis generation.
+ * Important implementation details:
+ * - It maps over the `DATA_TYPE_BADGES` configuration to render individual badges.
+ * - Each badge's appearance (background color, text color, opacity) is dynamically determined based on whether the corresponding data type is `present` in the `completeness` prop.
+ * - Uses inline styles for dynamic coloring and opacity based on the `present` status.
+ * - Provides a `title` attribute for accessibility, showing the full label and upload status on hover.
+ */
 function DataTypeBadges({ completeness }: { completeness: DataCompleteness }) {
   return (
     <div className="flex items-center gap-2">
@@ -52,6 +134,28 @@ function DataTypeBadges({ completeness }: { completeness: DataCompleteness }) {
   )
 }
 
+/**
+ * Renders the synthesis panel. Guard-clauses handle the four special states
+ * (insufficient data, pending analyses, loading, error) before reaching the
+ * fully-populated synthesis layout.
+ */
+/**
+ * Renders the synthesis panel. Guard-clauses handle the four special states
+ * (insufficient data, pending analyses, loading, error) before reaching the
+ * fully-populated synthesis layout.
+ *
+ * What it does: The main component responsible for displaying the AI-generated synthesis results for a session, or various states leading up to its generation.
+ * Why it is used: It serves as the primary UI element for users to view the AI-generated intelligence derived from multiple data sources (questions, debriefs, speaker analyses) or to be guided on how to enable its generation.
+ * Important implementation details:
+ * - Uses a series of guard clauses (`if` statements) at the beginning to handle different states: `insufficient` data, `pending` analyses, `loading`, and `error`. This ensures a clear progression and appropriate UI for each state.
+ * - Renders different UI elements (e.g., icons, messages, buttons, `DataTypeBadges`) based on the current state.
+ * - If `synthesis` data is available, it renders detailed sections like `Executive Summary`, `Curiosity Resolution`, `Theme Evolution`, `Emergent Themes`, `Emotional Tone Shift`, and `Gaps Across Data Sources`.
+ * - Leverages Tailwind CSS classes for styling and custom CSS variables for consistent typography.
+ * - Dynamically styles some sections based on data content (e.g., `item.addressed` for `Curiosity Resolution`).
+ * - The `onRetry` callback is crucial for allowing users to re-trigger data fetching in `pending` or `error` states.
+ * - The `synthesis` object itself contains rich structured data which is then rendered into distinct, visually organized sections.
+ * - The `DataTypeBadges` component is reused in several states (insufficient, pending, and full synthesis display).
+ */
 export function SynthesisPanel({
   synthesis,
   loading,
@@ -61,7 +165,7 @@ export function SynthesisPanel({
   dataCompleteness,
   onRetry,
 }: Props) {
-  // Insufficient data types
+  // Insufficient data types — show the badge gate before offering a generate button
   if (insufficient) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-5">

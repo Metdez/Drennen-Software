@@ -1,12 +1,38 @@
 'use client'
 
+/**
+ * @file SubscriptionBanner.tsx
+ * Context-aware subscription status banner shown at the top of app pages.
+ *
+ * Rendered by: app/(app)/layout.tsx (above page content, inside the authenticated shell)
+ * Reads: SubscriptionContext (reason, trialDaysRemaining)
+ *
+ * Three states:
+ * - `trial`        — purple left-border banner with days remaining + dismissible × button.
+ *                    Dismissal is persisted in sessionStorage (DISMISS_KEY) for the tab session.
+ * - `trial_expired` / `free_used` — orange non-dismissible banner with "Subscribe Now" CTA.
+ * - `no_subscription` or active sub — renders nothing.
+ *
+ * Clicking "Upgrade to Pro" or "Subscribe Now" opens PaywallModal inline.
+ */
+
 import { useState, useEffect } from 'react'
 import { useSubscription } from '@/components/subscription/SubscriptionContext'
 import { PaywallModal } from '@/components/subscription/PaywallModal'
 import { BRAND } from '@/lib/constants'
 
+/**
+ * sessionStorage key used to remember that the trial banner was dismissed.
+ * Scoped to the tab session — clears when the browser tab is closed.
+ */
 const DISMISS_KEY = 'subscription_banner_dismissed'
 
+/**
+ * Renders a subscription status banner appropriate to the user's current access state.
+ *
+ * Reads: SubscriptionContext via `useSubscription()`
+ * Side effect: reads/writes `sessionStorage[DISMISS_KEY]` for trial banner dismissal.
+ */
 export function SubscriptionBanner() {
   const { reason, trialDaysRemaining } = useSubscription()
   const [dismissed, setDismissed] = useState(true)
@@ -35,6 +61,7 @@ export function SubscriptionBanner() {
   let bannerContent = null
 
   if (reason === 'trial') {
+    // Trial flow shows a dismissible nudge and opens the paywall when the user hits upgrade.
     bannerContent = (
       <div
         className="rounded-xl px-4 py-3 mb-6 flex items-center justify-between shadow-sm animate-fade-up"

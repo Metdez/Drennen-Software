@@ -1,15 +1,53 @@
 'use client'
 
+/**
+ * SpeakerAnalysisUploadZone — ZIP upload zone for student speaker analysis files.
+ *
+ * Handles the full upload pipeline for a Canvas ZIP of student speaker
+ * evaluation analyses:
+ *  1. Client-side drag-and-drop / file selection (ZIP only)
+ *  2. Supabase Auth check (surfaces session-expiry errors inline)
+ *  3. Browser-side upload to `temp-uploads` bucket via `uploadTempZip`
+ *  4. POST to /api/sessions/[id]/speaker-analyses with the storage path
+ *  5. 1.2 s success delay then calls `onUploadComplete` to trigger parent refresh
+ *
+ * Errors surface inline (never `alert()`).  Progress messages update during
+ * each stage.  Green brand color (#0f6b37) is used throughout.
+ *
+ * Rendered by: app/(app)/preview/page.tsx (debrief tab — speaker analyses empty state)
+ * Calls: POST /api/sessions/[id]/speaker-analyses
+ */
+
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTempZip } from '@/lib/supabase/storage'
 import { ROUTES } from '@/lib/constants'
 
+/**
+ * Defines the props expected by the SpeakerAnalysisUploadZone component.
+ * 1. What it does: Specifies the contract for data passed into the component, ensuring type safety and clarity for its external interface.
+ * 2. Why it is used: To strongly type the properties required by the `SpeakerAnalysisUploadZone` component, preventing runtime errors and improving developer experience through autocompletion and type checking.
+ * 3. Important implementation details: It includes `sessionId` to identify the current session for which analyses are being uploaded, and `onUploadComplete` as a callback to notify the parent component when the upload process successfully finishes.
+ */
 interface Props {
   sessionId: string
   onUploadComplete: () => void
 }
 
+/**
+ * Renders a file upload interface for speaker analysis ZIP files, handling drag-and-drop, file selection, validation, and the entire upload and processing workflow.
+ * 1. What it does: This component provides a user interface for uploading a ZIP file containing student speaker analyses. It manages the UI state during drag/drop, file selection, validation, uploading to Supabase storage, and initiating backend processing via an API call. It provides visual feedback for progress, errors, and success.
+ * 2. Why it is used: It allows users (e.g., instructors) to upload evaluation data which is then processed by an AI for insights, serving as a critical input mechanism for the Drennen Restore application's analysis features.
+ * 3. Important implementation details: 
+ *    - Uses `useState` hooks for managing UI state such as drag activity (`isDragActive`), selected file (`file`), error messages (`error`), upload status (`uploading`), and progress messages (`progress`).
+ *    - Employs `useRef` to create a reference to the hidden file input element, allowing programmatic clicks for file selection.
+ *    - Implements `handleDrag` and `handleDrop` functions to provide a responsive drag-and-drop experience.
+ *    - `handleFile` performs client-side validation, ensuring only `.zip` files are selected.
+ *    - `handleUpload` orchestrates the entire upload process: authenticates with Supabase, uploads the ZIP file to temporary storage using `uploadTempZip`, and then calls a backend API endpoint (`ROUTES.API_SESSION_SPEAKER_ANALYSES`) to trigger server-side processing. It handles potential authentication issues, API errors, and updates progress/error messages.
+ *    - After a successful upload, a small delay is introduced with `setTimeout` before calling `onUploadComplete` to ensure the user sees the success message.
+ *    - Styling leverages Tailwind CSS classes and inline styles for a clean, animated, and responsive design, providing clear visual cues for different states (e.g., drag active, file selected, uploading).
+ */
+// Uploads speaker analysis ZIP files that feed the shared portal data and comparison experiences.
 export function SpeakerAnalysisUploadZone({ sessionId, onUploadComplete }: Props) {
   const [isDragActive, setIsDragActive] = useState(false)
   const [file, setFile] = useState<File | null>(null)

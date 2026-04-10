@@ -1,12 +1,44 @@
+/**
+ * StudentEngagement — Student participation stats, top contributors, and drop-off list.
+ *
+ * Three participation tiers (high ≥ 80%, medium 50–80%, low < 50%) are shown as
+ * stat cards with BRAND.GREEN/ORANGE/red colours. Top contributors are ranked by
+ * rate with the same colour-coding. Drop-off students show the last session they
+ * participated in.
+ *
+ * Rendered by: app/(app)/reports/[id]/page.tsx (student engagement section)
+ * Data source: StudentEngagementSection from SemesterReport type
+ */
 'use client'
 
 import type { StudentEngagementSection } from '@/types'
 import { BRAND } from '@/lib/constants'
 
+/**
+ * Props for StudentEngagement.
+ * @prop data - Student engagement section with participationTiers, topContributors, dropoff.
+ */
+/**
+ * What it does: Defines the shape of the props object for the StudentEngagement component.
+ * Why it is used: To enforce type safety and provide clear documentation for the data expected by the StudentEngagement component.
+ * Important implementation details: It includes a single property, `data`, which must conform to the `StudentEngagementSection` type, containing information about participation tiers, top contributors, and student drop-off.
+ */
 interface Props {
   data: StudentEngagementSection
 }
 
+/**
+ * What it does: Renders a comprehensive section displaying various student engagement metrics within a report, including participation breakdown by tiers, a list of top contributing students, and students who have dropped off.
+ * Why it is used: To provide a clear, organized, and interactive overview of how students are engaging with the content or sessions, helping educators or administrators identify trends and individual student performance.
+ * Important implementation details:
+ * - It's a client-side React component (`'use client'` directive).
+ * - It consumes `StudentEngagementSection` data, which includes `participationTiers`, `topContributors`, and `dropoff` information.
+ * - Participation tiers are categorized into High, Medium, and Low, each assigned a specific brand color for visual distinction.
+ * - Top contributors are displayed in a table, showing student name, session count, and a calculated contribution rate, with rate percentages color-coded based on performance thresholds (e.g., green for high, orange for medium, red for low).
+ * - Students who dropped off are listed with their last seen speaker and a formatted date.
+ * - Sections for "Top Contributors" and "Students Who Dropped Off" are conditionally rendered only if there is data available, preventing empty sections from appearing.
+ * - Styling is primarily handled via Tailwind CSS classes and custom CSS variables for theme consistency.
+ */
 export function StudentEngagement({ data }: Props) {
   const tierStats = [
     { label: 'High (80%+)', value: data.participationTiers.high, color: BRAND.GREEN },

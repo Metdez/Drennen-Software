@@ -1,8 +1,22 @@
+/**
+ * SpeakerEffectiveness — Speaker rankings table for the semester report.
+ *
+ * Renders a narrative paragraph and a sortable table of all speakers ranked by
+ * submission count, average question tier (BRAND.PURPLE), and debrief rating
+ * (BRAND.ORANGE). Cells with missing data show a dash.
+ *
+ * Rendered by: app/(app)/reports/[id]/page.tsx (speaker effectiveness section)
+ * Data source: SpeakerEffectivenessSection from SemesterReport type
+ */
 'use client'
 
 import type { SpeakerEffectivenessSection } from '@/types'
 import { BRAND } from '@/lib/constants'
 
+/**
+ * Props for SpeakerEffectiveness.
+ * @prop data - Speaker effectiveness section with narrative and rankings array.
+ */
 interface Props {
   data: SpeakerEffectivenessSection
 }

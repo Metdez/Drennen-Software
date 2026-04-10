@@ -1,3 +1,23 @@
+/**
+ * Semester report viewer page (`/reports/[id]`).
+ *
+ * Displays a fully-generated semester report with a dynamic table of contents
+ * and up to 10 configurable sections. Only sections included in `report.content`
+ * are rendered and listed in the TOC.
+ *
+ * Data: fetched from `GET /api/reports/[id]`. 401 redirects to login;
+ * 404 redirects to dashboard.
+ *
+ * Export: PDF and DOCX via `GET /api/reports/[id]/download?format=pdf|docx`.
+ * File is streamed as a blob and downloaded programmatically.
+ *
+ * Includes print-friendly global styles to hide navigation and set a white background.
+ *
+ * Section components (imported individually):
+ * ExecutiveSummary, SemesterGlance, SessionSummaries, ThemeEvolution,
+ * StudentEngagement, StudentGrowth, QuestionQuality, BlindSpots,
+ * SpeakerEffectiveness, AppendixRoster
+ */
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
@@ -17,11 +37,31 @@ import { BlindSpots } from '@/components/report/BlindSpots'
 import { SpeakerEffectiveness } from '@/components/report/SpeakerEffectiveness'
 import { AppendixRoster } from '@/components/report/AppendixRoster'
 
+/**
+ * What it does:
+ * Defines the structure for an entry in the Table of Contents (TOC) for a report.
+ *
+ * Why it is used:
+ * This interface ensures consistency and type safety when creating and managing entries for the dynamic Table of Contents rendered on the report page.
+ *
+ * Important implementation details:
+ * It contains an `id` field, which typically corresponds to an HTML anchor ID (e.g., #executive-summary), and a `label` field, which is the user-friendly display text for that section.
+ */
 interface TocEntry {
   id: string
   label: string
 }
 
+/**
+ * What it does:
+ * This constant object maps internal keys of report content sections to their display names and corresponding HTML `id` attributes.
+ *
+ * Why it is used:
+ * It centralizes the metadata for each report section, making it easy to generate the Table of Contents programmatically and ensure consistent labeling and linking across the report viewer. It decouples the internal data structure keys from the UI representation.
+ *
+ * Important implementation details:
+ * The keys of this object (e.g., `executive_summary`) directly correspond to the property names found within the `ReportContent` type. Each value is an object containing `id` (used for `href` attributes in TOC links and for HTML section `id`s) and `label` (the human-readable title).
+ */
 const SECTION_META: Record<string, { id: string; label: string }> = {
   executive_summary: { id: 'executive-summary', label: 'Executive Summary' },
   semester_at_a_glance: { id: 'semester-at-a-glance', label: 'Semester at a Glance' },
@@ -36,6 +76,16 @@ const SECTION_META: Record<string, { id: string; label: string }> = {
 }
 
 // Ordered list of section keys for consistent rendering
+/**
+ * What it does:
+ * This constant array defines the explicit rendering order for the various sections within a semester report.
+ *
+ * Why it is used:
+ * It ensures that report sections are always displayed in a consistent, predefined, and logical sequence to the user. This order is crucial for both rendering the report content and generating an accurate and ordered Table of Contents.
+ *
+ * Important implementation details:
+ * The array is typed `as const` to provide read-only tuple inference, ensuring strict type checking and preventing accidental modification. The string values in the array must match the keys used in `SECTION_META` and the properties of `ReportContent`.
+ */
 const SECTION_ORDER = [
   'executive_summary',
   'semester_at_a_glance',
@@ -49,6 +99,23 @@ const SECTION_ORDER = [
   'appendix_roster',
 ] as const
 
+/**
+ * What it does:
+ * This is the main page component for displaying a specific semester report. It fetches report data, renders various report sections, generates a dynamic table of contents, and provides options to download the report.
+ *
+ * Why it is used:
+ * It serves as the primary interface for users to view a detailed analysis of a semester's data. It brings together different report components into a cohesive, interactive document, allowing for easy navigation and export of the generated report.
+ *
+ * Important implementation details:
+ * 1.  Uses Next.js `useParams` to extract the report `id` from the URL.
+ * 2.  Manages component state for `report` data, `loading` status, `error` messages, and `downloading` state.
+ * 3.  `useEffect` hook handles asynchronous data fetching from `ROUTES.API_REPORT(params.id)`. It includes error handling for network issues, unauthorized access (401, redirects to login), and not found reports (404, redirects to dashboard).
+ * 4.  `useMemo` hook dynamically constructs the `toc` (Table of Contents) based on which sections are present in the fetched `report.content` and adheres to `SECTION_ORDER`.
+ * 5.  `handleDownload` function manages the process of fetching PDF or DOCX versions of the report from `ROUTES.API_REPORT_DOWNLOAD` and initiating a client-side download.
+ * 6.  Renders a `LoadingSkeleton` during data fetching and an informative error message if the report fails to load or is not found.
+ * 7.  Conditionally renders individual report components (e.g., `ExecutiveSummary`, `SemesterGlance`) only if their respective data exists in `report.content`.
+ * 8.  Includes inline `<style jsx global>` for print-specific CSS rules, optimizing the report's layout when printed or saved as PDF from the browser. Elements with `no-print` class are hidden during printing.
+ */
 export default function ReportPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
@@ -291,6 +358,16 @@ export default function ReportPage() {
   )
 }
 
+/**
+ * What it does:
+ * Renders a placeholder user interface (UI) to indicate that content is being loaded for the report page.
+ *
+ * Why it is used:
+ * It enhances the user experience by providing visual feedback during asynchronous data fetching. Instead of a blank screen, users see a structured representation of the incoming content, which improves perceived performance and reduces cognitive load.
+ *
+ * Important implementation details:
+ * This component uses a series of `div` elements styled with Tailwind CSS utility classes, including `h-*`, `w-*`, `rounded-xl`, `bg-[var(--surface-elevated)]`, and `animate-pulse`. These styles create animated, generic shapes that mimic the layout and size of the actual report sections, providing a smooth transition once the real data is loaded.
+ */
 function LoadingSkeleton() {
   return (
     <div className="space-y-6 animate-fade-up">

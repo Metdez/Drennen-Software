@@ -1,3 +1,21 @@
+/**
+ * Semester narrative story viewer page (`/stories/[id]`).
+ *
+ * Displays an AI-generated 5-section narrative story for a semester. Each section
+ * has a title and multi-paragraph body and can be edited inline by the professor.
+ *
+ * Data: fetched from `GET /api/stories/[id]`. 401 redirects to login;
+ * 404 redirects to /semesters.
+ *
+ * Edit flow: clicking "Edit" on a section opens an inline editor with a text input
+ * for the title and an auto-resizing textarea for the body. Saving PATCHes
+ * `PATCH /api/stories/[id]` with the full updated `sections` array. A
+ * `beforeunload` listener warns on unsaved changes.
+ *
+ * Export: PDF and DOCX via `GET /api/stories/[id]/download?format=pdf|docx`.
+ *
+ * Includes print-friendly global styles.
+ */
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -6,6 +24,25 @@ import Link from 'next/link'
 import { ROUTES, BRAND } from '@/lib/constants'
 import type { SemesterStory, StorySection } from '@/types'
 
+/**
+ * What it does: This component renders a dynamic page for a single semester story, identified by its ID in the URL. It allows users to view the story's content, edit individual sections, and download the complete story in PDF or DOCX formats.
+ * Why it is used: It serves as the primary interface for users to interact with their generated stories, enabling detailed review, modification of narrative sections, and export for external use.
+ * Important implementation details:
+ * - Uses `useParams` to extract the story ID from the URL and `useRouter` for programmatic navigation (e.g., redirecting on error or authentication failure).
+ * - Fetches story data from the backend API (`ROUTES.API_STORY(params.id)`) upon initial component mount. Handles 401 (unauthorized) and 404 (not found) responses by redirecting the user.
+ * - Manages various states including `story` data, `loading` status, `error` messages, `downloading` state, and a set of states for the in-line editing functionality (`editingIndex`, `editTitle`, `editBody`, `saving`, `hasUnsaved`).
+ * - Includes `useEffect` hooks for:
+ *     - Initial data fetching based on `params.id`.
+ *     - Warning the user about unsaved changes before leaving the page using `beforeunload`.
+ *     - Auto-resizing the textarea element during section editing.
+ * - `startEditing`, `cancelEditing`, and `saveSection` are memoized with `useCallback` to manage the editing workflow for individual story sections.
+ * - `handleDownload` asynchronously fetches PDF or DOCX files from the API and initiates a client-side download.
+ * - Displays a `LoadingSkeleton` component while story data is being fetched.
+ * - Renders story metadata (title, generation date, session count) and iterates through `story.sections`.
+ * - Each section dynamically switches between a read-only view and an editable form based on the `editingIndex` state.
+ * - Applies global CSS (`style jsx global`) to optimize the page for printing by hiding navigation elements and adjusting styles.
+ * - Utilizes constants from `@/lib/constants` like `ROUTES` for API endpoints and `BRAND` for consistent styling.
+ */
 export default function StoryPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
@@ -347,6 +384,14 @@ export default function StoryPage() {
   )
 }
 
+/**
+ * What it does: This component renders a placeholder UI, simulating the layout of the `StoryPage` content.
+ * Why it is used: It provides a visual indication to the user that content is being loaded, improving perceived performance and user experience by preventing a blank screen during data fetching.
+ * Important implementation details:
+ * - Designed using Tailwind CSS classes to create animated, pulsing gray blocks (`animate-pulse`, `bg-[var(--surface-elevated)]`).
+ * - Mimics the structure of the story page, including placeholders for the main title, metadata, and multiple story sections (each with a heading and a larger body block).
+ * - Does not contain any interactive logic or data, purely serving as a visual loading state.
+ */
 function LoadingSkeleton() {
   return (
     <div className="max-w-[720px] mx-auto space-y-6 animate-fade-up">

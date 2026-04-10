@@ -1,3 +1,13 @@
+/**
+ * QuestionQuality — Question tier distribution charts for the semester report.
+ *
+ * Renders a trend indicator (improving/stable/declining), a stacked bar chart of
+ * tier distribution across sessions, and an overall distribution card grid.
+ * Tier colors: T1=BRAND.ORANGE, T2=BRAND.PURPLE, T3=BRAND.GREEN, T4=blue, T5=violet.
+ *
+ * Rendered by: app/(app)/reports/[id]/page.tsx (question quality section)
+ * Data source: QuestionQualitySection from SemesterReport type
+ */
 'use client'
 
 import type { QuestionQualitySection } from '@/types'
@@ -12,10 +22,26 @@ import {
   Legend,
 } from 'recharts'
 
+/**
+ * Props for QuestionQuality.
+ * @prop data - Question quality section with perSessionTiers, overallDistribution, trend, narrative.
+ */
+/**
+ * Defines the shape of the properties accepted by the QuestionQuality component.
+ * 1. What it does: Specifies the single `data` prop required by the component.
+ * 2. Why it is used: Ensures type safety and clarity for the data passed to the component, making sure it conforms to the `QuestionQualitySection` interface.
+ * 3. Important implementation details: The `data` prop is of type `QuestionQualitySection`, which contains `perSessionTiers`, `overallDistribution`, `trend`, and `narrative`.
+ */
 interface Props {
   data: QuestionQualitySection
 }
 
+/**
+ * Maps specific question quality tier names to corresponding color codes.
+ * 1. What it does: Provides a centralized lookup for consistent coloring of different quality tiers across the component's visualizations.
+ * 2. Why it is used: Ensures brand consistency and readability by associating each tier with a distinct, predefined color. It prevents hardcoding colors directly in the rendering logic.
+ * 3. Important implementation details: Uses colors from the `BRAND` constants for 'Tier 1', 'Tier 2', and 'Tier 3', and defines additional hex codes for 'Tier 4' and 'Tier 5'. It's a `Record<string, string>` for easy key-value access.
+ */
 const TIER_COLORS: Record<string, string> = {
   'Tier 1': BRAND.ORANGE,
   'Tier 2': BRAND.PURPLE,
@@ -24,10 +50,28 @@ const TIER_COLORS: Record<string, string> = {
   'Tier 5': '#a78bfa',
 }
 
+/**
+ * Retrieves the color associated with a given question quality tier.
+ * 1. What it does: Takes a tier name as input and returns its corresponding color from the `TIER_COLORS` map.
+ * 2. Why it is used: Provides a utility function to safely access tier colors, including a fallback for any unknown or unspecified tiers to ensure a default color is always returned, preventing UI issues.
+ * 3. Important implementation details: If a tier is not found in `TIER_COLORS`, it defaults to a gray color (`#94a3b8`), which typically indicates a neutral or undefined state.
+ */
 function getTierColor(tier: string): string {
   return TIER_COLORS[tier] ?? '#94a3b8'
 }
 
+/**
+ * A React functional component that displays a comprehensive report on question quality, including trends, per-session tier distribution, and overall distribution.
+ * 1. What it does: Renders various sections of a question quality report using data passed via props. This includes a narrative summary with a trend indicator, a stacked bar chart showing tier distribution over time, and a grid displaying overall tier counts.
+ * 2. Why it is used: To provide a visual and textual summary of question quality metrics, allowing users to quickly understand performance trends and distribution across different sessions and overall. It consolidates multiple data points into an easily digestible format.
+ * 3. Important implementation details:
+ *     - It's a client-side component (`'use client'`).
+ *     - Processes `data.perSessionTiers` to create `chartData` suitable for `recharts`, dynamically collecting all unique tier keys for the chart bars.
+ *     - Calculates `trendColor`, `trendIcon`, and `trendLabel` based on the `data.trend` property to visually represent improving, declining, or stable trends.
+ *     - Utilizes `recharts` for the interactive stacked bar chart, displaying session dates on the X-axis and tier counts on the Y-axis. The tooltip is customized to show full speaker name and date.
+ *     - Displays overall distribution by iterating through `data.overallDistribution` and sorting tiers alphabetically.
+ *     - Uses Tailwind CSS classes (implied by `className`) for styling and layout, and CSS variables for theming (e.g., `var(--text-primary)`, `var(--brand-orange)`).
+ */
 export function QuestionQuality({ data }: Props) {
   // Collect all unique tier keys across all sessions
   const allTiers = Array.from(

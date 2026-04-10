@@ -1,13 +1,44 @@
 'use client'
 
+/**
+ * SemesterSelector — Dropdown pill in NavHeader for switching the active semester filter.
+ *
+ * Reads SemesterContext (semesters, activeSemesterId, setSemester). Splits semesters into
+ * active and archived groups separated by a divider. Selecting an option calls
+ * setSemester() which updates the `?semester=` URL param via router.replace().
+ * "Manage Semesters" links to ROUTES.SEMESTERS.
+ *
+ * Rendered by: components/layout/NavHeader.tsx
+ * Reads: SemesterContext
+ * Calls: None (state changes are handled by SemesterContext)
+ */
+
 import { useSemesterContext } from '@/components/semester/SemesterContext'
 import { ROUTES } from '@/lib/constants'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+/**
+ * This client-side React component renders a dropdown menu that enables users to select and switch between different academic semesters or view all sessions. It provides a visual indication of the currently active semester and allows navigation to a dedicated semester management page.
+ *
+ * It is used to provide a convenient and consistent way for users to filter or scope the application's data based on a specific academic semester. This enhances usability by allowing quick context switching without navigating away from the current view.
+ *
+ * Important implementation details:
+ * - It consumes the `SemesterContext` to access and manage the global active semester state, including `semesters`, `activeSemesterId`, `activeSemester`, `setSemester`, and `loading` status.
+ * - Uses `useState` to manage the dropdown's open/closed state (`open`).
+ * - Employs a `useRef` to target the component's container for handling outside clicks.
+ * - An `useEffect` hook implements an event listener for `mousedown` to close the dropdown when a click occurs outside its boundaries.
+ * - Semesters fetched from the context are filtered into `activeSemesters` and `archivedSemesters` for categorized display within the dropdown.
+ * - Displays a "Loading..." message when semester data is being fetched.
+ * - The primary button displays the name of the `activeSemester` or "All Sessions" if no specific semester is selected.
+ * - The dropdown options allow users to set a specific semester as active using `setSemester(s.id)` or clear the selection with `setSemester(null)` for "All Sessions".
+ * - Includes a `Link` to `ROUTES.SEMESTERS` to navigate to a page where semesters can be managed.
+ * - Styling is primarily handled via inline styles, utilizing CSS variables for consistent theming.
+ */
 export function SemesterSelector() {
   const { semesters, activeSemesterId, activeSemester, setSemester, loading } =
     useSemesterContext()
+  // Dropdown taps SemesterContext so analytics/history filters and management modals share the same semester scope.
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 

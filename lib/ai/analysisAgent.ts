@@ -1,3 +1,36 @@
+/**
+ * @file lib/ai/analysisAgent.ts
+ *
+ * Gemini-powered analysis agents for session and theme deep-dives.
+ *
+ * This file contains three distinct analysis functions, each targeting a
+ * different analytical scope:
+ *
+ * 1. **`runSessionAnalysis`** — Analyzes all submissions for a single speaker
+ *    session. Produces theme clusters, underlying tensions, interview
+ *    suggestions, blind spots, and sentiment distribution. Result is cached
+ *    in the `session_analyses` table via `generateAndCacheSessionAnalysis`.
+ *
+ * 2. **`runThemeAnalysis`** — Drills into a single theme within one session.
+ *    Surfaces what students are really asking beneath the surface, probe
+ *    questions for the professor, missed angles, and behavioral patterns.
+ *    Powers the `/preview/theme` deep-dive page.
+ *
+ * 3. **`runCrossSessionThemeAnalysis`** — Examines how a recurring theme
+ *    appears across multiple sessions / speakers. Identifies persistent
+ *    student curiosities and patterns over time. Powers the
+ *    `/analytics/theme` cross-session view.
+ *
+ * All three functions use Google Gemini via the shared singleton.
+ * Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly.
+ *
+ * Called by:
+ *   - lib/ai/generateSessionAnalysis.ts (`runSessionAnalysis`)
+ *   - app/api/sessions/[id]/analysis/route.ts (POST — `runSessionAnalysis`)
+ *   - app/api/sessions/[id]/theme-analysis/route.ts (`runThemeAnalysis`)
+ *   - app/api/analytics/themes/route.ts (`runCrossSessionThemeAnalysis`)
+ */
+
 import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { SessionAnalysis, ThemeAnalysis, CrossSessionThemeAnalysis } from '@/types'
 
@@ -5,11 +38,46 @@ import type { SessionAnalysis, ThemeAnalysis, CrossSessionThemeAnalysis } from '
 // Session-level analysis
 // ---------------------------------------------------------------------------
 
+/**
+ * Constructs the Gemini prompt for whole-session analysis.
+ *
+ * The prompt embeds both the AI-generated interview sheet (already theme-grouped)
+ * and the raw student submissions. This dual-context approach lets Gemini use
+ * the interview sheet's theme titles as anchors for cluster assignment while
+ * still reasoning over the full, unfiltered submission text.
+ *
+ * The requested JSON schema maps directly to the `SessionAnalysis` type in
+ * `types/index.ts`. Strict schema instructions are included in the prompt itself
+ * (not just the system instruction) to reduce hallucinated field names.
+ *
+ * @param speakerName - Guest speaker's name, used as context for blind-spot detection
+ * @param sessionOutput - The AI-generated markdown interview sheet for this session
+ * @param submissions - Array of raw student submissions with student names
+ * @returns            - Fully formatted prompt string ready to send to Gemini
+ */
+/**
+ * Constructs the Gemini prompt for whole-session analysis.
+ *
+ * The prompt embeds both the AI-generated interview sheet (already theme-grouped)
+ * and the raw student submissions. This dual-context approach lets Gemini use
+ * the interview sheet's theme titles as anchors for cluster assignment while
+ * still reasoning over the full, unfiltered submission text.
+ *
+ * The requested JSON schema maps directly to the `SessionAnalysis` type in
+ * `types/index.ts`. Strict schema instructions are included in the prompt itself
+ * (not just the system instruction) to reduce hallucinated field names.
+ *
+ * @param speakerName - Guest speaker's name, used as context for blind-spot detection
+ * @param sessionOutput - The AI-generated markdown interview sheet for this session
+ * @param submissions - Array of raw student submissions with student names
+ * @returns            - Fully formatted prompt string ready to send to Gemini
+ */
 function buildSessionAnalysisPrompt(
   speakerName: string,
   sessionOutput: string,
   submissions: Array<{ student_name: string; submission_text: string }>
 ): string {
+  // Format submissions as labeled paragraphs so the model can attribute findings
   const submissionsText = submissions
     .map((s) => `[${s.student_name}]: ${s.submission_text}`)
     .join('\n\n')
@@ -75,11 +143,58 @@ Rules:
 - Return ONLY valid JSON. No markdown fences, no explanation text.`
 }
 
+/**
+ * Runs Gemini analysis over all submissions for a single session, returning
+ * structured insights that power the Analysis and Insights tabs on the Preview page.
+ *
+ * The response is requested as `application/json` MIME type to prevent Gemini
+ * from wrapping the JSON in markdown fences. The raw text is still `.trim()`-ed
+ * before parsing as a safety measure.
+ *
+ * This function does NOT persist the result — persistence is handled by
+ * `lib/ai/generateSessionAnalysis.ts` which wraps this call with a DB write.
+ * Direct callers (the API route POST handler) handle persistence themselves.
+ *
+ * Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
+ *
+ * Called by: lib/ai/generateSessionAnalysis.ts,
+ *            app/api/sessions/[id]/analysis/route.ts (POST)
+ *
+ * @param speakerName  - Guest speaker's name (used as blind-spot context)
+ * @param sessionOutput - The markdown interview sheet for this session
+ * @param submissions   - Raw student submissions array
+ * @returns             - Parsed `SessionAnalysis` object
+ * @throws              - JSON.parse will throw if Gemini returns malformed JSON
+ */
+/**
+ * Runs Gemini analysis over all submissions for a single session, returning
+ * structured insights that power the Analysis and Insights tabs on the Preview page.
+ *
+ * The response is requested as `application/json` MIME type to prevent Gemini
+ * from wrapping the JSON in markdown fences. The raw text is still `.trim()`-ed
+ * before parsing as a safety measure.
+ *
+ * This function does NOT persist the result — persistence is handled by
+ * `lib/ai/generateSessionAnalysis.ts` which wraps this call with a DB write.
+ * Direct callers (the API route POST handler) handle persistence themselves.
+ *
+ * Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
+ *
+ * Called by: lib/ai/generateSessionAnalysis.ts,
+ *             app/api/sessions/[id]/analysis/route.ts (POST)
+ *
+ * @param speakerName  - Guest speaker's name (used as blind-spot context)
+ * @param sessionOutput - The markdown interview sheet for this session
+ * @param submissions   - Raw student submissions array
+ * @returns             - Parsed `SessionAnalysis` object
+ * @throws              - JSON.parse will throw if Gemini returns malformed JSON
+ */
 export async function runSessionAnalysis(
   speakerName: string,
   sessionOutput: string,
   submissions: Array<{ student_name: string; submission_text: string }>
 ): Promise<SessionAnalysis> {
+  // Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
   const ai = getGeminiClient()
   const model = getGeminiModel()
 
@@ -88,6 +203,7 @@ export async function runSessionAnalysis(
     contents: buildSessionAnalysisPrompt(speakerName, sessionOutput, submissions),
     config: {
       systemInstruction: 'You are an expert at analyzing student questions for university professors. Always respond with valid JSON only.',
+      // Requesting JSON MIME type suppresses markdown fences in the response
       responseMimeType: 'application/json',
     },
   })
@@ -100,6 +216,30 @@ export async function runSessionAnalysis(
 // Theme deep-dive analysis
 // ---------------------------------------------------------------------------
 
+/**
+ * Constructs the Gemini prompt for single-theme deep-dive analysis.
+ *
+ * Unlike the session-level prompt, this one focuses exclusively on the
+ * questions assigned to one theme, asking Gemini to surface what students are
+ * really asking beneath the surface-level text.
+ *
+ * @param themeName  - Theme title (e.g. "Leadership and Building Teams")
+ * @param speakerName - Guest speaker's name (context for relevance)
+ * @param questions   - Questions belonging to this theme with student attribution
+ * @returns            - Fully formatted prompt string
+ */
+/**
+ * Constructs the Gemini prompt for single-theme deep-dive analysis.
+ *
+ * Unlike the session-level prompt, this one focuses exclusively on the
+ * questions assigned to one theme, asking Gemini to surface what students are
+ * really asking beneath the surface-level text.
+ *
+ * @param themeName  - Theme title (e.g. "Leadership and Building Teams")
+ * @param speakerName - Guest speaker's name (context for relevance)
+ * @param questions   - Questions belonging to this theme with student attribution
+ * @returns            - Fully formatted prompt string
+ */
 function buildThemeAnalysisPrompt(
   themeName: string,
   speakerName: string,
@@ -146,11 +286,46 @@ Rules:
 - Return ONLY valid JSON. No markdown fences, no explanation.`
 }
 
+/**
+ * Runs Gemini deep-dive analysis on a single theme cluster from one session.
+ *
+ * Powers the `/preview/theme` page, giving professors a richer view of what
+ * students are really asking within a specific theme — including latent concerns,
+ * follow-up probe questions, and missed angles.
+ *
+ * Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
+ *
+ * Called by: app/api/sessions/[id]/theme-analysis/route.ts
+ *
+ * @param themeName  - The theme title to analyze (matches `session_themes.title`)
+ * @param speakerName - Guest speaker's name
+ * @param questions   - Questions in this theme cluster with student attribution
+ * @returns            - Parsed `ThemeAnalysis` object
+ * @throws             - JSON.parse will throw if Gemini returns malformed JSON
+ */
+/**
+ * Runs Gemini deep-dive analysis on a single theme cluster from one session.
+ *
+ * Powers the `/preview/theme` page, giving professors a richer view of what
+ * students are really asking within a specific theme — including latent concerns,
+ * follow-up probe questions, and missed angles.
+ *
+ * Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
+ *
+ * Called by: app/api/sessions/[id]/theme-analysis/route.ts
+ *
+ * @param themeName  - The theme title to analyze (matches `session_themes.title`)
+ * @param speakerName - Guest speaker's name
+ * @param questions   - Questions in this theme cluster with student attribution
+ * @returns            - Parsed `ThemeAnalysis` object
+ * @throws             - JSON.parse will throw if Gemini returns malformed JSON
+ */
 export async function runThemeAnalysis(
   themeName: string,
   speakerName: string,
   questions: Array<{ text: string; student_name: string }>
 ): Promise<ThemeAnalysis> {
+  // Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
   const ai = getGeminiClient()
   const model = getGeminiModel()
 
@@ -171,10 +346,43 @@ export async function runThemeAnalysis(
 // Cross-session Theme analysis
 // ---------------------------------------------------------------------------
 
+/**
+ * Constructs the Gemini prompt for cross-session theme analysis.
+ *
+ * This prompt receives questions from multiple sessions — each labeled with
+ * both the student name and the speaker name — so Gemini can trace patterns
+ * across speakers over time rather than within a single session.
+ *
+ * An important nuance: the input questions are pulled by broad text-similarity
+ * matching (not hard-assigned theme labels), so the model is explicitly
+ * instructed to filter out loosely-related questions itself before writing
+ * the analysis.
+ *
+ * @param themeName - The cross-session theme being analyzed
+ * @param questions - Questions from multiple sessions, each tagged with session_id and speaker_name
+ * @returns          - Fully formatted prompt string
+ */
+/**
+ * Constructs the Gemini prompt for cross-session theme analysis.
+ *
+ * This prompt receives questions from multiple sessions — each labeled with
+ * both the student name and the speaker name — so Gemini can trace patterns
+ * across speakers over time rather than within a single session.
+ *
+ * An important nuance: the input questions are pulled by broad text-similarity
+ * matching (not hard-assigned theme labels), so the model is explicitly
+ * instructed to filter out loosely-related questions itself before writing
+ * the analysis.
+ *
+ * @param themeName - The cross-session theme being analyzed
+ * @param questions - Questions from multiple sessions, each tagged with session_id and speaker_name
+ * @returns          - Fully formatted prompt string
+ */
 function buildCrossSessionThemeAnalysisPrompt(
   themeName: string,
   questions: Array<{ text: string; student_name: string; session_id: string; speaker_name: string }>
 ): string {
+  // Include speaker name in each line so the model can attribute patterns to specific sessions
   const questionsText = questions
     .map((q) => `[${q.speaker_name}] [${q.student_name}]: ${q.text}`)
     .join('\n')
@@ -220,10 +428,53 @@ Rules:
 - Return ONLY valid JSON. No markdown fences, no explanation.`
 }
 
+/**
+ * Runs Gemini analysis across questions from multiple sessions that share a
+ * common theme, identifying longitudinal patterns in student curiosity.
+ *
+ * This is a more expensive call than single-session analysis because it
+ * processes questions spanning all of a professor's sessions. Results are
+ * cached by the calling API route to avoid repeated Gemini calls.
+ *
+ * The model is asked to self-filter the input — questions are provided by
+ * rough theme match, but the model returns only the truly relevant ones in
+ * `relevant_questions`, giving callers a clean subset to display.
+ *
+ * Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
+ *
+ * Called by: app/api/analytics/themes/route.ts
+ *
+ * @param themeName - The overarching theme name (e.g. "Leadership")
+ * @param questions - Candidate questions from all sessions, tagged with session/speaker context
+ * @returns          - Parsed `CrossSessionThemeAnalysis` object including self-filtered `relevant_questions`
+ * @throws           - JSON.parse will throw if Gemini returns malformed JSON
+ */
+/**
+ * Runs Gemini analysis across questions from multiple sessions that share a
+ * common theme, identifying longitudinal patterns in student curiosity.
+ *
+ * This is a more expensive call than single-session analysis because it
+ * processes questions spanning all of a professor's sessions. Results are
+ * cached by the calling API route to avoid repeated Gemini calls.
+ *
+ * The model is asked to self-filter the input — questions are provided by
+ * rough theme match, but the model returns only the truly relevant ones in
+ * `relevant_questions`, giving callers a clean subset to display.
+ *
+ * Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
+ *
+ * Called by: app/api/analytics/themes/route.ts
+ *
+ * @param themeName - The overarching theme name (e.g. "Leadership")
+ * @param questions - Candidate questions from all sessions, tagged with session/speaker context
+ * @returns          - Parsed `CrossSessionThemeAnalysis` object including self-filtered `relevant_questions`
+ * @throws           - JSON.parse will throw if Gemini returns malformed JSON
+ */
 export async function runCrossSessionThemeAnalysis(
   themeName: string,
   questions: Array<{ text: string; student_name: string; session_id: string; speaker_name: string }>
 ): Promise<CrossSessionThemeAnalysis> {
+  // Uses: lib/ai/geminiClient.ts — never instantiate GoogleGenAI directly
   const ai = getGeminiClient()
   const model = getGeminiModel()
 

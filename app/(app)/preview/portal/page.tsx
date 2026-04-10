@@ -1,3 +1,26 @@
+/**
+ * Speaker portal preview page (`/preview/portal?sessionId=...`).
+ *
+ * Professor-facing editor for the AI-generated speaker portal. The portal is a
+ * public-facing page sent to incoming guest speakers before their session.
+ *
+ * Sections: Welcome & Context, What Students Want to Know, What Students Are Asking
+ * (sample questions), Suggested Talking Points, Know Your Audience, What Past Speakers
+ * Found Useful, and (read-only) Post-Session Feedback.
+ *
+ * Data: fetched from `GET /api/sessions/[id]/portal`.
+ *
+ * Edit flow: per-section edit/save toggle. `handleSave` sends `PUT /api/sessions/[id]/portal`
+ * with `editedContent`. `handleReset` sends same endpoint with `editedContent: null`.
+ *
+ * Publish flow: `handlePublish` calls `POST /api/sessions/[id]/portal/publish` to generate
+ * a public share token. Once published, a "Copy Portal Link" button and preview link appear.
+ * `handleUnpublish` calls `DELETE /api/sessions/[id]/portal/publish` to revoke the token.
+ *
+ * Post-session feedback auto-populates when the professor marks the debrief complete.
+ *
+ * Components: SectionCard (inline), PortalContent (inner client component wrapped in Suspense)
+ */
 "use client"
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
@@ -10,18 +33,42 @@ import type { SpeakerPortal, SpeakerPortalContent } from '@/types'
 // Icons
 // ---------------------------------------------------------------------------
 
+/**
+ * What it does
+ * Renders a simple SVG icon depicting a pencil.
+ * Why it is used
+ * This icon is used to visually represent an "edit" action or a state where a section is available for editing. It provides a clear and universally recognizable symbol for modifying content.
+ * Important implementation details
+ * Uses Tailwind CSS classes (h-4 w-4) for consistent sizing and standard SVG attributes for stroke and path definition.
+ */
 const PencilIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
   </svg>
 )
 
+/**
+ * What it does
+ * Renders a simple SVG icon depicting a checkmark.
+ * Why it is used
+ * This icon is used to visually confirm an action, such as "done editing" or "changes saved," or to indicate that a task has been completed. It provides immediate feedback to the user.
+ * Important implementation details
+ * Uses Tailwind CSS classes (h-4 w-4) for consistent sizing and standard SVG attributes for stroke and path definition.
+ */
 const CheckIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
   </svg>
 )
 
+/**
+ * What it does
+ * Renders a simple SVG icon that animates as a spinning loader.
+ * Why it is used
+ * This icon is used to indicate that an asynchronous operation is in progress (e.g., saving data, publishing content). It provides visual feedback to the user that the application is busy and prevents them from attempting further actions prematurely.
+ * Important implementation details
+ * Uses Tailwind CSS classes (animate-spin h-4 w-4) to apply the spinning animation and consistent sizing. The SVG uses a combination of a circle and a path to create the spinner effect, with opacity classes for visual styling.
+ */
 const SpinnerIcon = () => (
   <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -33,6 +80,19 @@ const SpinnerIcon = () => (
 // Section Card
 // ---------------------------------------------------------------------------
 
+/**
+ * What it does
+ * A reusable UI component that displays a titled section of content, allowing it to be toggled between a view mode and an editable mode.
+ * Why it is used
+ * This component provides a consistent and structured way to present different editable sections within the speaker portal preview. It enhances the user experience by visually segmenting the content and offering a clear mechanism to switch between viewing and editing specific parts.
+ * Important implementation details
+ * - Accepts `title` (string), `editing` (boolean state), `onToggleEdit` (callback function), and `children` (React.ReactNode).
+ * - Renders a header with the provided `title` and a button that toggles the `editing` state via `onToggleEdit`.
+ * - The button's icon changes between `PencilIcon` (edit) and `CheckIcon` (done) based on the `editing` prop.
+ * - The button's styling also changes to reflect its current state (e.g., green for 'done', muted for 'edit').
+ * - The main content area renders the `children` prop, which contains the actual display or editing fields for the section.
+ * - Employs application-specific CSS variables (e.g., `--border-accent`, `--surface`) for theme integration.
+ */
 function SectionCard({
   title,
   editing,
@@ -71,6 +131,27 @@ function SectionCard({
 // Portal Content Component
 // ---------------------------------------------------------------------------
 
+/**
+ * What it does
+ * This is the main client-side component responsible for fetching, displaying, and managing the editable content of a speaker's session portal. It serves as the interactive interface for reviewing and modifying portal details.
+ * Why it is used
+ * It provides a comprehensive and dynamic view for administrators or content creators to manage the information presented to a speaker. This component is crucial for customizing portal content (e.g., welcome messages, student interests, talking points) and controlling its publication status before sharing it with speakers.
+ * Important implementation details
+ * - It's marked "use client" to enable client-side interactivity and hooks.
+ * - Uses `useSearchParams` to extract the `sessionId` from the URL, which is essential for fetching the correct portal data.
+ * - Manages a complex state using `useState` for:
+ *     - `portal`: The original `SpeakerPortal` data fetched from the API.
+ *     - `loading`, `error`: For managing data fetching status and errors.
+ *     - `editedContent`: A mutable copy of the portal's content, allowing users to make changes without immediately affecting the original `portal.content`.
+ *     - `editingSections`: A `Set` to track which `SectionCard` components are currently in edit mode.
+ *     - `saving`, `publishing`, `copied`, `actionError`: For managing the state of various asynchronous actions and displaying related feedback.
+ * - `useEffect` is used to fetch the `SpeakerPortal` data when the component mounts or `sessionId` changes. It populates `portal` and initializes `editedContent` either from existing `portal.editedContent` or `portal.content`.
+ * - Provides a suite of `update` functions (e.g., `updateWelcome`, `updateTheme`) that modify specific fields within the `editedContent` state.
+ * - Implements asynchronous handlers (`handleSave`, `handleReset`, `handlePublish`, `handleUnpublish`, `handleCopyLink`) to interact with the backend API for data persistence and portal management.
+ * - Conditionally renders different UI states: a loading spinner, an error message with a dashboard link, or the full interactive portal view.
+ * - Utilizes the `SectionCard` component to encapsulate each distinct content area (Welcome & Context, Student Interests, etc.), providing consistent editing functionality across sections.
+ * - Displays action buttons (Save, Reset, Publish/Unpublish, Copy Link) whose visibility and state (disabled, loading) are dynamically updated based on `hasChanges`, `hasEditsStored`, and ongoing API operations.
+ */
 function PortalContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('sessionId')
@@ -84,6 +165,7 @@ function PortalContent() {
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sessionId) {
@@ -169,6 +251,7 @@ function PortalContent() {
   async function handleSave() {
     if (!sessionId || !editedContent) return
     setSaving(true)
+    setActionError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_PORTAL(sessionId), {
         method: 'PUT',
@@ -181,7 +264,7 @@ function PortalContent() {
       )
       setEditingSections(new Set())
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save')
+      setActionError(err instanceof Error ? err.message : 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -190,6 +273,7 @@ function PortalContent() {
   async function handleReset() {
     if (!sessionId || !portal) return
     setSaving(true)
+    setActionError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_PORTAL(sessionId), {
         method: 'PUT',
@@ -201,7 +285,7 @@ function PortalContent() {
       setPortal((prev) => (prev ? { ...prev, editedContent: null } : prev))
       setEditingSections(new Set())
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to reset')
+      setActionError(err instanceof Error ? err.message : 'Failed to reset')
     } finally {
       setSaving(false)
     }
@@ -210,13 +294,14 @@ function PortalContent() {
   async function handlePublish() {
     if (!sessionId) return
     setPublishing(true)
+    setActionError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_PORTAL_PUBLISH(sessionId), { method: 'POST' })
       if (!res.ok) throw new Error('Failed to publish')
       const data = await res.json()
       setPortal((prev) => prev ? { ...prev, isPublished: true, shareToken: data.shareToken ?? prev.shareToken } : prev)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to publish')
+      setActionError(err instanceof Error ? err.message : 'Failed to publish')
     } finally {
       setPublishing(false)
     }
@@ -225,12 +310,13 @@ function PortalContent() {
   async function handleUnpublish() {
     if (!sessionId) return
     setPublishing(true)
+    setActionError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_PORTAL_PUBLISH(sessionId), { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to revoke')
       setPortal((prev) => prev ? { ...prev, isPublished: false } : prev)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to revoke')
+      setActionError(err instanceof Error ? err.message : 'Failed to revoke')
     } finally {
       setPublishing(false)
     }
@@ -239,12 +325,13 @@ function PortalContent() {
   async function handleCopyLink() {
     if (!portal) return
     const url = `${window.location.origin}${ROUTES.SPEAKER_PORTAL(portal.shareToken)}`
+    setActionError(null)
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      alert('Failed to copy link')
+      setActionError('Failed to copy link')
     }
   }
 
@@ -272,6 +359,11 @@ function PortalContent() {
 
   return (
     <div className="flex flex-col gap-6">
+      {actionError && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-[family-name:var(--font-dm-sans)]">
+          {actionError}
+        </div>
+      )}
       {/* Back link */}
       <Link
         href={`${ROUTES.PREVIEW}?sessionId=${sessionId}`}
@@ -663,6 +755,16 @@ function PortalContent() {
   )
 }
 
+/**
+ * What it does
+ * The root page component for the speaker portal preview and editing interface, specifically serving the `/preview/portal` route.
+ * Why it is used
+ * Its primary purpose is to act as a client-side entry point that wraps the `PortalContent` component with a `Suspense` boundary. This is necessary because `PortalContent` is a client component that reads URL search parameters using `useSearchParams`, which might not be available during server-side rendering or initial client-side hydration. The `Suspense` boundary ensures a graceful fallback (e.g., a loading message) while the client component initializes and fetches data.
+ * Important implementation details
+ * - It's a simple functional component.
+ * - Renders `PortalContent` as its child.
+ * - Provides a `Suspense` component with a `fallback` prop that displays a generic "Loading..." message. This ensures that the user sees a loading indicator while `PortalContent` is being prepared and potentially fetching data.
+ */
 export default function PortalPage() {
   return (
     <Suspense

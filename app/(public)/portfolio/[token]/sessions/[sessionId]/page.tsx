@@ -1,3 +1,20 @@
+/**
+ * Public portfolio session detail page (`/portfolio/[token]/sessions/[sessionId]`).
+ *
+ * Route group: `(public)` — no auth required.
+ * Fetches `GET /api/portfolio/[token]/sessions/[sessionId]`, which returns
+ * session metadata, AI output, analysis, debrief summary, and speaker brief
+ * — all scoped to the portfolio's allowed session set.
+ *
+ * Tab structure (tabs built dynamically based on available data):
+ * - Questions: always shown — the 10-section AI output via `OutputPreview`
+ * - Analysis: theme clusters + tensions via `AnalysisPanelLeft` (read-only)
+ * - Insights: suggestions, blind spots, sentiment via `AnalysisPanelRight`
+ * - Debrief: shown only if `debrief.status === 'complete'` and `aiSummary` exists
+ * - Speaker Brief: shown only if `brief` content is present
+ *
+ * Components: OutputPreview, AnalysisPanelLeft, AnalysisPanelRight (all in read-only mode)
+ */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -9,8 +26,18 @@ import { AnalysisPanelRight } from '@/components/analytics/AnalysisPanelRight'
 import { ROUTES } from '@/lib/constants'
 import type { SessionAnalysis, SpeakerBriefContent } from '@/types'
 
+/**
+ * What it does: Defines a union type representing the possible tabs available on the session detail page.
+ * Why it is used: It ensures type safety and restricts the active tab state to a predefined set of values, making the component's state management more robust and readable.
+ * Important implementation details: The literal string values ('questions', 'analysis', 'insights', 'debrief', 'brief') directly correspond to the keys used for rendering different content panels.
+ */
 type Tab = 'questions' | 'analysis' | 'insights' | 'debrief' | 'brief'
 
+/**
+ * What it does: Defines the structure of the data expected from the API when fetching session details for a specific portfolio session.
+ * Why it is used: Provides a clear, type-safe contract for the session data, including core session information, associated analysis, debrief, and speaker brief content. This helps in understanding the data shape and prevents runtime errors related to missing or incorrectly typed properties.
+ * Important implementation details: It includes nested objects for `session`, `analysis`, `debrief`, and `brief`, allowing for comprehensive display of all related information. Properties like `analysis`, `debrief`, and `brief` are explicitly marked as nullable (`| null`) to account for cases where this data might not be available.
+ */
 interface SessionDetail {
   session: {
     id: string
@@ -25,10 +52,20 @@ interface SessionDetail {
   brief: SpeakerBriefContent | null
 }
 
+/**
+ * What it does: Formats an ISO 8601 date string into a more human-readable date string.
+ * Why it is used: To display session creation dates in a user-friendly format on the UI, rather than the raw, less readable ISO string.
+ * Important implementation details: It uses `Date.toLocaleDateString` with `en-US` locale and specific options (`year: 'numeric'`, `month: 'long'`, `day: 'numeric'`) to achieve a format like 'Month Day, Year'.
+ */
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+/**
+ * What it does: This is a Next.js page component responsible for displaying the detailed view of a single session within a user's portfolio.
+ * Why it is used: It serves as the primary interface for users to review all aspects of a specific session, including submitted questions, AI analysis, insights, post-session debrief, and speaker brief content.
+ * Important implementation details: It's a client-side component ('use client'). It uses `useEffect` to fetch session data asynchronously based on `token` and `sessionId` parameters from the URL. It manages loading, error, and detail states using `useState`. The page dynamically renders a tabbed interface, only showing tabs for which relevant data (e.g., debrief, brief) is available. It utilizes several sub-components like `OutputPreview`, `AnalysisPanelLeft`, and `AnalysisPanelRight` to display different sections of the session data.
+ */
 export default function PortfolioSessionDetailPage() {
   const params = useParams<{ token: string; sessionId: string }>()
   const [detail, setDetail] = useState<SessionDetail | null>(null)

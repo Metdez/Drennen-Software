@@ -1,3 +1,38 @@
+/**
+ * @file lib/ai/reportAgent.ts
+ *
+ * Generates comprehensive semester reports that combine structured data sections
+ * (no AI required) with AI-narrated analytical sections — all assembled in a
+ * single on-demand generation pass and persisted as a `ReportContent` JSON blob.
+ *
+ * ## Report structure
+ * Up to 9 sections, each independently toggleable via `ReportConfig.includedSections`:
+ *
+ * **Pure-data sections** (built from DB data, no Gemini call):
+ * - `semester_at_a_glance` — aggregate stats: sessions, submissions, students, tier dist
+ * - `session_summaries` — per-session cards with themes and debrief highlights
+ * - `student_engagement` — participation tier buckets, top contributors, drop-offs
+ * - `appendix_roster` — full alphabetical roster with per-student participation rates
+ *
+ * **AI-narrated sections** (Gemini generates narrative prose, ground-truth data added):
+ * - `executive_summary` — 2-3 paragraph synthesis of the semester
+ * - `theme_evolution` — how themes shifted across speakers chronologically
+ * - `student_growth` — standout development stories from student profiles
+ * - `blind_spots` — underexplored topics + actionable recommendations
+ * - `speaker_effectiveness` — speaker-by-speaker rating and question quality analysis
+ * - `question_quality` — how tier distribution evolved over the semester
+ *
+ * ## Where it fits
+ * - Called by: app/api/reports/generate/route.ts
+ * - Persists to: `semester_reports` via lib/db/reports.ts
+ * - Exported via: app/api/reports/[id]/download/route.ts (PDF/DOCX)
+ * - Reads from: `session_debriefs`, `student_profiles`, `student_submissions`,
+ *               `session_tier_data` (via createAdminClient for cross-table reads)
+ *
+ * Uses: lib/ai/geminiClient.ts, lib/db/analytics.ts, lib/db/themes.ts,
+ *       lib/db/classInsights.ts, lib/db/tierData.ts, lib/db/reports.ts
+ */
+
 import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAnalytics } from '@/lib/db/analytics'
@@ -30,10 +65,17 @@ import type {
 
 // ── Gemini setup ──
 
+/** Returns the lazy Gemini client singleton. Keeps section builders DRY. */
 const getAI = () => getGeminiClient()
 
+/** Returns the configured Gemini model name. Keeps section builders DRY. */
 const getModel = () => getGeminiModel()
 
+/**
+ * Strips markdown code fences from a Gemini JSON response.
+ * Gemini occasionally wraps JSON in ```json ... ``` even when responseMimeType
+ * is set to 'application/json'. This ensures JSON.parse always receives clean input.
+ */
 function cleanJSON(raw: string): string {
   return raw
     .replace(/^```(?:json)?\s*/i, '')
@@ -41,6 +83,16 @@ function cleanJSON(raw: string): string {
     .trim()
 }
 
+/**
+ * Thin helper that calls Gemini with JSON mode and parses the response.
+ * All AI-narrated section builders delegate to this to keep error handling
+ * and JSON stripping in one place.
+ *
+ * @param prompt - The full prompt string for the section
+ * @param systemInstruction - The system instruction for the section
+ * @returns Parsed JSON response cast to type T
+ * @throws SyntaxError if Gemini returns invalid JSON
+ */
 async function callGemini<T>(prompt: string, systemInstruction: string): Promise<T> {
   const ai = getAI()
   const response = await ai.models.generateContent({
@@ -57,24 +109,54 @@ async function callGemini<T>(prompt: string, systemInstruction: string): Promise
 
 // ── Aggregated data bag passed to section builders ──
 
+/**
+ * All data needed to build every section of the report, assembled once by
+ * `aggregateData()` and then passed to every section builder function.
+ *
+ * Using a single shared bag avoids redundant DB round-trips and makes the
+ * parallel section generation step in `generateSemesterReport()` cleaner.
+ */
 interface ReportData {
   analytics: AnalyticsData
   themeFrequency: ThemeFrequency[]
   insightsInput: InsightsInput
   classInsights: ClassInsights | null
+  /** Map of sessionId → tier distribution data; only populated sessions appear */
   tierDataMap: Map<string, SessionTierData>
+  /** Map of sessionId → debrief info; only completed debriefs appear */
   debriefMap: Map<string, {
     rating: number | null
     aiSummary: string | null
     questionsFeedback: QuestionFeedback[]
     followupTopics: string
   }>
-  studentParticipation: Map<string, Set<string>> // studentName -> set of sessionIds
+  /** Map of studentName → Set of sessionIds they submitted questions for */
+  studentParticipation: Map<string, Set<string>>
   totalStudents: number
 }
 
 // ── Main entry point ──
 
+/**
+ * Generates a comprehensive semester report and persists it to the database.
+ *
+ * Orchestrates the full report generation pipeline:
+ *  1. Aggregates all required data in parallel (`aggregateData`)
+ *  2. Builds pure-data sections synchronously (no AI cost)
+ *  3. Fires all AI-narrated section generators in parallel (`Promise.all`)
+ *  4. Assembles the final `ReportContent` object and inserts it via `insertReport`
+ *
+ * Only sections listed in `config.includedSections` are generated; excluded
+ * sections are omitted from the content object entirely (not set to null/undefined).
+ * The `speaker_effectiveness` section is additionally skipped when no completed
+ * debriefs exist; `question_quality` is skipped when no tier data exists.
+ *
+ * @param userId - The authenticated professor's user ID (used for all DB queries)
+ * @param config - Report configuration: title, included sections, optional date range
+ * @returns `{ reportId, content }` — the persisted report's ID and its full content
+ *
+ * @usedBy app/api/reports/generate/route.ts (POST handler)
+ */
 export async function generateSemesterReport(
   userId: string,
   config: ReportConfig
@@ -153,6 +235,23 @@ export async function generateSemesterReport(
 
 // ── Step 1: Data aggregation ──
 
+/**
+ * Fetches and assembles all raw data needed to build the report sections.
+ *
+ * Runs four top-level queries in parallel (analytics, theme frequency, insights
+ * input, class insights), then applies the optional date range filter to the
+ * session list. After filtering, three additional queries run in parallel
+ * (tier data, debriefs, student participation) scoped to only the filtered
+ * session IDs to keep the data bag consistent.
+ *
+ * The leaderboard and dropoff arrays inside `analytics` are NOT re-filtered
+ * after the date range is applied — doing so would require a full re-query of
+ * student submissions, which is deferred for performance reasons.
+ *
+ * @param userId - The professor's user ID, scoped to all DB reads
+ * @param config - The report config, used to apply optional date range filtering
+ * @returns A fully populated `ReportData` bag ready for section builders
+ */
 async function aggregateData(userId: string, config: ReportConfig): Promise<ReportData> {
   const [analytics, themeFrequency, insightsInput, classInsights] = await Promise.all([
     getAnalytics(userId),
@@ -205,6 +304,16 @@ async function aggregateData(userId: string, config: ReportConfig): Promise<Repo
   }
 }
 
+/**
+ * Fetches completed debrief records for the given session IDs.
+ *
+ * Only rows with `status = 'complete'` are included — in-progress debriefs are
+ * excluded because their data is partial and would skew speaker effectiveness ratings.
+ * Returns an empty Map if no session IDs are provided (short-circuits the DB call).
+ *
+ * @param sessionIds - Array of session UUIDs to fetch debriefs for
+ * @returns Map of sessionId → debrief summary fields (rating, aiSummary, feedback, followups)
+ */
 async function fetchDebriefs(sessionIds: string[]): Promise<ReportData['debriefMap']> {
   const map = new Map<string, {
     rating: number | null
@@ -234,6 +343,22 @@ async function fetchDebriefs(sessionIds: string[]): Promise<ReportData['debriefM
   return map
 }
 
+/**
+ * Builds a map of student name → set of session IDs they participated in,
+ * scoped to the filtered session list.
+ *
+ * Used by both the `student_engagement` section (participation tier buckets,
+ * top contributors) and the `appendix_roster` section (per-student rates).
+ * Querying `student_submissions` rather than a pre-aggregated table ensures
+ * the counts reflect actual submission records, not cached counters.
+ *
+ * Note: `userId` is not used in the query body — participation is derived
+ * from session IDs which are already scoped to the professor via `aggregateData`.
+ *
+ * @param userId - The professor's user ID (kept for interface consistency)
+ * @param sessionIds - The filtered session UUIDs to scope the query
+ * @returns Map of studentName → Set<sessionId>
+ */
 async function fetchStudentParticipation(
   userId: string,
   sessionIds: string[]
@@ -258,6 +383,17 @@ async function fetchStudentParticipation(
 
 // ── Step 2: Pure-data section builders ──
 
+/**
+ * Builds the `semester_at_a_glance` section — aggregate stats for the semester.
+ *
+ * Pure data: no Gemini call. Aggregates total submissions, students, and average
+ * submissions per session directly from the analytics data bag. The tier
+ * distribution is computed by summing `tierCounts` across all sessions in
+ * `tierDataMap` so the report shows the overall quality distribution at a glance.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `SemesterGlanceSection` object
+ */
 function buildSemesterAtAGlance(data: ReportData): SemesterGlanceSection {
   const { analytics, tierDataMap } = data
   const totalSubmissions = analytics.sessions.reduce((sum, s) => sum + s.submissionCount, 0)
@@ -287,6 +423,16 @@ function buildSemesterAtAGlance(data: ReportData): SemesterGlanceSection {
   }
 }
 
+/**
+ * Builds the `session_summaries` section — one card per session.
+ *
+ * Pure data: no Gemini call. Joins session metadata from `insightsInput` with
+ * the completed debrief (if any) from `debriefMap` so each card shows themes
+ * alongside the professor's post-session rating and AI summary.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `SessionSummariesSection` with one entry per session
+ */
 function buildSessionSummaries(data: ReportData): SessionSummariesSection {
   const { insightsInput, debriefMap } = data
 
@@ -306,6 +452,17 @@ function buildSessionSummaries(data: ReportData): SessionSummariesSection {
   return { sessions }
 }
 
+/**
+ * Builds the `student_engagement` section — participation tier buckets and top contributors.
+ *
+ * Pure data: no Gemini call. Segments students into high/medium/low engagement
+ * tiers using thresholds: ≥80% = high, ≥50% = medium, <50% = low. The
+ * `topContributors` list is capped at 10 to keep the section skimmable.
+ * Secondary sort by sessionCount breaks ties when two students have the same rate.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `StudentEngagementSection` with tier counts, top contributors, and drop-offs
+ */
 function buildStudentEngagement(data: ReportData): StudentEngagementSection {
   const { analytics, studentParticipation } = data
   const totalSessions = analytics.sessions.length
@@ -350,6 +507,18 @@ function buildStudentEngagement(data: ReportData): StudentEngagementSection {
   }
 }
 
+/**
+ * Builds the `appendix_roster` section — full alphabetical student list.
+ *
+ * Pure data: no Gemini call. Maps every student who participated in at least
+ * one session to a `RosterEntry` with their participation rate and the list
+ * of sessionIds they attended. Sorted alphabetically by student name for
+ * easy reference. Also includes a `sessionOrder` array so the UI can render
+ * per-session participation columns in chronological order.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `AppendixRosterSection` with students and session order
+ */
 function buildAppendixRoster(data: ReportData): AppendixRosterSection {
   const { analytics, studentParticipation } = data
   const totalSessions = analytics.sessions.length
@@ -376,6 +545,18 @@ function buildAppendixRoster(data: ReportData): AppendixRosterSection {
 
 // ── Step 3: AI-generated section builders ──
 
+/**
+ * Generates the `executive_summary` section via Gemini.
+ *
+ * Feeds aggregate semester metrics, the top 5 recurring themes, the speaker list,
+ * and the pre-existing class insights narrative (if available) into a prompt asking
+ * for a 2-3 paragraph synthesis of the semester plus a short bullet list of highlights.
+ * The returned `keyMetrics` block is assembled from ground-truth data (no AI), so
+ * even if the narrative is imprecise, the numbers shown in the report are accurate.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `ExecutiveSummarySection` with narrative, highlights, and keyMetrics
+ */
 async function generateExecutiveSummary(data: ReportData): Promise<ExecutiveSummarySection> {
   const { analytics, themeFrequency, classInsights, tierDataMap } = data
   const totalSubmissions = analytics.sessions.reduce((sum, s) => sum + s.submissionCount, 0)
@@ -426,6 +607,17 @@ Return JSON:
   }
 }
 
+/**
+ * Generates the `theme_evolution` section via Gemini.
+ *
+ * Builds a chronological timeline and a `dominantThemes` list from ground-truth
+ * data, then asks Gemini to narrate how themes shifted across speakers. The
+ * first/last seen dates for each dominant theme are derived from `insightsInput`
+ * rather than from Gemini, so the timeline anchor points are always accurate.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `ThemeEvolutionSection` with narrative, timeline, and dominant themes
+ */
 async function generateThemeEvolution(data: ReportData): Promise<ThemeEvolutionSection> {
   const { insightsInput, themeFrequency } = data
 
@@ -487,6 +679,19 @@ Return JSON:
   }
 }
 
+/**
+ * Generates the `student_growth` section via Gemini.
+ *
+ * Fetches `student_profiles` from the DB to enrich participation data with AI-generated
+ * growth signals and thinking progressions. Only students with 2+ sessions are included
+ * (single-session students lack the arc needed for a growth narrative). The top 20 by
+ * participation rate are sent to Gemini; the model returns a class-level narrative and
+ * up to 5 individual student growth highlights. Growth profiles are fetched with a try/catch
+ * so a DB failure silently degrades to participation-only data rather than crashing the report.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `StudentGrowthSection` with narrative and individual highlights
+ */
 async function generateStudentGrowthHighlights(data: ReportData): Promise<StudentGrowthSection> {
   const { studentParticipation, analytics, insightsInput } = data
 
@@ -596,6 +801,17 @@ Rules:
   }
 }
 
+/**
+ * Generates the `blind_spots` section via Gemini.
+ *
+ * Sends the top 15 themes, speaker list, class narrative, and professor-noted
+ * follow-up topics to Gemini, which identifies 3-5 underexplored topics and
+ * generates 3-5 actionable recommendations for the next semester (e.g., speaker
+ * types to prioritize, prompt strategies, structural changes).
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `BlindSpotsSection` with blindSpots and recommendations arrays
+ */
 async function generateBlindSpotsAndRecs(data: ReportData): Promise<BlindSpotsSection> {
   const { themeFrequency, classInsights, insightsInput, debriefMap } = data
 
@@ -657,6 +873,18 @@ Rules:
   }
 }
 
+/**
+ * Generates the `speaker_effectiveness` section via Gemini.
+ *
+ * Computes ground-truth `SpeakerRanking` entries for every session (combining debrief
+ * rating with average question tier) and then asks Gemini to narrate patterns across
+ * speakers. The weighted average tier is computed by (Σ tier * count) / totalQuestions —
+ * a lower average tier indicates higher question quality (tier 1 is best).
+ * Only called when `debriefMap.size > 0` (checked in the main orchestrator).
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `SpeakerEffectivenessSection` with narrative and per-speaker rankings
+ */
 async function generateSpeakerEffectiveness(data: ReportData): Promise<SpeakerEffectivenessSection> {
   const { analytics, debriefMap, tierDataMap } = data
 
@@ -718,6 +946,18 @@ Return JSON:
   }
 }
 
+/**
+ * Generates the `question_quality` section via Gemini.
+ *
+ * Builds per-session tier distribution data from ground-truth `tierDataMap` entries,
+ * then asks Gemini whether quality trended improving, declining, or stable. Gemini's
+ * trend value is validated against the allowed literals before being stored — if the
+ * model returns an unexpected string, the section defaults to 'stable' rather than
+ * propagating a type error. Only called when `tierDataMap.size > 0`.
+ *
+ * @param data - The fully populated report data bag
+ * @returns Populated `QuestionQualitySection` with narrative, trend, per-session tiers, and overall distribution
+ */
 async function generateQualityTrendNarrative(data: ReportData): Promise<QuestionQualitySection> {
   const { analytics, tierDataMap, classInsights } = data
 

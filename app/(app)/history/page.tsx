@@ -1,3 +1,16 @@
+/**
+ * Session history page (`/history`).
+ *
+ * Lists all past processed sessions for the authenticated professor, filtered by the
+ * active semester from `SemesterContext`. Clicking a row navigates to `/preview`.
+ *
+ * Compare mode: toggled by a "Compare" button (shown when >= 2 sessions exist).
+ * In compare mode, clicking rows selects them for comparison. Once 2 are selected,
+ * a floating action bar appears to navigate to `/compare?a=...&b=...`.
+ *
+ * Data: fetched from `GET /api/sessions` (or `GET /api/sessions?semester=...`).
+ * Components: SessionsTable, HistoryLoadingSkeleton (inline)
+ */
 'use client'
 
 import { useEffect, useState } from 'react'

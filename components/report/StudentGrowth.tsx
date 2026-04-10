@@ -1,11 +1,37 @@
+/**
+ * StudentGrowth — Narrative + highlight cards for student growth in the semester report.
+ *
+ * Renders a narrative paragraph followed by a grid of student growth highlight
+ * cards. Each card shows the student name, an optional growth signal badge
+ * (BRAND.PURPLE), session count, a narrative, and a thinking progression quote.
+ *
+ * Rendered by: app/(app)/reports/[id]/page.tsx (student growth section)
+ * Data source: StudentGrowthSection from SemesterReport type
+ */
 'use client'
 
 import type { StudentGrowthSection } from '@/types'
 
+/**
+ * Props for StudentGrowth.
+ * @prop data - Student growth section with narrative and highlights array.
+ */
+/**
+ * Defines the structure of properties accepted by the StudentGrowth component.
+ * 1. What it does: Specifies the single `data` prop required by the `StudentGrowth` component.
+ * 2. Why it is used: Ensures type safety and provides clear documentation for the expected input data, making the component easier to use and maintain.
+ * 3. Important implementation details: The `data` property must conform to the `StudentGrowthSection` type, which includes a narrative string and an array of growth highlights.
+ */
 interface Props {
   data: StudentGrowthSection
 }
 
+/**
+ * Renders a dedicated section displaying student growth information within a larger report.
+ * 1. What it does: This component takes student growth data and presents it as a main narrative followed by individual highlight cards for specific students.
+ * 2. Why it is used: To provide a clear, structured, and visually appealing summary of student growth, enabling users to quickly grasp overall progress and specific achievements.
+ * 3. Important implementation details: It is a client-side component ('use client'). It uses Tailwind CSS for styling and conditionally renders the highlight cards only if there are growth highlights available in the provided data. Each highlight card includes the student's name, an optional growth signal, sessions participated, a specific narrative, and an optional thinking progression.
+ */
 export function StudentGrowth({ data }: Props) {
   return (
     <section id="student-growth" className="space-y-5">

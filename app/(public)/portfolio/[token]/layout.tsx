@@ -1,3 +1,21 @@
+/**
+ * Portfolio layout (`app/(public)/portfolio/[token]/layout.tsx`).
+ *
+ * Route group: `(public)` — no auth required.
+ * Access control: the `[token]` URL segment is the only gate. Invalid or
+ * revoked tokens cause `PortfolioProvider` to surface an error state that
+ * each child page renders gracefully.
+ *
+ * Wraps all portfolio sub-pages with:
+ * - `PortfolioProvider` — fetches `GET /api/portfolio/[token]` once and
+ *   provides the config, section visibility flags, and aggregated data to
+ *   all child pages via `usePortfolio()`.
+ * - `PortfolioNav` — horizontal nav bar showing only the sections that
+ *   the professor has enabled in the portfolio config.
+ *
+ * The `token` param is extracted client-side via `useParams` because this
+ * is a Client Component; it cannot use server-side params directly.
+ */
 'use client'
 
 import { PortfolioProvider } from '@/components/portfolio/PortfolioContext'

@@ -1,6 +1,41 @@
+/**
+ * lib/ai/speakerBrief.ts
+ *
+ * Generates a polished, professional preparation brief intended to be sent
+ * directly to an incoming guest speaker before their session with the class.
+ *
+ * Unlike the speaker portal (which is a self-service web view), the brief is
+ * a downloadable document — think of it as a one-page briefing memo from the
+ * professor to the speaker. It synthesizes student submission data into a warm,
+ * executive-friendly narrative without exposing raw student question text or
+ * internal scoring details.
+ *
+ * Inputs aggregated from:
+ *  - Session metadata (speaker name, date, file count)
+ *  - Session themes extracted from the AI interview sheet (session_themes table)
+ *  - Per-session Gemini analysis (session_analyses table, via SanitizedAnalysis)
+ *  - Cross-session class insights (class_insights table, via SanitizedClassInsights)
+ *
+ * Output (SpeakerBriefContent) is persisted to the `speaker_briefs` table via
+ * lib/db/speakerBriefs.ts, triggered from app/api/sessions/[id]/brief/route.ts.
+ *
+ * Uses: lib/ai/geminiClient.ts
+ * Called by: app/api/sessions/[id]/brief/route.ts (POST handler)
+ * Persists to: speaker_briefs table via lib/db/speakerBriefs.ts
+ */
+
 import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import type { SpeakerBriefContent } from '@/types'
 
+/**
+ * A sanitized subset of the per-session Gemini analysis (SessionAnalysis).
+ * Fields are cherry-picked here so that speakerBrief.ts does not need to
+ * import the full SessionAnalysis type and can be consumed safely even when
+ * the full analysis object contains additional internal fields.
+ *
+ * Produced by: app/api/sessions/[id]/brief/route.ts (reads session_analyses row)
+ * Also re-exported and used by: lib/ai/speakerPortal.ts
+ */
 export interface SanitizedAnalysis {
   theme_clusters: Array<{
     name: string
@@ -18,12 +53,36 @@ export interface SanitizedAnalysis {
   }
 }
 
+/**
+ * A sanitized subset of ClassInsights scoped to what the speaker brief needs.
+ * Gives the brief contextual depth by surfacing semester-level patterns
+ * (recurring themes, quality trend) without exposing the full class insights
+ * object, which contains fields irrelevant or inappropriate for the speaker.
+ *
+ * Produced by: app/api/sessions/[id]/brief/route.ts (reads class_insights row)
+ * Also re-exported and used by: lib/ai/speakerPortal.ts
+ */
 export interface SanitizedClassInsights {
   narrative: string
   qualityTrend: { direction: string; description: string }
   topThemes: Array<{ title: string; sessionCount: number }>
 }
 
+/**
+ * Constructs the Gemini prompt for speaker brief generation.
+ *
+ * Builds a structured data section from the session metadata, optional
+ * per-session analysis, and optional class-wide insights. The more data
+ * that is available, the richer the resulting brief. The function is kept
+ * private to this module; callers should use `generateSpeakerBrief` instead.
+ *
+ * @param params - All session and analysis data needed to populate the brief
+ * @returns A fully-formed prompt string ready for Gemini content generation
+ * @remarks
+ * The prompt deliberately withholds raw student question text and all internal
+ * scoring/tier labels. The brief is designed to be sent externally to executives,
+ * so it synthesizes and abstracts student data rather than quoting it.
+ */
 function buildBriefPrompt(params: {
   speakerName: string
   sessionDate: string
@@ -34,6 +93,8 @@ function buildBriefPrompt(params: {
 }): string {
   const { speakerName, sessionDate, fileCount, themes, analysis, classInsights } = params
 
+  // Build the core data section from the session metadata and theme list.
+  // This is the minimum data always present; analysis and classInsights are optional.
   let dataSection = `Speaker: ${speakerName}
 Session Date: ${sessionDate}
 Number of Student Submissions: ${fileCount}
@@ -41,6 +102,8 @@ Number of Student Submissions: ${fileCount}
 Session Themes (${themes.length} total):
 ${themes.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
 
+  // Append per-session Gemini analysis if available.
+  // Includes theme clusters, tensions, interview angles, blind spots, and sentiment distribution.
   if (analysis) {
     dataSection += `
 
@@ -63,6 +126,10 @@ Student Sentiment Distribution:
 - Critical/Challenging: ${analysis.sentiment.critical}%`
   }
 
+  // Append semester-level class insights if available.
+  // This gives the brief contextual depth by surfacing recurring themes and
+  // the quality trend across all sessions this semester, helping the speaker
+  // understand the intellectual arc of the class beyond just this one visit.
   if (classInsights) {
     dataSection += `
 
@@ -120,6 +187,33 @@ Rules:
 - Return ONLY valid JSON. No markdown fences, no explanation text.`
 }
 
+/**
+ * Generates a professional preparation brief for an incoming guest speaker.
+ *
+ * Calls Gemini with a rich prompt that weaves together session metadata,
+ * per-session analysis, and semester-level class insights into a warm,
+ * skimmable JSON document structured as: header, narrative, topThemes,
+ * talkingPoints, classContext, and whatToExpect.
+ *
+ * The Gemini system instruction enforces that student names and raw question
+ * text are NEVER included in the output — the brief is safe to send externally.
+ *
+ * Caller is responsible for persisting the returned SpeakerBriefContent to
+ * the `speaker_briefs` table via `upsertSpeakerBrief` in lib/db/speakerBriefs.ts.
+ *
+ * @param params - Session metadata, optional analysis, and optional class insights
+ * @returns Parsed SpeakerBriefContent JSON object ready for storage and export
+ *
+ * Uses: lib/ai/geminiClient.ts
+ * Called by: app/api/sessions/[id]/brief/route.ts (POST handler)
+ * @remarks
+ * The `responseMimeType: 'application/json'` Gemini config option is used to
+ * suppress markdown fence wrapping. The response is trimmed and parsed directly —
+ * no cleanJSON step is needed here because JSON mode is strictly enforced.
+ * Student names and raw question text are prohibited by the system instruction.
+ * @see app/api/sessions/[id]/brief/route.ts — POST handler that calls this function
+ * @see lib/db/speakerBriefs.ts — upsertSpeakerBrief persists the returned content
+ */
 export async function generateSpeakerBrief(params: {
   speakerName: string
   sessionDate: string
@@ -128,6 +222,7 @@ export async function generateSpeakerBrief(params: {
   analysis: SanitizedAnalysis | null
   classInsights: SanitizedClassInsights | null
 }): Promise<SpeakerBriefContent> {
+  // Uses: lib/ai/geminiClient.ts
   const ai = getGeminiClient()
   const model = getGeminiModel()
 
@@ -137,10 +232,12 @@ export async function generateSpeakerBrief(params: {
     config: {
       systemInstruction:
         'You are an expert at writing polished, professional documents for senior executives. Always respond with valid JSON only. Never include student names or raw question text.',
+      // Force JSON response to avoid markdown fences or prose wrapping the output
       responseMimeType: 'application/json',
     },
   })
 
+  // response.text is the raw JSON string; trim and parse directly
   const raw = (response.text ?? '').trim()
   return JSON.parse(raw) as SpeakerBriefContent
 }

@@ -1,3 +1,19 @@
+/**
+ * Public shared comparison page (`/shared/compare/[token]`).
+ *
+ * No-auth read-only view of a saved session comparison, accessed via a share token.
+ * Mirrors the authenticated `/compare` page but omits the "Generate AI Analysis"
+ * and share controls (the `onGenerate` callback is a no-op).
+ *
+ * Tabs: Overview, Themes, Quality, Sentiment, Participation, AI Analysis.
+ * Same tab components as the authenticated compare page.
+ *
+ * Data: `GET /api/shared/compare/[token]` — returns `SessionComparisonData`
+ * including savedComparison with pre-generated AI analysis if available.
+ *
+ * Components: ComparisonHeader, ThemeVenn, QualityComparison, SentimentComparison,
+ *             ParticipationDelta, ComparativeNarrative
+ */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,8 +27,18 @@ import { ComparativeNarrative } from '@/components/compare/ComparativeNarrative'
 import { APP_NAME } from '@/lib/constants'
 import type { SessionComparisonData, ComparativeAnalysis } from '@/types'
 
+/**
+ * Defines a union type representing the available navigation tabs on the comparison page.
+ * Why it is used: Ensures type safety and provides a clear, restricted set of values for controlling the active comparison view.
+ * Important implementation details: Includes tabs for 'overview', 'themes', 'quality', 'sentiment', 'participation', and 'analysis'.
+ */
 type Tab = 'overview' | 'themes' | 'quality' | 'sentiment' | 'participation' | 'analysis'
 
+/**
+ * An array of objects, each defining a navigation tab for the comparison page.
+ * Why it is used: To dynamically render the tab bar, providing both a unique programmatic key and a user-friendly label for each comparison section.
+ * Important implementation details: Each object has a `key` (of type `Tab`) used for internal state management and an `label` (string) for display in the UI. This array directly drives the rendering and interaction of the tab navigation.
+ */
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'themes', label: 'Themes' },
@@ -22,6 +48,11 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'analysis', label: 'AI Analysis' },
 ]
 
+/**
+ * This is the main page component responsible for displaying a shared comparison between two sessions.
+ * Why it is used: It serves as the entry point for users to view a comparison report generated and shared by another user via a unique token. It orchestrates data fetching, state management, and the rendering of various comparison sub-components.
+ * Important implementation details: It's a client-side component that uses `useEffect` to fetch comparison data from a Next.js API route (`/api/shared/compare/[token]`) based on the URL parameter. It manages loading, error, and active tab states. It conditionally renders different comparison visualizations (e.g., ThemeVenn, QualityComparison) based on the user's tab selection.
+ */
 export default function SharedComparePage() {
   const params = useParams()
   const token = params.token as string
@@ -155,6 +186,11 @@ export default function SharedComparePage() {
   )
 }
 
+/**
+ * Renders the content for the 'Overview' tab within the shared comparison page, providing a summary of key metrics and AI-generated insights.
+ * Why it is used: To offer users a quick, high-level understanding of the comparison, presenting essential statistics and notable differences at a glance.
+ * Important implementation details: It receives `SessionComparisonData` and `ComparativeAnalysis` as props. It displays statistics such as submission counts, theme counts, and student overlap between the two sessions. If available, it also renders the first few key differences identified by the AI analysis, providing a concise summary of the comparison's most impactful insights.
+ */
 function SharedOverviewTab({ data, aiAnalysis }: { data: SessionComparisonData; aiAnalysis: ComparativeAnalysis | null }) {
   const { a, b, themeOverlap, participationDelta } = data
 

@@ -1,8 +1,30 @@
 'use client'
 
+/**
+ * StudentReflectionsPanel — Debrief-analysis display panel.
+ *
+ * Renders a fully structured view of AI-generated student reflection insights:
+ *  - Reflection summary (count + prose)
+ *  - Reflection themes (expandable bar-chart rows with per-student quotes)
+ *  - Key moments (sentiment-dot + mention count)
+ *  - What surprised students (quote list)
+ *  - Career connections (per-student career area + quote)
+ *  - Student sentiment breakdown (horizontal progress bars)
+ *
+ * Does not fetch data itself; receives a pre-loaded `StudentDebriefAnalysis`
+ * object from the parent.  Powered by Gemini.
+ *
+ * Rendered by: app/(app)/preview/page.tsx (debrief tab, reflections sub-tab)
+ */
+
 import { useState } from 'react'
 import type { StudentDebriefAnalysis } from '@/types'
 
+/**
+ * Stores metadata for different student sentiments, including their display label, foreground color, and background color.
+ * It is used to ensure consistent styling and labeling across the UI when displaying sentiment breakdowns.
+ * Each key represents a sentiment category (e.g., 'inspired', 'reflective'), and its value is an object containing `label` for display, `color` for text, and `bg` for background styling.
+ */
 const SENTIMENT_META: Record<string, { label: string; color: string; bg: string }> = {
   inspired: { label: 'Inspired', color: '#0f6b37', bg: 'rgba(15,107,55,0.12)' },
   reflective: { label: 'Reflective', color: '#542785', bg: 'rgba(84,39,133,0.12)' },
@@ -10,18 +32,34 @@ const SENTIMENT_META: Record<string, { label: string; color: string; bg: string 
   indifferent: { label: 'Indifferent', color: '#666', bg: 'rgba(128,128,128,0.12)' },
 }
 
+/**
+ * Maps sentiment types for key moments to specific hexadecimal color codes.
+ * It is used to visually represent the sentiment (positive, neutral, mixed) of individual key moments with a distinct color dot.
+ * This constant provides a quick lookup for styling based on the sentiment string received from the analysis data.
+ */
 const MOMENT_SENTIMENT_COLORS: Record<string, string> = {
   positive: '#0f6b37',
   neutral: '#666',
   mixed: '#f36f21',
 }
 
+/**
+ * Defines the shape of the properties accepted by the `StudentReflectionsPanel` component.
+ * It is used to strongly type the input data for the component, ensuring that the `analysis` object and `fileCount` are provided in the expected format.
+ * `analysis`: Contains all the structured data derived from student reflections, such as summary, themes, key moments, and sentiment breakdown. `fileCount`: Represents the total number of reflection files analyzed.
+ */
 interface Props {
   analysis: StudentDebriefAnalysis
   fileCount: number
 }
 
+/**
+ * A React functional component that displays a comprehensive analysis of student reflections.
+ * It is used to present insights derived from student feedback in a structured and visually appealing manner, making it easier for educators or administrators to understand student experiences and sentiments.
+ * This component uses the `useState` hook to manage the expansion state of reflection themes. It renders various sections including a summary, collapsible reflection themes with student quotes, key moments, student surprises, career connections, and a sentiment breakdown, all dynamically populated from the `analysis` prop. Styling is primarily handled using Tailwind CSS classes and inline styles based on predefined color constants.
+ */
 export function StudentReflectionsPanel({ analysis, fileCount }: Props) {
+  // This panel renders the same aggregated debrief analysis that the detail view references when labelling reflections inside the submissions tab.
   const [expandedTheme, setExpandedTheme] = useState<number | null>(null)
 
   return (

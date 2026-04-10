@@ -4,8 +4,24 @@ import { getReportById } from '@/lib/db/reports'
 import { generateReportPDF } from '@/lib/export/reportPdf'
 import { generateReportDocx } from '@/lib/export/reportDocx'
 
+/**
+ * What it does: This variable sets the Next.js route segment config for this API route.
+ * Why it is used: It is used to force this route to be dynamically rendered on every request.
+ * Important implementation details: By setting it to 'force-dynamic', Next.js will not statically optimize or cache the output of this route, ensuring that user-specific authentication and up-to-date report generation logic runs for each download request.
+ */
 export const dynamic = 'force-dynamic'
 
+/**
+ * What it does: This function handles GET requests to the /api/reports/[id]/download endpoint. It is responsible for authenticating the user, authorizing access to the specified report, generating the report in either PDF or DOCX format, and returning it as a downloadable file.
+ * Why it is used: It provides a secure and format-flexible API endpoint for users to download their reports, enabling data export functionality within the application.
+ * Important implementation details:
+ * - It first authenticates the current user using `getCurrentUser()`.
+ * - It then fetches the report by ID and performs an authorization check, ensuring the report belongs to the authenticated user.
+ * - It validates the `format` query parameter (must be 'pdf' or 'docx').
+ * - It uses `generateReportPDF()` or `generateReportDocx()` from dedicated export libraries to create the document buffer.
+ * - The response includes appropriate `Content-Type` and `Content-Disposition` headers to trigger a file download in the client's browser.
+ * - Comprehensive error handling is implemented for unauthorized access, report not found, invalid format, and general server errors, returning `NextResponse.json` with appropriate status codes.
+ */
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }

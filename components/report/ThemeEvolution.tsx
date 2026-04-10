@@ -1,11 +1,39 @@
+/**
+ * ThemeEvolution — Session-by-session theme timeline and dominant themes table.
+ *
+ * Renders a chronological timeline of sessions with their theme pills, where each
+ * theme gets a deterministically-assigned colour from THEME_COLORS (via a simple
+ * string hash). A dominant themes table shows total count, first seen, and last seen.
+ *
+ * Rendered by: app/(app)/reports/[id]/page.tsx (theme evolution section)
+ * Data source: ThemeEvolutionSection from SemesterReport type
+ */
 'use client'
 
 import type { ThemeEvolutionSection } from '@/types'
 
+/**
+ * Props for ThemeEvolution.
+ * @prop data - Theme evolution section with narrative, timeline, and dominantThemes.
+ */
+/**
+ * What it does: Defines the shape of the props object for the ThemeEvolution component.
+ * Why it is used: To ensure type safety and clear expectations for the data passed into the component, making the component's API explicit and easier to use correctly.
+ * Important implementation details: It expects a single property, `data`, which must conform to the `ThemeEvolutionSection` type, providing all the necessary information for the component to render the theme evolution report.
+ */
 interface Props {
   data: ThemeEvolutionSection
 }
 
+/**
+ * Palette of four colour sets cycled via a string hash.
+ * Ensures each theme title consistently maps to the same colour regardless of render order.
+ */
+/**
+ * What it does: An array of color objects, each containing specific `bg` (background), `border`, and `text` color values.
+ * Why it is used: To provide a predefined and limited set of colors for styling theme tags in a consistent and visually appealing manner across the application. This array is designed to be cycled through using a deterministic hash function to ensure each unique theme title consistently maps to the same color.
+ * Important implementation details: Each color object uses `rgba` for background and border values to allow for transparency and layering effects, while `text` uses a hex code for solid readability. The chosen colors are distinct yet harmonious, suitable for tag-like elements.
+ */
 const THEME_COLORS = [
   { bg: 'rgba(255,107,0,0.15)', border: 'rgba(255,107,0,0.4)', text: '#fb923c' },
   { bg: 'rgba(130,80,255,0.15)', border: 'rgba(130,80,255,0.4)', text: '#c084fc' },
@@ -13,6 +41,15 @@ const THEME_COLORS = [
   { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', text: '#60a5fa' },
 ]
 
+/**
+ * Deterministic integer hash of a string, used to assign a consistent colour
+ * index from THEME_COLORS to each theme title.
+ */
+/**
+ * What it does: A pure utility function that computes a deterministic integer hash from an input string.
+ * Why it is used: To consistently map a theme title string to a specific index within the `THEME_COLORS` array. This ensures that a given theme always receives the same visual color styling across different render cycles or parts of the report, enhancing user experience through visual consistency.
+ * Important implementation details: It employs a simple bitwise shift and XOR operation (`hash = ((hash << 5) - hash) + s.charCodeAt(i)`) to generate the hash. The `hash |= 0` operation ensures the result is a 32-bit integer. The absolute value of the final hash modulo `THEME_COLORS.length` is used to derive a valid, positive array index for color selection.
+ */
 function hashString(s: string): number {
   let hash = 0
   for (let i = 0; i < s.length; i++) {
@@ -22,6 +59,11 @@ function hashString(s: string): number {
   return hash
 }
 
+/**
+ * What it does: A React functional component that renders a comprehensive report on the evolution of themes. It displays a narrative summary, a chronological timeline of themes extracted from individual sessions, and a summary table of dominant themes.
+ * Why it is used: To provide users with a visual and structured overview of how various themes have emerged, developed, and their prevalence over a series of recorded sessions. This helps in understanding longitudinal trends and key discussion points.
+ * Important implementation details: It is a client-side component ('use client'). It accepts `ThemeEvolutionSection` data via its `data` prop. The component leverages the `THEME_COLORS` array and the `hashString` utility to apply consistent, deterministically assigned colors to theme tags within the timeline. It conditionally renders the timeline and dominant themes table sections only if their respective data arrays are not empty, improving robustness. Styling is primarily achieved using Tailwind CSS classes, with dynamic `style` attributes used for applying calculated theme colors.
+ */
 export function ThemeEvolution({ data }: Props) {
   return (
     <section id="theme-evolution" className="space-y-5">

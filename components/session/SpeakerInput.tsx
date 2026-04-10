@@ -1,5 +1,21 @@
 "use client"
 
+/**
+ * @file SpeakerInput.tsx
+ * Controlled text input for capturing the guest speaker's name on the upload form.
+ *
+ * Rendered by: app/(app)/dashboard/page.tsx
+ *
+ * This is a pure controlled component — all state lives in the parent.
+ * The value is passed to /api/process as `speakerName` and stored on the session row.
+ */
+
+/**
+ * Labelled text field for the speaker name entry.
+ *
+ * @param value - Current speaker name string (controlled from parent).
+ * @param onChangeAction - Called with the new value on every keystroke.
+ */
 export function SpeakerInput({ value, onChangeAction }: { value: string, onChangeAction: (val: string) => void }) {
   return (
     <div className="flex flex-col gap-2">

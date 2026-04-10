@@ -1,12 +1,30 @@
 "use client"
 
+/**
+ * @file DropZone.tsx
+ * Drag-and-drop (and click-to-browse) ZIP file selector for the upload form.
+ *
+ * Rendered by: app/(app)/dashboard/page.tsx
+ *
+ * Validates that the selected file has a `.zip` extension before calling the
+ * parent callback. Non-ZIP selections show an inline error and clear the state.
+ * Supports both native drag events and `<input type="file">` for broad compatibility.
+ */
+
 import { useState } from 'react'
 
+/**
+ * Drag-and-drop file input restricted to `.zip` files.
+ *
+ * @param onFileChangeAction - Called with the validated File on success, or `null`
+ *   when the selection is cleared or an invalid file type is dropped.
+ */
 export function DropZone({ onFileChangeAction }: { onFileChangeAction: (file: File | null) => void }) {
   const [isDragActive, setIsDragActive] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  /** Handles dragenter, dragover, and dragleave to toggle the active highlight state. */
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -17,6 +35,7 @@ export function DropZone({ onFileChangeAction }: { onFileChangeAction: (file: Fi
     }
   }
 
+  /** Extracts the first dropped file and delegates to `handleFile` for validation. */
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -26,6 +45,7 @@ export function DropZone({ onFileChangeAction }: { onFileChangeAction: (file: Fi
     }
   }
 
+  /** Handles the native `<input type="file">` change event (click-to-browse path). */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault()
     if (e.target.files && e.target.files[0]) {
@@ -33,6 +53,10 @@ export function DropZone({ onFileChangeAction }: { onFileChangeAction: (file: Fi
     }
   }
 
+  /**
+   * Validates the file extension and either updates state + notifies the parent,
+   * or sets an inline error and clears the selection if the file isn't a `.zip`.
+   */
   const handleFile = (selectedFile: File) => {
     if (!selectedFile.name.endsWith('.zip')) {
       setError('Please upload a ZIP file')

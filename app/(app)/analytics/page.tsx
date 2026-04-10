@@ -1,3 +1,25 @@
+/**
+ * Analytics page (`/analytics`).
+ *
+ * "Class Intelligence Report" — aggregated view of student engagement across all sessions,
+ * optionally filtered to the active semester.
+ *
+ * Fetches in parallel:
+ * - `GET /api/analytics` — session trend, leaderboard, drop-off analysis
+ * - `GET /api/analytics/insights` — saved Gemini class analysis narrative
+ *
+ * Sections rendered:
+ * - AI Synthesis narrative (from class insights)
+ * - Quick stats grid (sessions, students, unique themes, quality trend)
+ * - ThemeExplorer component (top themes from insights)
+ * - SupportingIntelligence: Engagement Leaderboard, Drop-off Watch,
+ *   Theme Evolution Timeline, Session Effectiveness
+ *
+ * A "Generate Semester Report" button opens `ReportConfigPanel` to configure and
+ * trigger `POST /api/reports/generate`.
+ *
+ * Components: ReportConfigPanel, WhatChangedBanner, ThemeExplorer, CollapsiblePanel
+ */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -9,6 +31,17 @@ import { ThemeExplorer } from '@/components/analytics/ThemeExplorer'
 import { CollapsiblePanel } from '@/components/analytics/CollapsiblePanel'
 import type { AnalyticsData, ClassInsights } from '@/types'
 
+/**
+ * What it does: This is the main page component for displaying class analytics and AI-generated insights.
+ * Why it is used: It serves as the primary interface for users (teachers) to gain a comprehensive understanding of student engagement, learning patterns, and class performance based on uploaded session data. It aggregates various data points and presents them in an easily digestible format.
+ * Important implementation details:
+ * - It is a client-side component, indicated by `'use client'`.
+ * - Manages state for `data` (AnalyticsData), `insights` (ClassInsights), `loading`, `error`, and `showReportConfig` using React's `useState` hook.
+ * - Utilizes `useSemesterContext` to dynamically fetch analytics relevant to the currently active semester, ensuring data is always synchronized with the user's selection.
+ * - Employs a `useEffect` hook to asynchronously fetch analytics data from `/api/analytics` and AI-generated insights from `/api/analytics/insights` when the `activeSemesterId` or `semesterLoading` state changes.
+ * - Provides conditional rendering for `LoadingSkeleton`, `ErrorCard`, and `EmptyState` based on the data fetching status and availability.
+ * - Renders several sub-components like `ReportConfigPanel` (a modal for generating reports), `WhatChangedBanner`, `ThemeExplorer`, and `SupportingIntelligence` to structure and display different facets of the analytics.
+ */
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [insights, setInsights] = useState<ClassInsights | null>(null)
@@ -178,6 +211,15 @@ export default function AnalyticsPage() {
 // Supporting Intelligence
 // ---------------------------------------------------------------------------
 
+/**
+ * What it does: This functional component renders a collection of detailed, supporting analytics panels, encapsulated within collapsible sections.
+ * Why it is used: It provides granular data and specific insights that complement the high-level overview on the main analytics page. This allows users to drill down into particular areas such as individual student engagement, attendance trends, topic evolution, and session-specific effectiveness.
+ * Important implementation details:
+ * - It receives `AnalyticsData` and `ClassInsights` as props, which are used to populate its various sections.
+ * - Each distinct intelligence section (e.g., Leaderboard, Drop-off Watch, Theme Evolution, Session Effectiveness) is rendered within a `CollapsiblePanel` component, promoting a cleaner UI and allowing users to focus on what's relevant.
+ * - It pre-processes data, such as creating a `submissionMap` for efficient lookup of submission counts in the Theme Evolution Timeline.
+ * - Includes `Link` components to allow navigation to student-specific roster pages or theme detail pages, enhancing discoverability and further analysis.
+ */
 function SupportingIntelligence({ data, insights }: { data: AnalyticsData; insights: ClassInsights | null }) {
   const topLeader = data.leaderboard[0]
 
@@ -324,6 +366,13 @@ function SupportingIntelligence({ data, insights }: { data: AnalyticsData; insig
 // Utility Components
 // ---------------------------------------------------------------------------
 
+/**
+ * What it does: This component renders a visual placeholder (a skeleton screen) with animated loading indicators.
+ * Why it is used: It improves the perceived performance and user experience during data fetching. Instead of a blank screen, users see a representation of the content structure appearing, which signals that the application is active and data is on its way, reducing anxiety and perceived wait times.
+ * Important implementation details:
+ * - It consists of simple `div` elements styled with Tailwind CSS classes, primarily `bg-[var(--surface-elevated)]` for background and `animate-pulse` for the subtle animation effect.
+ * - The layout of the skeleton roughly mimics the structure of the main `AnalyticsPage` content to provide a consistent loading experience.
+ */
 function LoadingSkeleton() {
   return (
     <div className="space-y-6 animate-fade-up">
@@ -341,6 +390,13 @@ function LoadingSkeleton() {
   )
 }
 
+/**
+ * What it does: This component displays a structured error message to the user.
+ * Why it is used: It provides clear and immediate feedback to the user when an error occurs during the data loading process. This helps in communicating system status and guides the user on potential next steps or provides information for troubleshooting.
+ * Important implementation details:
+ * - It accepts a `message` prop, which allows it to display specific error details passed from the parent component.
+ * - The styling (`rounded-xl border bg-[var(--surface)] p-8 text-center`) creates a visually distinct card element, making the error message prominent.
+ */
 function ErrorCard({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
@@ -349,6 +405,13 @@ function ErrorCard({ message }: { message: string }) {
   )
 }
 
+/**
+ * What it does: This component informs the user when there is no data available to display for the analytics page.
+ * Why it is used: It serves as a guide for new users or when a selected semester has no associated session data. It directs the user on how to get started (e.g., by uploading data), preventing confusion from a blank page and encouraging engagement with the core functionality.
+ * Important implementation details:
+ * - It provides a clear instructional message.
+ * - Includes an `<a>` tag styled as a `Link` (though a Next.js `Link` component might be more appropriate for client-side navigation) to direct users to the `/dashboard` page where they can upload session ZIP files.
+ */
 function EmptyState() {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-12 text-center">

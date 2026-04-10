@@ -1,3 +1,29 @@
+/**
+ * Centralised route path registry for the entire application.
+ *
+ * Every page path and API endpoint should be represented here. Use these constants
+ * everywhere instead of hardcoding path strings — this makes refactoring routes a
+ * single-file change and makes grepping for route usage reliable.
+ *
+ * Conventions:
+ * - Static paths are plain strings: `ROUTES.DASHBOARD`
+ * - Dynamic paths are arrow functions that accept the ID/token parameter: `ROUTES.API_SESSION(id)`
+ * - All API routes start with `API_`; public share routes have their own prefix
+ *
+ * Do NOT import from this file directly. Import from the `@/lib/constants` barrel instead.
+ */
+/**
+ * Defines a comprehensive collection of all client-side navigation paths and backend API endpoints utilized throughout the application.
+ *
+ * Why it is used:
+ * It provides a centralized, strongly-typed, and consistent mechanism for referencing application routes and API endpoints. This approach prevents the proliferation of hardcoded strings, reduces the risk of typos, and significantly enhances maintainability and refactorability across the codebase.
+ *
+ * Important implementation details:
+ * - The object is declared as `const` and uses `as const` to ensure deep immutability and literal type inference for all its properties. This provides strong type checking and read-only access.
+ * - Routes are defined either as static string paths or as functions that generate paths dynamically based on provided parameters (e.g., IDs, names, tokens).
+ * - For dynamic path segments that might contain special characters (such as student names), `encodeURIComponent` is explicitly used to ensure that the generated URLs are valid and properly formatted.
+ * - It encompasses both user-facing client-side navigation routes (e.g., `/dashboard`) and server-facing API endpoints (e.g., `/api/process`).
+ */
 export const ROUTES = {
   LOGIN: '/login',
   DASHBOARD: '/dashboard',

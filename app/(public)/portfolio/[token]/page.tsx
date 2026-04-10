@@ -1,12 +1,37 @@
+/**
+ * Public portfolio landing page (`/portfolio/[token]`).
+ *
+ * No-auth page. The `PortfolioContext` (provided by the portfolio layout) fetches
+ * portfolio config and sessions for the given token.
+ *
+ * Displays:
+ * - Aggregate stats: session count, student count, submission count, semester count
+ * - Quick-links to enabled sections (sessions, analytics, roster, reports), controlled
+ *   by the professor's `PortfolioConfig.sections` flags
+ * - A recent sessions list (up to 10), each linking to `/portfolio/[token]/sessions/[id]`
+ *
+ * Data: via `usePortfolio()` hook (reads from `PortfolioContext`, which fetches
+ * `GET /api/portfolio/[token]`).
+ */
 'use client'
 
 import Link from 'next/link'
 import { usePortfolio } from '@/components/portfolio/PortfolioContext'
 
+/**
+ * Formats an ISO date string into a user-friendly locale-specific date format. This function ensures consistency in how dates are displayed throughout the portfolio, making them easily readable for the end-user.
+ *
+ * It takes an ISO 8601 formatted date string as input, converts it to a `Date` object, and then formats it using `toLocaleDateString` for 'en-US' locale, displaying a short month name, day, and full year (e.g., 'Jan 1, 2023').
+ */
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+/**
+ * The main page component for displaying a specific teaching portfolio based on a unique token. This component serves as the entry point for users to view a portfolio, providing an overview of key statistics, quick navigation to sub-sections, and a list of recent activities.
+ *
+ * It is a client-side component that leverages the `usePortfolio` hook to fetch portfolio data. It gracefully handles loading states by displaying a spinner and error states by showing a 'Portfolio Not Available' message. Once data is loaded, it renders the portfolio's date range, a grid of essential metrics (sessions, students, submissions, semesters), dynamic quick links to other portfolio sections (like Analytics, Roster, Reports) based on data availability, and a preview of the 10 most recent sessions. The component uses `next/link` for efficient client-side navigation and applies extensive Tailwind CSS for styling and responsiveness, including custom font and color variables for a themed appearance.
+ */
 export default function PortfolioLandingPage() {
   const { data, loading, error } = usePortfolio()
 

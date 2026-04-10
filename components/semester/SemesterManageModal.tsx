@@ -1,3 +1,17 @@
+/**
+ * SemesterManageModal — Create or edit a semester (name, start/end dates).
+ *
+ * In create mode: validates the form and POSTs to /api/semesters. If an active
+ * semester already exists, it is automatically archived (archiveCurrent: true).
+ * In edit mode: PATCHes /api/semesters/[id] and shows an Archive Semester button
+ * for active semesters.
+ *
+ * Rendered by: app/(app)/semesters/page.tsx,
+ *              components/semester/SemesterOnboardingBanner.tsx
+ * Reads: SemesterContext (activeSemester for the "will archive" warning)
+ * Calls: POST /api/semesters (create),
+ *        PATCH /api/semesters/[id] (edit or archive)
+ */
 'use client'
 
 import { useState, useEffect, type FormEvent } from 'react'
@@ -5,6 +19,18 @@ import { useSemesterContext } from '@/components/semester/SemesterContext'
 import { ROUTES, BRAND } from '@/lib/constants'
 import type { SemesterSummary } from '@/types'
 
+/**
+ * Props for SemesterManageModal.
+ * @prop open             - Controls visibility.
+ * @prop onClose          - Called when the modal is dismissed.
+ * @prop editingSemester  - When provided, the modal is in edit mode for this semester.
+ * @prop onSaved          - Called after a successful save or archive; parent should refresh.
+ */
+/**
+ * What it does: Defines the shape of the props object passed to the SemesterManageModal component.
+ * Why it is used: To ensure type safety and clear communication of expected inputs for the SemesterManageModal component.
+ * Important implementation details: It includes properties for controlling visibility (`open`), handling dismissal (`onClose`), providing an optional semester for editing (`editingSemester`), and a callback for successful save or archive operations (`onSaved`).
+ */
 interface SemesterManageModalProps {
   open: boolean
   onClose: () => void
@@ -12,6 +38,18 @@ interface SemesterManageModalProps {
   onSaved: () => void
 }
 
+/**
+ * What it does: Renders a modal form for managing semester records, allowing users to create new semesters, edit existing ones, or archive an active semester.
+ * Why it is used: To provide a dedicated user interface for adding, updating, and archiving semester information within the application, which is essential for structuring academic periods.
+ * Important implementation details:
+ * 1.  Manages form inputs (name, start date, end date), loading states (saving, archiving), and error messages using `useState` hooks.
+ * 2.  Utilizes a `useEffect` hook to populate the form fields with existing data when `editingSemester` is provided, indicating an edit operation.
+ * 3.  Integrates `useSemesterContext` to access the `activeSemester`, displaying a warning message if creating a new semester would archive the currently active one.
+ * 4.  Includes client-side validation (`validate` function) for form fields to ensure data integrity before submission.
+ * 5.  Handles form submission (`handleSubmit`) for both creating (POST) and updating (PATCH) semesters, interacting with the backend API endpoints defined in `ROUTES`.
+ * 6.  Provides a separate `handleArchive` function to mark an active semester as archived via a PATCH API call.
+ * 7.  Displays appropriate loading indicators and error messages to the user during API interactions.
+ */
 export function SemesterManageModal({
   open,
   onClose,
@@ -19,6 +57,7 @@ export function SemesterManageModal({
   onSaved,
 }: SemesterManageModalProps) {
   const { activeSemester } = useSemesterContext()
+  // Reads activeSemester to warn when creating/archiving while keeping the shared SemesterContext flow consistent.
 
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('')

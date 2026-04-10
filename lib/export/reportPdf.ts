@@ -1,3 +1,34 @@
+/**
+ * @file reportPdf.ts
+ * Exports a SemesterReport as a branded, multi-page PDF document.
+ *
+ * Called by: app/api/reports/[id]/download/route.ts (?format=pdf)
+ *
+ * Library: @react-pdf/renderer — React element tree rendered to PDF buffer server-side.
+ * All elements are created with React.createElement (no JSX) because this runs in a
+ * Node.js API route context where JSX transform is not configured for this file.
+ *
+ * Document structure:
+ *   1. Cover page  (branded title, date range, course label)
+ *   2. Table of contents  (auto-generated from present sections)
+ *   3. One page per report section, rendered only if present in report.content
+ *
+ * Brand colors are defined as local constants here rather than imported from
+ * lib/constants/brand.ts because @react-pdf/renderer requires plain hex strings
+ * in StyleSheet — the BRAND object values resolve to the same hex but keeping
+ * them co-located prevents any future BRAND type divergence from breaking PDFs.
+ *
+ * Section rendering components (ExecutiveSummary, SemesterGlance, etc.) are
+ * internal React components used only by buildDocument(). Each accepts a single
+ * `data` prop typed to its corresponding report section type from types/report.ts.
+ *
+ * SVG sub-components (BarChart, ProgressBar) are rendered inline using the
+ * @react-pdf/renderer Svg primitives, enabling data visualization without a canvas.
+ *
+ * @see lib/export/reportDocx.ts for the plain DOCX variant of this report
+ * @see types/report.ts for the SemesterReport type and all section subtypes
+ */
+
 import React from 'react'
 import {
   Document,
@@ -28,17 +59,91 @@ import type {
 } from '@/types/report'
 
 // ── Brand colors ──
+// Kept as local constants (not imported from lib/constants/brand) because
+// @react-pdf/renderer StyleSheet requires plain hex strings.
 
+/**
+ * Defines the hexadecimal color code for orange, used as a primary accent color throughout the report.
+ *
+ * Why it is used:
+ * This color is part of the brand palette and serves to highlight key elements, borders, and specific text within the PDF report.
+ *
+ * Important implementation details:
+ * It is explicitly defined as a local constant rather than imported from a shared `brand` constants file because `@react-pdf/renderer`'s `StyleSheet` requires plain hex string values, which can sometimes be problematic with imported constants or more complex color objects.
+ */
 const ORANGE = '#f36f21'
+/**
+ * Defines the hexadecimal color code for purple, used as a primary brand color for headings and significant values in the report.
+ *
+ * Why it is used:
+ * This color is part of the brand palette and provides a strong visual identity for titles, high-value metrics, and background elements in the PDF report.
+ *
+ * Important implementation details:
+ * It is explicitly defined as a local constant rather than imported from a shared `brand` constants file because `@react-pdf/renderer`'s `StyleSheet` requires plain hex string values, which can sometimes be problematic with imported constants or more complex color objects.
+ */
 const PURPLE = '#542785'
+/**
+ * Defines the hexadecimal color code for green, typically used to indicate positive trends, highlights, or successful outcomes.
+ *
+ * Why it is used:
+ * This color is part of the brand palette and provides visual cues for positive indicators, such as successful recommendations or 'improving' trends, within the PDF report.
+ *
+ * Important implementation details:
+ * It is explicitly defined as a local constant rather than imported from a shared `brand` constants file because `@react-pdf/renderer`'s `StyleSheet` requires plain hex string values, which can sometimes be problematic with imported constants or more complex color objects.
+ */
 const GREEN = '#0f6b37'
+/**
+ * Defines the hexadecimal color code for a light gray, primarily used as a subtle background for cards, metric boxes, or alternating table rows.
+ *
+ * Why it is used:
+ * This neutral color helps to visually separate content blocks and improve readability without being distracting, adhering to brand guidelines for background elements.
+ *
+ * Important implementation details:
+ * It is explicitly defined as a local constant rather than imported from a shared `brand` constants file because `@react-pdf/renderer`'s `StyleSheet` requires plain hex string values, which can sometimes be problematic with imported constants or more complex color objects.
+ */
 const LIGHT_GRAY = '#f5f5f5'
+/**
+ * Defines the hexadecimal color code for a medium gray, used for borders, lines, and progress bar backgrounds.
+ *
+ * Why it is used:
+ * This color provides subtle separation and structure within the report, particularly for table borders, chart baselines, and inactive parts of progress bars.
+ *
+ * Important implementation details:
+ * It is explicitly defined as a local constant rather than imported from a shared `brand` constants file because `@react-pdf/renderer`'s `StyleSheet` requires plain hex string values, which can sometimes be problematic with imported constants or more complex color objects.
+ */
 const MID_GRAY = '#e0e0e0'
+/**
+ * Defines the hexadecimal color code for a dark text color, used for primary content text.
+ *
+ * Why it is used:
+ * Ensures high readability for the main body text of the report by providing sufficient contrast against lighter backgrounds, aligning with accessibility best practices.
+ *
+ * Important implementation details:
+ * It is explicitly defined as a local constant rather than imported from a shared `brand` constants file because `@react-pdf/renderer`'s `StyleSheet` requires plain hex string values, which can sometimes be problematic with imported constants or more complex color objects.
+ */
 const DARK_TEXT = '#1a1a1a'
+/**
+ * Defines the hexadecimal color code for a muted gray text color, used for secondary information, labels, and less prominent text.
+ *
+ * Why it is used:
+ * Provides a visual hierarchy for text, allowing less critical information (like footnotes, chart labels, or descriptive text) to be present without competing with primary headings and body content.
+ *
+ * Important implementation details:
+ * It is explicitly defined as a local constant rather than imported from a shared `brand` constants file because `@react-pdf/renderer`'s `StyleSheet` requires plain hex string values, which can sometimes be problematic with imported constants or more complex color objects.
+ */
 const MUTED_TEXT = '#666666'
 
 // ── Styles ──
 
+/**
+ * This constant holds the stylesheet object created using `@react-pdf/renderer`'s `StyleSheet.create` method.
+ *
+ * Why it is used:
+ * It centralizes all the styling rules for the entire PDF report, making it easier to manage and maintain a consistent visual design. By using `StyleSheet.create`, styles are optimized by `@react-pdf/renderer` for performance and consistency across PDF elements.
+ *
+ * Important implementation details:
+ * Styles are grouped logically (e.g., `page`, `coverPage`, `tocTitle`, `tableHeader`) to improve readability and organization. Many styles leverage the brand color constants defined earlier in the file. It defines styles for basic typography, layout containers, specific components like metric cards, tables, tags, progress bars, and a fixed footer.
+ */
 const s = StyleSheet.create({
   // Page defaults
   page: {
@@ -306,7 +411,17 @@ const s = StyleSheet.create({
 })
 
 // ── Section label map ──
+// Maps report content keys to their human-readable display names for the TOC.
 
+/**
+ * This constant is a record (object) that maps internal report content keys (like `executive_summary`) to their human-readable display names (e.g., 'Executive Summary').
+ *
+ * Why it is used:
+ * It ensures that section titles in the Table of Contents and potentially elsewhere in the report are consistently presented with user-friendly names, abstracting away the more programmatic keys used in the `SemesterReport` data structure.
+ *
+ * Important implementation details:
+ * The keys correspond directly to the property names within the `ReportContent` type, and the values are the desired titles for display.
+ */
 const SECTION_LABELS: Record<string, string> = {
   executive_summary: 'Executive Summary',
   semester_at_a_glance: 'Semester at a Glance',
@@ -320,8 +435,18 @@ const SECTION_LABELS: Record<string, string> = {
   appendix_roster: 'Appendix: Full Roster',
 }
 
-// ── Helper: format date ──
+// ── Helpers ──
 
+/** Formats an ISO date string to short locale date (e.g. "Apr 4, 2026"). Returns raw string on parse failure. */
+/**
+ * Formats an ISO date string into a short, locale-specific date format (e.g., "Apr 4, 2026").
+ *
+ * Why it is used:
+ * Provides a consistent and user-friendly date representation throughout the PDF report, improving readability compared to raw ISO strings.
+ *
+ * Important implementation details:
+ * It uses `Date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })` for formatting. Includes basic error handling; if the input `d` is empty or cannot be parsed into a valid `Date` object, it returns the original string or an empty string to prevent application crashes.
+ */
 function fmtDate(d: string): string {
   if (!d) return ''
   try {
@@ -335,21 +460,56 @@ function fmtDate(d: string): string {
   }
 }
 
-// ── Helper: percent string ──
-
+/** Converts a 0–1 decimal ratio to a percentage string (e.g. 0.875 → "88%"). */
+/**
+ * Converts a decimal ratio (ranging from 0 to 1) into a rounded percentage string (e.g., 0.875 becomes "88%").
+ *
+ * Why it is used:
+ * Offers a standardized and easily understandable way to display rates and proportions in the report, which are often provided as decimal values in the underlying data.
+ *
+ * Important implementation details:
+ * Multiplies the input number by 100, rounds it to the nearest whole number using `Math.round()`, and appends the '%' symbol.
+ */
 function pct(n: number): string {
   return `${Math.round(n * 100)}%`
 }
 
-// ── Helper: truncate string ──
-
+/**
+ * Truncates a string to `max` characters, appending an ellipsis if needed.
+ * Used to prevent long speaker/theme names from overflowing fixed-width table cells.
+ */
+/**
+ * Truncates a given string to a maximum length, appending an ellipsis ('…') if the original string exceeds that maximum.
+ *
+ * Why it is used:
+ * Prevents text overflow in fixed-width containers, particularly in tables where speaker names, theme titles, or other labels might be too long to fit comfortably. This maintains the visual integrity and layout of the PDF.
+ *
+ * Important implementation details:
+ * It checks if the string's length is already less than or equal to `max`. If not, it slices the string to `max - 1` characters and appends the Unicode ellipsis character `\u2026`.
+ */
 function truncate(str: string, max: number): string {
   if (str.length <= max) return str
   return str.slice(0, max - 1) + '\u2026'
 }
 
-// ── SVG Bar Chart ──
+// ── SVG visualizations ──
+// These components use @react-pdf/renderer's Svg primitives to render charts inline.
+// They return null when there is no data to avoid empty SVG elements in the PDF.
 
+/**
+ * Renders an SVG bar chart (submissions per session) using @react-pdf/renderer Svg primitives.
+ * Bars are centered within the available width; value labels appear above each bar,
+ * and truncated speaker/label names appear below.
+ */
+/**
+ * Renders a vertical bar chart using `@react-pdf/renderer`'s SVG primitives. It visualizes data as bars, typically showing 'submissions per session'.
+ *
+ * Why it is used:
+ * Provides a clear and concise visual representation of quantitative data (e.g., submission counts) over discrete categories (e.g., sessions/speakers), making trends and comparisons easily digestible in the report.
+ *
+ * Important implementation details:
+ * Accepts `data` (an array of `label`/`value` objects), `width`, and `height`. It calculates `maxVal` to scale bar heights proportionally. Bars are centered, and value labels appear above the bars, while truncated `label` names appear below. It includes a horizontal baseline for reference. Returns `null` if the `data` array is empty to avoid rendering an empty SVG element, which helps keep the PDF clean.
+ */
 function BarChart({
   data,
   width,
@@ -424,8 +584,20 @@ function BarChart({
   )
 }
 
-// ── SVG Progress Bar (horizontal) ──
-
+/**
+ * Renders a horizontal SVG progress bar.
+ * The fill width is proportional to `value / max`; falls back to 0 fill when max is 0.
+ * Used for tier distribution, participation tiers, and question quality breakdowns.
+ */
+/**
+ * Renders a horizontal progress bar using `@react-pdf/renderer`'s SVG primitives. It visually represents a value's proportion to a maximum.
+ *
+ * Why it is used:
+ * Offers an intuitive way to display progress, distribution, or participation rates (e.g., student tiers, question quality breakdowns) as a fill within a defined track. This helps users quickly grasp relative magnitudes.
+ *
+ * Important implementation details:
+ * Takes `value`, `max`, `width`, and `color` as props. It draws a background `Rect` (using `MID_GRAY`) for the full width and a foreground `Rect` whose `width` is proportional to `value / max`. It handles the edge case where `max` is zero to prevent division by zero, resulting in a 0 fill width.
+ */
 function ProgressBar({
   value,
   max,
@@ -460,8 +632,21 @@ function ProgressBar({
   )
 }
 
-// ── Page footer component ──
-
+/**
+ * Fixed-position page footer rendered on every page.
+ * Shows the report title on the left and "pageNumber / totalPages" on the right.
+ * The `fixed` prop from @react-pdf/renderer pins it to the bottom of each page
+ * without consuming flow space in the section content area.
+ */
+/**
+ * A React component that renders a fixed-position footer at the bottom of every page in the PDF.
+ *
+ * Why it is used:
+ * Ensures consistent branding and navigation elements (report title and page numbers) are present on every page, enhancing the professional appearance and usability of the report. The `fixed` prop is crucial for this persistent placement.
+ *
+ * Important implementation details:
+ * It uses the `fixed` prop from `@react-pdf/renderer` to ensure it stays at the specified position regardless of content flow. It displays the report title on the left and dynamically renders `pageNumber / totalPages` on the right using a `render` prop on the `Text` component.
+ */
 function PageFooter({ title }: { title: string }) {
   return React.createElement(
     View,
@@ -476,10 +661,27 @@ function PageFooter({ title }: { title: string }) {
 
 // ════════════════════════════════════════════
 //  Section renderers
+//  Each function accepts a typed section data prop and returns a React element
+//  tree to be wrapped in a Page by buildDocument(). They are only instantiated
+//  when the corresponding section key is present in report.content.
 // ════════════════════════════════════════════
 
 // ── 1. Executive Summary ──
 
+/**
+ * Renders the Executive Summary section: narrative paragraph, key metrics cards grid,
+ * and an optional highlights bullet list.
+ * Metrics are displayed in two rows of card tiles using the `metricsRow` + `metricCard` styles.
+ */
+/**
+ * Renders the "Executive Summary" section of the report. This section provides a high-level overview of key insights and performance.
+ *
+ * Why it is used:
+ * To give stakeholders a quick, concise understanding of the report's most important findings and metrics without needing to delve into every detail.
+ *
+ * Important implementation details:
+ * It displays a narrative paragraph, a grid of key metrics presented as interactive cards (`metricsRow`, `metricCard` styles), and an optional bulleted list of highlights. Metrics include total sessions, submissions, students, average submissions per session, and participation rate.
+ */
 function ExecutiveSummary({ data }: { data: ExecutiveSummarySection }) {
   const km = data.keyMetrics
   return React.createElement(
@@ -550,6 +752,19 @@ function ExecutiveSummary({ data }: { data: ExecutiveSummarySection }) {
 
 // ── 2. Semester at a Glance ──
 
+/**
+ * Renders the Semester at a Glance section: stats card row, a BarChart of
+ * submissions per session, and ProgressBar tier-distribution rows.
+ */
+/**
+ * Renders the "Semester at a Glance" section, providing an overview of overall semester activity.
+ *
+ * Why it is used:
+ * To present a summary of the semester's statistical data and high-level distributions, giving a quick snapshot of performance.
+ *
+ * Important implementation details:
+ * It includes a row of general statistics cards (similar to the Executive Summary), a `BarChart` visualizing submissions per session by speaker, and `ProgressBar` components to show the distribution of student tiers.
+ */
 function SemesterGlance({ data }: { data: SemesterGlanceSection }) {
   const chartData = data.sessionsOverTime.map((s) => ({
     label: s.speakerName,
@@ -639,6 +854,20 @@ function SemesterGlance({ data }: { data: SemesterGlanceSection }) {
 
 // ── 3. Session Summaries ──
 
+/**
+ * Renders the Session Summaries section as a striped table: speaker, date, file count,
+ * debrief rating, and theme tags (capped at 4 tags per session to prevent overflow).
+ * Speaker names are truncated to 18 characters via `truncate()`.
+ */
+/**
+ * Renders the "Session Summaries" section, displaying a tabular breakdown of individual sessions.
+ *
+ * Why it is used:
+ * To provide a detailed, session-by-session log, allowing readers to quickly review key information about each teaching engagement.
+ *
+ * Important implementation details:
+ * It presents data in a striped table format, showing speaker name (truncated), date (formatted), file count, debrief rating, and relevant themes (displayed as tags, with a maximum of 4 per session to prevent overflow). The `truncate` helper is used for speaker names to maintain table layout.
+ */
 function SessionSummaries({ data }: { data: SessionSummariesSection }) {
   return React.createElement(
     View,
@@ -691,6 +920,15 @@ function SessionSummaries({ data }: { data: SessionSummariesSection }) {
 
 // ── 4. Theme Evolution ──
 
+/**
+ * Renders the "Theme Evolution" section, illustrating how key themes emerged and developed throughout the semester.
+ *
+ * Why it is used:
+ * To provide insights into the thematic progression and focus areas over the course of the semester, highlighting recurring topics and their duration.
+ *
+ * Important implementation details:
+ * It includes an introductory narrative, a table of 'Dominant Themes' showing their total count and first/last seen dates, and a 'Session Theme Timeline' that lists themes associated with each individual session.
+ */
 function ThemeEvolution({ data }: { data: ThemeEvolutionSection }) {
   return React.createElement(
     View,
@@ -760,6 +998,15 @@ function ThemeEvolution({ data }: { data: ThemeEvolutionSection }) {
 
 // ── 5. Student Engagement ──
 
+/**
+ * Renders the "Student Engagement" section, detailing student participation and interaction.
+ *
+ * Why it is used:
+ * To analyze and present data on how students engaged with the material and sessions, identifying top contributors and potential disengagement.
+ *
+ * Important implementation details:
+ * It visualizes 'Participation Tiers' using `ProgressBar` components (categorized as High, Medium, Low engagement), lists 'Top Contributors' in a table (showing student name, sessions participated, and rate), and identifies 'Disengaged Students' with their last known activity.
+ */
 function StudentEngagement({ data }: { data: StudentEngagementSection }) {
   const tiers = data.participationTiers
   const totalTiers = tiers.high + tiers.medium + tiers.low || 1
@@ -882,6 +1129,15 @@ function StudentEngagement({ data }: { data: StudentEngagementSection }) {
 
 // ── 6. Student Growth ──
 
+/**
+ * Renders the "Student Growth" section, focusing on individual student development.
+ *
+ * Why it is used:
+ * To highlight specific instances of student improvement or significant learning journeys identified throughout the semester.
+ *
+ * Important implementation details:
+ * It includes an introductory narrative and an optional list of 'Growth Highlights'. Each highlight is presented as a 'card' (`s.card` style) containing the student's name, number of sessions participated, and a narrative description of their growth.
+ */
 function StudentGrowth({ data }: { data: StudentGrowthSection }) {
   return React.createElement(
     View,
@@ -913,6 +1169,15 @@ function StudentGrowth({ data }: { data: StudentGrowthSection }) {
 
 // ── 7. Question Quality ──
 
+/**
+ * Renders the "Question Quality" section, evaluating the quality of questions or submissions over time.
+ *
+ * Why it is used:
+ * To provide insights into the intellectual depth and effectiveness of student or participant contributions, showing overall trends and per-session breakdowns.
+ *
+ * Important implementation details:
+ * It features a 'trend badge' indicating if quality is 'improving', 'declining', or 'stable' (colored green, red, or muted gray respectively), an introductory narrative, 'Overall Tier Distribution' using `ProgressBar` components, and a detailed 'Per-Session Breakdown' table showing tier counts for each session.
+ */
 function QuestionQuality({ data }: { data: QuestionQualitySection }) {
   const trendColor =
     data.trend === 'improving' ? GREEN : data.trend === 'declining' ? '#cc3333' : MUTED_TEXT
@@ -1031,6 +1296,15 @@ function QuestionQuality({ data }: { data: QuestionQualitySection }) {
 
 // ── 8. Blind Spots ──
 
+/**
+ * Renders the "Blind Spots & Recommendations" section, identifying areas for improvement and proposing actions.
+ *
+ * Why it is used:
+ * To formally document identified weaknesses or areas needing attention and to provide actionable advice for future sessions or programmatic adjustments.
+ *
+ * Important implementation details:
+ * It presents 'Identified Blind Spots' as cards with a red left border (`#cc3333`) and 'Recommendations' as cards with a green left border (`GREEN`), visually distinguishing issues from solutions. Each card includes a title and a description/reason.
+ */
 function BlindSpots({ data }: { data: BlindSpotsSection }) {
   return React.createElement(
     View,
@@ -1073,6 +1347,15 @@ function BlindSpots({ data }: { data: BlindSpotsSection }) {
 
 // ── 9. Speaker Effectiveness ──
 
+/**
+ * Renders the "Speaker Effectiveness" section, providing an evaluation of speaker performance.
+ *
+ * Why it is used:
+ * To assess and rank speakers based on metrics such as debrief ratings, average submission tier, and submission counts, offering data-driven feedback.
+ *
+ * Important implementation details:
+ * It includes an introductory narrative and a 'Speaker Rankings' table. The table lists speakers with their rank, date of session, debrief rating, average submission tier, and total submission count. Rank numbers are highlighted in orange.
+ */
 function SpeakerEffectiveness({ data }: { data: SpeakerEffectivenessSection }) {
   return React.createElement(
     View,
@@ -1134,9 +1417,19 @@ function SpeakerEffectiveness({ data }: { data: SpeakerEffectivenessSection }) {
 
 // ── 10. Appendix Roster ──
 
+/**
+ * Renders the "Appendix: Full Roster" section, presenting a comprehensive list of students and their attendance across all sessions.
+ *
+ * Why it is used:
+ * To provide a detailed record of student participation and presence for administrative purposes or further analysis, ensuring transparency and accountability.
+ *
+ * Important implementation details:
+ * It displays student names (truncated), their overall participation rate, and a grid indicating attendance for each session. Attendance is marked with a checkmark (`\u2713`) for present and a dash (`\u2014`) for absent. Column widths for sessions are dynamically calculated to fit within the page, clamped between 30-50pt for legibility, even for many sessions.
+ */
 function AppendixRoster({ data }: { data: AppendixRosterSection }) {
   const sessions = data.sessionOrder
-  // For wide rosters, we may need to limit columns per page
+  // Column width is dynamically calculated so the attendance grid fits within 500pt.
+  // Clamped between 30–50pt to stay legible; very wide rosters may push columns narrow.
   const colWidth = Math.max(30, Math.min(50, (500 - 120 - 50) / Math.max(sessions.length, 1)))
 
   return React.createElement(
@@ -1205,6 +1498,22 @@ function AppendixRoster({ data }: { data: AppendixRosterSection }) {
 //  Document builder
 // ════════════════════════════════════════════
 
+/**
+ * Assembles the complete @react-pdf/renderer Document element tree for a semester report.
+ *
+ * Structure: cover page → table of contents → one Page per present report section.
+ * Sections are rendered in a fixed order regardless of insertion order in report.content.
+ * Any section key absent from report.content is skipped (its renderer returns null).
+ */
+/**
+ * Assembles the complete `Document` element tree for a semester report using `@react-pdf/renderer` components.
+ *
+ * Why it is used:
+ * This is the core function responsible for orchestrating the entire PDF report generation. It brings together all the individual section renderers and structural components (cover, TOC, footer) into a single, cohesive document, ensuring correct ordering and inclusion of only requested sections.
+ *
+ * Important implementation details:
+ * It takes a `SemesterReport` object as input and dynamically determines which sections to include based on the presence of data in `report.content`. Sections are rendered in a predefined logical order, not necessarily the order they appear in the `report.content` object. It constructs a cover page, a table of contents (TOC), and then iterates through the included sections, creating a new `Page` for each and injecting the appropriate section renderer. A `PageFooter` is added to every page.
+ */
 function buildDocument(report: SemesterReport) {
   const content = report.content
   const config = content.config
@@ -1340,6 +1649,23 @@ function buildDocument(report: SemesterReport) {
 //  Public API
 // ════════════════════════════════════════════
 
+/**
+ * Generates a branded PDF buffer for a semester report.
+ *
+ * @param report - Full SemesterReport object including content sections and config.
+ * @returns      - PDF as a Uint8Array, ready to stream as application/pdf.
+ *
+ * @usedBy app/api/reports/[id]/download/route.ts (?format=pdf)
+ */
+/**
+ * This is the primary public API function for generating a PDF report. It takes a `SemesterReport` object, constructs the PDF document, and renders it into a `Uint8Array` buffer.
+ *
+ * Why it is used:
+ * It provides a clean, asynchronous interface for external modules (e.g., API endpoints) to request and receive a complete PDF document ready for streaming or saving. It encapsulates the complexities of React PDF rendering.
+ *
+ * Important implementation details:
+ * It internally calls `buildDocument` to create the React PDF element tree. It then uses `renderToBuffer` from `@react-pdf/renderer` to convert this React tree into a binary buffer, which is returned as a `Uint8Array`. This `Uint8Array` can be directly sent as an `application/pdf` response from a server. It is explicitly marked for use by `app/api/reports/[id]/download/route.ts` when the `format` query parameter is `pdf`.
+ */
 export async function generateReportPDF(report: SemesterReport): Promise<Uint8Array> {
   const doc = buildDocument(report)
   const buffer = await renderToBuffer(doc)

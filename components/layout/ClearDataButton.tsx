@@ -1,15 +1,34 @@
 'use client'
 
+/**
+ * @file ClearDataButton.tsx
+ * Admin-only button that wipes all session and student data for the current professor.
+ *
+ * Rendered by: app/(app)/account/page.tsx (admin section)
+ * Calls: POST /api/admin/clear
+ *
+ * Uses a two-step confirmation UI: first click reveals "Yes, clear all" / "Cancel"
+ * buttons to prevent accidental data loss. Redirects to /dashboard after success.
+ */
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ROUTES } from '@/lib/constants'
 
+/**
+ * Two-step confirmation button for the admin data-clear action.
+ *
+ * On first click: shows a confirmation prompt with Yes / Cancel options.
+ * On confirm: POSTs to `/api/admin/clear` and redirects to the dashboard.
+ * Errors are shown inline next to the confirmation buttons.
+ */
 export function ClearDataButton() {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /** Executes the destructive clear after the professor clicks "Yes, clear all". */
   async function handleConfirm() {
     setLoading(true)
     setError(null)

@@ -1,3 +1,23 @@
+/**
+ * Dashboard page (`/dashboard`).
+ *
+ * Main upload form for creating a new session. Professors enter a speaker name,
+ * upload a Canvas ZIP of student submissions, and trigger the AI pipeline.
+ *
+ * Key behaviors:
+ * - Checks subscription access via `SubscriptionContext`; shows `PaywallModal` if blocked.
+ * - On submit: uploads ZIP to Supabase Storage via `uploadTempZip`, then POSTs to
+ *   `/api/process` with the resulting `storagePath`.
+ * - On success: caches AI output and overlapping themes in `sessionStorage`, then
+ *   navigates to `/preview?sessionId=...`.
+ * - Handles post-Stripe-checkout redirect (`?checkout=success&session_id=`) by
+ *   verifying with `/api/stripe/checkout` and refreshing subscription state.
+ * - Handles first-signup welcome banner via `?welcome=true` query param.
+ * - Renders `ProcessingView` during generation (animated progress indicator).
+ * - Renders `SystemPromptEditor` so professors can preview / switch prompt versions.
+ *
+ * Components: SpeakerInput, DropZone, ProcessingView, SystemPromptEditor, PaywallModal
+ */
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'

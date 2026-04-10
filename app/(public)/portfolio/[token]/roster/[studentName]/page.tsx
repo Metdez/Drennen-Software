@@ -1,3 +1,21 @@
+/**
+ * Public portfolio student detail page (`/portfolio/[token]/roster/[studentName]`).
+ *
+ * Route group: `(public)` — no auth required.
+ * Fetches `GET /api/portfolio/[token]/roster/[studentName]`, which returns
+ * the student's participation stats, AI profile, and per-session submission text.
+ *
+ * Two-tab layout:
+ * - Profile: AI-generated profile sections (interests, career direction, growth
+ *   trajectory, personality) — only rendered if `profile` is non-null
+ * - Submissions: raw submission text per session, truncated at 500 chars
+ *
+ * The student name is passed URL-encoded in the route param and must be
+ * encoded again when constructing the fetch URL (double encoding is intentional
+ * because `useParams` returns the decoded value while the API expects encoded).
+ *
+ * Components: inline render (no extracted components)
+ */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -5,6 +23,11 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { StudentProfile } from '@/types'
 
+/**
+ * Defines the structure for the detailed information of a student.
+ *
+ * This interface is used to type the data fetched from the API for a specific student's page, ensuring consistency and type safety across the component. It includes core student identifiers, session statistics, a list of individual session submissions, and an optional AI-generated student profile.
+ */
 interface StudentDetailData {
   studentName: string
   sessionCount: number
@@ -18,10 +41,30 @@ interface StudentDetailData {
   profile: StudentProfile | null
 }
 
+/**
+ * Formats an ISO date string into a user-friendly, localized date format.
+ *
+ * This utility function is used to present session creation timestamps in a readable format (e.g., 'Jan 1, 2023') to the end-user.
+ *
+ * It takes an ISO 8601 date string, converts it to a Date object, and then formats it using `toLocaleDateString` with 'en-US' locale and options for short month, numeric day, and numeric year.
+ */
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+/**
+ * Renders the client-side page for a specific student's detailed view within a portfolio.
+ *
+ * This component provides a comprehensive overview of a student, including their AI-generated profile and a chronological list of their session submissions. It allows educators or portfolio viewers to quickly access insights into a student's engagement and personalized data.
+ *
+ * - It's a client component, marked with `'use client'`. 
+ * - Utilizes `useParams` to extract `token` and `studentName` from the URL, which are critical for fetching student-specific data. 
+ * - Manages loading state and displays appropriate messages while data is being fetched or if the student is not found. 
+ * - Fetches student details using `useEffect` from a dynamic API endpoint (`/api/portfolio/[token]/roster/[studentName]`). 
+ * - Implements a tabbed interface to switch between the 'Profile' (displaying AI insights like Interests, Career Direction, Growth Trajectory, Personality) and 'Submissions' (listing all session submissions). 
+ * - Features breadcrumb navigation for easy navigation back to the Roster or main Portfolio page. 
+ * - Dynamically styles profile traits and growth trajectory direction for visual distinction.
+ */
 export default function PortfolioStudentDetailPage() {
   const params = useParams<{ token: string; studentName: string }>()
   const [detail, setDetail] = useState<StudentDetailData | null>(null)

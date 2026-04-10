@@ -1,9 +1,57 @@
+/**
+ * lib/ai/storyAgent.ts
+ *
+ * Generates a magazine-style narrative story for an entire semester.
+ *
+ * Unlike the semester report (which is data-driven with metrics and tables),
+ * the story is a literary artifact — flowing prose written in third person that
+ * narrates the arc of the semester for a human audience (administrators,
+ * accreditation reviewers, or the professor themselves).
+ *
+ * Structure: exactly 5 sections in a fixed order:
+ *  - "opening"           — scene-setting introduction to the semester
+ *  - "speakers_and_themes" — how themes evolved across guest speakers
+ *  - "student_journey"   — the class's collective intellectual development
+ *  - "discoveries"       — unexpected patterns and surprising connections
+ *  - "closing"           — synthesis and forward-looking recommendations
+ *
+ * Each section key and title is validated after parsing; missing sections are
+ * replaced with empty stubs so the story structure is always complete even if
+ * Gemini omits a section. The result is upserted (not inserted) so re-generating
+ * a story for the same semester safely overwrites the previous version.
+ *
+ * AI Provider: Google Gemini (via lib/ai/geminiClient.ts)
+ * Called by:   app/api/stories/generate/route.ts (POST handler)
+ * Persists to: semester_stories table via lib/db/stories.ts (upsertStory)
+ */
+
 import { getGeminiClient, getGeminiModel } from '@/lib/ai/geminiClient'
 import { fetchInsightsInput, getClassInsights } from '@/lib/db/classInsights'
 import { getThemeFrequency } from '@/lib/db/themes'
 import { upsertStory } from '@/lib/db/stories'
 import type { StorySection, SemesterStory } from '@/types'
 
+/**
+ * Constructs the Gemini prompt for semester story generation.
+ *
+ * Builds a rich data section from session metadata, theme frequency, leaderboard,
+ * drop-off patterns, and (optionally) the previously generated class narrative and
+ * quality trend. The prompt contains explicit writing instructions — including a
+ * word count range (2,000-3,000 words), prohibition on bullet points, and a
+ * requirement to use specific names — to push Gemini toward literary output rather
+ * than a summary report.
+ *
+ * Conditional fields (debrief rating, home run questions, student reflections) are
+ * spread into the session summary only when present, so sessions without post-session
+ * data are represented accurately rather than showing null/0 values.
+ *
+ * @param semesterName - The semester's display name (e.g., "Spring 2026")
+ * @param input - Aggregated session and engagement data from `fetchInsightsInput`
+ * @param classNarrative - Previously generated class insights narrative, or null
+ * @param qualityTrend - Previously detected quality trend direction/description, or null
+ * @param topThemes - Theme frequency list from `getThemeFrequency`
+ * @returns Fully-formed prompt string ready for Gemini content generation
+ */
 function buildPrompt(
   semesterName: string,
   input: Awaited<ReturnType<typeof fetchInsightsInput>>,
@@ -90,6 +138,36 @@ CRITICAL WRITING INSTRUCTIONS:
 - Write like a skilled journalist crafting a feature article, not an AI summarizing data`
 }
 
+/**
+ * Generates a magazine-style narrative story for a semester and persists it.
+ *
+ * Pipeline:
+ *  1. Fetches session data, class insights, and theme frequency in parallel
+ *  2. Guards against empty semesters (throws if no sessions found)
+ *  3. Builds the prompt via `buildPrompt` and calls Gemini with JSON mode
+ *  4. Strips markdown fences and parses the response
+ *  5. Validates that all 5 expected section keys are present, filling in empty
+ *     stubs for any sections Gemini omitted
+ *  6. Upserts the story to `semester_stories` via `upsertStory`
+ *
+ * The `SemesterStory` type is imported but not used as the return type here —
+ * the function returns only the fields needed by the route handler.
+ *
+ * @param userId - The professor's user ID (scopes all DB reads)
+ * @param semesterId - The semester UUID to generate the story for
+ * @param semesterName - The semester's display name (used in the prompt and as a title fallback)
+ * @returns `{ storyId, title, sections }` — the persisted story's ID, title, and section array
+ * @throws Error if no sessions are found for the semester
+ * @remarks
+ * The story uses `upsertStory` (not insert) so that re-generating a semester story
+ * safely overwrites the previous version rather than creating duplicate rows.
+ * The 5-section structure is validated post-parse and filled with empty stubs for
+ * any missing keys, ensuring downstream renderers always receive a complete array.
+ * @see app/api/stories/generate/route.ts — POST handler that triggers generation
+ * @see lib/db/stories.ts — upsertStory persists the result
+ * @see lib/export/storyPdf.ts — exports the story sections as a PDF document
+ * @see lib/export/storyDocx.ts — exports the story sections as a DOCX document
+ */
 export async function generateSemesterStory(
   userId: string,
   semesterId: string,
@@ -140,10 +218,13 @@ export async function generateSemesterStory(
   const title = parsed.title || `The Story of ${semesterName}`
   const sections: StorySection[] = parsed.sections ?? []
 
-  // Validate we got all 5 sections
+  // Validate we got all 5 sections. Map over expected keys in order so the
+  // section array always has a stable structure regardless of what Gemini returned.
+  // Missing sections get an empty body stub rather than crashing downstream renderers.
   const expectedKeys = ['opening', 'speakers_and_themes', 'student_journey', 'discoveries', 'closing'] as const
   const validSections = expectedKeys.map(key => {
     const found = sections.find(s => s.key === key)
+    // Fall back to a stub with a humanised title if the section is absent
     return found ?? { key, title: key.replace(/_/g, ' '), body: '' }
   })
 

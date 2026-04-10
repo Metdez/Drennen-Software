@@ -18,8 +18,10 @@
     "@supabase/supabase-js": "^2.x",
     "@vercel/functions": "^3.4.3",
     "docx": "^8.x",
+    "dotenv": "^17.4.0",
     "mammoth": "^1.7.x",
     "next": "14.2.x",
+    "node-html-parser": "^7.1.0",
     "openai": "^4.x",
     "pdf-parse": "^1.1.x",
     "pg": "^8.20.0",
@@ -39,8 +41,12 @@
     "autoprefixer": "^10.x",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
+    "glob": "^13.0.6",
+    "p-limit": "^7.3.0",
     "postcss": "^8.x",
     "tailwindcss": "^3.x",
+    "ts-morph": "^27.0.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.x"
   }
 }

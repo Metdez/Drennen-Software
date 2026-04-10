@@ -1,20 +1,63 @@
+/**
+ * ThemeExplorer — Ranked theme list with expand-to-detail for the analytics page.
+ *
+ * Renders the top themes from the professor's class-level Gemini insights.
+ * Each row shows a rank number, theme title, a proportional progress bar
+ * (% of sessions where the theme appeared), and a NEW badge for recent themes.
+ * Clicking a row expands an inline detail view with summary, session list, and
+ * sample questions, plus a link to the full cross-session theme analysis page.
+ *
+ * Rendered by: app/(app)/analytics/page.tsx (Theme Explorer section)
+ * Reads: ClassInsights.topThemes (from class_insights table via Gemini)
+ */
 'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
 import type { ClassInsights } from '@/types'
 
+/**
+ * Props for ThemeExplorer.
+ * @prop themes        - Top themes array from ClassInsights, sorted by frequency.
+ * @prop totalSessions - Denominator for computing per-theme session percentage.
+ */
+/**
+ * Props for the ThemeExplorer component.
+ * 1. What it does: Defines the shape of the properties that the ThemeExplorer component expects to receive.
+ * 2. Why it is used: Ensures type safety and clarity for the data passed into the component, specifically the list of themes and the total session count required for calculations.
+ * 3. Important implementation details: Includes `themes`, an array of `ClassInsights['topThemes']` sorted by frequency, and `totalSessions`, a number used as the denominator to compute the percentage of sessions per theme.
+ */
 interface ThemeExplorerProps {
   themes: ClassInsights['topThemes']
   totalSessions: number
 }
 
+/** Number of themes shown before the "View all N themes" toggle appears. */
+/**
+ * A constant defining the initial number of themes displayed by default in the Theme Explorer.
+ * 1. What it does: Sets the threshold for how many themes are visible before the "View all N themes" toggle appears.
+ * 2. Why it is used: Improves initial load performance and UI decluttering by only showing the most relevant themes, while still providing an option to see all available data.
+ * 3. Important implementation details: Currently set to 5. This value is used in conjunction with the `showAll` state to determine the `visibleThemes` array.
+ */
 const INITIAL_VISIBLE = 5
 
+/**
+ * A React client component that displays and allows interaction with a list of top themes from class analytics.
+ * 1. What it does: Renders a 'Theme Explorer' section, presenting a list of themes with their rank, session percentage, and a dynamic progress bar. Users can expand individual themes to view more details like a summary, associated sessions, and sample questions. It also includes a "View all" toggle to show additional themes beyond the initial visible set.
+ * 2. Why it is used: Provides an interactive and organized way for users to explore the most prominent themes identified in their class data, offering quick insights and the option to delve deeper into specific themes.
+ * 3. Important implementation details:
+ *     *   Uses the `'use client'` directive, indicating it's a client-side component capable of managing state and handling user interactions.
+ *     *   Manages two local states: `expandedTheme` (a string holding the title of the currently expanded theme or `null`) and `showAll` (a boolean to control whether all themes or only `INITIAL_VISIBLE` themes are shown).
+ *     *   Conditionally renders either a compact button or an expanded detail card for each theme based on the `expandedTheme` state.
+ *     *   Calculates `pct` (percentage) dynamically based on `theme.sessionCount` and `totalSessions`.
+ *     *   Provides a `Link` to a dedicated `/analytics/theme` page for a full analysis of an individual theme.
+ *     *   The "View all" button is only shown if there are more themes than `INITIAL_VISIBLE` and `showAll` is `false`.
+ */
 export function ThemeExplorer({ themes, totalSessions }: ThemeExplorerProps) {
   const [expandedTheme, setExpandedTheme] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
 
+  // Toggle between the default summary view and the full list when the user asks to see all themes.
   const visibleThemes = showAll ? themes : themes.slice(0, INITIAL_VISIBLE)
 
   return (
@@ -29,10 +72,11 @@ export function ThemeExplorer({ themes, totalSessions }: ThemeExplorerProps) {
       </div>
       <div className="h-0.5 w-10 bg-[var(--brand-orange)] rounded-sm mb-4" />
 
-      {visibleThemes.map((theme, i) => {
-        const rank = i + 1
-        const pct = totalSessions > 0 ? Math.round((theme.sessionCount / totalSessions) * 100) : 0
-        const isExpanded = expandedTheme === theme.title
+    {visibleThemes.map((theme, i) => {
+      const rank = i + 1
+      // Derived percentage for the progress bar; zero when no sessions exist yet.
+      const pct = totalSessions > 0 ? Math.round((theme.sessionCount / totalSessions) * 100) : 0
+      const isExpanded = expandedTheme === theme.title
 
         if (isExpanded) {
           return (

@@ -1,27 +1,86 @@
 'use client'
 
+/**
+ * @file SystemPromptEditor.tsx
+ * Collapsible editor for managing custom AI system prompt versions.
+ *
+ * Rendered by:
+ *   - app/(app)/dashboard/page.tsx (compact=false, no sessionId — create flow)
+ *   - app/(app)/preview/page.tsx (with sessionId — enables Re-run Session button)
+ *
+ * Calls:
+ *   GET  /api/system-prompts               — loads versions + active prompt on mount
+ *   POST /api/system-prompts               — saves the current textarea text as a new immutable version
+ *   POST /api/system-prompts/reset         — resets the active prompt to the built-in default
+ *   PATCH /api/system-prompts/[id]/activate — activates a previously saved version
+ *   POST /api/sessions/[id]/rerun          — re-generates the session with the current active prompt
+ *
+ * Architecture:
+ *   - The built-in default prompt lives in lib/ai/prompt.ts (version-controlled).
+ *   - Custom versions are stored immutably in the `custom_system_prompts` table.
+ *   - `sessions.prompt_version_id = NULL` means the built-in default was used.
+ *   - `isDirty` tracks whether the textarea differs from the currently loaded version.
+ *   - On re-run success, the new session's output is written to sessionStorage
+ *     (`session_{newSessionId}`) before calling `onRerun` so the preview page
+ *     can read it without an extra API round-trip.
+ */
+
 import { useEffect, useState } from 'react'
 import { BRAND, ROUTES } from '@/lib/constants'
 import { validateCustomPrompt } from '@/lib/ai/prompt'
 import type { SystemPrompt } from '@/types'
 
+/**
+ * Defines the props accepted by the SystemPromptEditor component.
+ * It is used to pass configuration and callback functions to the editor, controlling its initial state, layout, and behavior for session re-runs.
+ *
+ * `defaultExpanded`: Controls the initial expanded state of the editor. Defaults to `false`.
+ * `compact`: When `true`, hides the version history sidebar, useful for space-constrained layouts.
+ * `sessionId`: If provided, enables the "Re-run Session" button, linking the editor to a specific session.
+ * `onRerun`: A callback function invoked with the new session ID after a successful session re-run.
+ */
 interface SystemPromptEditorProps {
+  /** Whether the editor panel starts expanded. Defaults to `false`. */
   defaultExpanded?: boolean
+  /**
+   * When `true`, hides the version history sidebar (useful in space-constrained
+   * layouts like the dashboard upload form).
+   */
   compact?: boolean
+  /** If provided, enables the "Re-run Session" button to re-generate this session. */
   sessionId?: string
+  /** Called with the new session ID after a successful re-run. */
   onRerun?: (newSessionId: string) => void
 }
 
+/**
+ * Represents the structure of the data expected from the `/api/system-prompts` API endpoint.
+ * It is used to type-safely handle the response when fetching system prompt versions and the currently active prompt from the backend.
+ *
+ * Includes a list of `versions` (SystemPrompt[]), the `activeVersion` (SystemPrompt | null, null if default is active), and the `defaultPrompt` text (string), which is the built-in prompt text fetched from the server.
+ */
 interface PromptResponse {
   versions: SystemPrompt[]
   activeVersion: SystemPrompt | null
   defaultPrompt: string
 }
 
+/**
+ * A discriminated union type that tracks whether the prompt text currently displayed in the editor textarea originates from the built-in default prompt or a specific custom prompt version.
+ * It is used to accurately determine the "dirty" state of the editor (`isDirty`). By knowing the source, the component can compare the current `promptText` against the correct baseline (either `defaultPrompt` or a specific `SystemPrompt.promptText`).
+ *
+ * `type: 'default'` signifies the built-in default prompt is loaded. `type: 'version'; id: string` signifies a specific custom version identified by its ID is loaded.
+ */
 type LoadedSource =
   | { type: 'default' }
   | { type: 'version'; id: string }
 
+/**
+ * Formats an ISO date string into a human-readable date string.
+ * It is used to display the creation date of custom system prompt versions in a user-friendly format within the version history sidebar.
+ *
+ * Uses `toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })` to format the date. Accepts an ISO date string as input.
+ */
 function formatPromptDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
@@ -30,6 +89,19 @@ function formatPromptDate(iso: string): string {
   })
 }
 
+/**
+ * Collapsible system prompt management panel.
+ *
+ * State model:
+ * - `versions`       — all saved custom prompt versions for this professor
+ * - `activeVersion`  — the currently active version (null = built-in default is active)
+ * - `defaultPrompt`  — the built-in prompt text from lib/ai/prompt.ts (server-fetched)
+ * - `promptText`     — the current textarea value (may differ from any saved version)
+ * - `loadedSource`   — tracks which version is loaded in the editor so `isDirty` can compare
+ *
+ * `isDirty` is true when `promptText !== loadedText` (the saved text of the loaded version).
+ * The Save button is disabled until dirty AND valid (per `validateCustomPrompt`).
+ */
 export function SystemPromptEditor({
   defaultExpanded = false,
   compact = false,
@@ -88,6 +160,11 @@ export function SystemPromptEditor({
   const validation = validateCustomPrompt(promptText)
   const activeBadge = activeVersion ? `v${activeVersion.version} active` : 'Default active'
 
+  /**
+   * Prompts for an optional version label, then POSTs the current textarea text
+   * as a new immutable prompt version and reloads state.
+   * Calls: POST /api/system-prompts
+   */
   async function handleSave() {
     const labelInput = window.prompt('Optional label for this prompt version:', '')
     if (labelInput === null) return
@@ -111,12 +188,15 @@ export function SystemPromptEditor({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save prompt version.'
       setError(message)
-      alert(message)
     } finally {
       setSaving(false)
     }
   }
 
+  /**
+   * Resets the active prompt to the built-in default (clears any active custom version).
+   * Calls: POST /api/system-prompts/reset
+   */
   async function handleResetToDefault() {
     setSaving(true)
     setError(null)
@@ -130,12 +210,15 @@ export function SystemPromptEditor({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to reset prompt.'
       setError(message)
-      alert(message)
     } finally {
       setSaving(false)
     }
   }
 
+  /**
+   * Activates a saved custom version (versionId != null) or resets to the default (null).
+   * Calls: PATCH /api/system-prompts/[id]/activate  OR  POST /api/system-prompts/reset
+   */
   async function handleActivate(versionId: string | null) {
     setSaving(true)
     setError(null)
@@ -151,12 +234,17 @@ export function SystemPromptEditor({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to activate prompt.'
       setError(message)
-      alert(message)
     } finally {
       setSaving(false)
     }
   }
 
+  /**
+   * Re-runs the current session with the active prompt.
+   * On success, writes the new output to sessionStorage so the preview page can
+   * read it without a redundant API call, then invokes `onRerun` with the new session ID.
+   * Calls: POST /api/sessions/[id]/rerun
+   */
   async function handleRerun() {
     if (!sessionId) return
 
@@ -170,18 +258,24 @@ export function SystemPromptEditor({
       }
 
       if (data.sessionId && data.output) {
+        // Pre-seed sessionStorage so the preview page renders immediately without a fetch.
         sessionStorage.setItem(`session_${data.sessionId}`, data.output)
       }
       onRerun?.(data.sessionId)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to rerun session.'
       setError(message)
-      alert(message)
     } finally {
       setRerunning(false)
     }
   }
 
+  /**
+   * Loads a saved version (or the default) into the editor textarea without saving.
+   * Sets `loadedSource` so `isDirty` can compare against the right baseline.
+   *
+   * @param version - The version to load, or `null` to load the built-in default.
+   */
   function loadVersion(version: SystemPrompt | null) {
     if (version) {
       setPromptText(version.promptText)

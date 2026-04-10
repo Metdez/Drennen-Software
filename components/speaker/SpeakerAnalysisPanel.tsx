@@ -1,25 +1,72 @@
 'use client'
 
+/**
+ * SpeakerAnalysisPanel — Student speaker evaluation analysis display panel.
+ *
+ * Renders a fully structured view of AI-generated speaker analysis insights:
+ *  - Speaker analysis summary (count + prose)
+ *  - Evaluation themes (expandable bar-chart rows with per-student quotes)
+ *  - Leadership qualities identified (expandable list with quotes)
+ *  - Course concept connections (concept pills + per-student examples)
+ *  - Areas of agreement & disagreement (side-by-side grid)
+ *  - Analytical sophistication breakdown (high/moderate/surface %)
+ *  - Notable observations (per-student quotes + why notable)
+ *
+ * Does not fetch data itself; receives a pre-loaded `StudentSpeakerAnalysis`
+ * object from the parent.  Powered by Gemini.
+ *
+ * Rendered by: app/(app)/preview/page.tsx (debrief tab, speaker analysis sub-tab)
+ */
+
 import { useState } from 'react'
 import type { StudentSpeakerAnalysis } from '@/types'
 
+/**
+ * Defines metadata (label, text color, and background color) for different levels of analytical sophistication.
+ *
+ * It is used to consistently style and display the analytical sophistication levels (e.g., High, Moderate, Surface) within the UI, ensuring that each level has a distinct and theme-aligned visual representation.
+ *
+ * This is a constant record mapping string keys (like 'high', 'moderate', 'surface') to an object containing `label` for display, `color` for text, and `bg` for background color, used in percentage bars and labels.
+ */
 const SOPHISTICATION_META: Record<string, { label: string; color: string; bg: string }> = {
   high: { label: 'High', color: '#0f6b37', bg: 'rgba(15,107,55,0.12)' },
   moderate: { label: 'Moderate', color: '#f36f21', bg: 'rgba(243,111,33,0.12)' },
   surface: { label: 'Surface', color: '#666', bg: 'rgba(128,128,128,0.12)' },
 }
 
+/**
+ * Maps sentiment keys (e.g., positive, negative, neutral) to specific hex color codes.
+ *
+ * It is used to apply consistent and visually distinct colors to points of agreement based on their sentiment, enhancing readability and quick comprehension in the 'Areas of Agreement' section.
+ *
+ * This is a constant record where string keys representing sentiment directly map to string values representing hex color codes.
+ */
 const AGREEMENT_SENTIMENT_COLORS: Record<string, string> = {
   positive: '#0f6b37',
   negative: '#e53e3e',
   neutral: '#666',
 }
 
+/**
+ * Defines the interface for the properties expected by the `SpeakerAnalysisPanel` component.
+ *
+ * This interface is used to ensure type safety and clarity for the data that must be passed to the component, making the component's API explicit and easier to consume and maintain.
+ *
+ * It includes `analysis`, which is the core `StudentSpeakerAnalysis` data object containing all the detailed analysis results, and `fileCount`, a number indicating how many analyses are aggregated, primarily used for display in the summary.
+ */
 interface Props {
   analysis: StudentSpeakerAnalysis
   fileCount: number
 }
 
+/**
+ * A React functional component that renders a comprehensive panel displaying a detailed student speaker analysis.
+ *
+ * It is used to present AI-generated insights from student speaker analyses in a structured, interactive, and user-friendly interface. It consolidates various aspects of the analysis, such as summaries, evaluation themes, leadership qualities, course concept connections, areas of agreement/disagreement, analytical sophistication, and notable observations, making them easily digestible for users.
+ *
+ * This component utilizes the `useState` hook to manage the expansion state of 'Evaluation Themes' and 'Leadership Qualities' sections, allowing users to toggle the visibility of associated quotes. It conditionally renders sections based on the presence of data (e.g., `analysis.leadership_qualities.length > 0`). Styling is primarily driven by Tailwind CSS classes and dynamic inline styles derived from `SOPHISTICATION_META` and `AGREEMENT_SENTIMENT_COLORS` for consistent thematic presentation. It maps through various data arrays within the `analysis` object to dynamically generate content, and includes a "Powered by Gemini" attribution.
+ */
+// Presents the speaker analysis summary that anchors the portal's analytics section and the public share view.
 export function SpeakerAnalysisPanel({ analysis, fileCount }: Props) {
   const [expandedTheme, setExpandedTheme] = useState<number | null>(null)
   const [expandedQuality, setExpandedQuality] = useState<number | null>(null)

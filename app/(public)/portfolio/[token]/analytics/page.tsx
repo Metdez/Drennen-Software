@@ -1,3 +1,17 @@
+/**
+ * Public portfolio analytics page (`/portfolio/[token]/analytics`).
+ *
+ * No-auth. Displays theme frequency, class insights narrative, quality trend,
+ * and theme evolution timeline for the shared portfolio.
+ *
+ * Only visible if the professor enabled `sections.analytics` in their portfolio config.
+ *
+ * Data: fetched from `GET /api/portfolio/[token]/analytics`. Portfolio token is
+ * read from `PortfolioContext` (loaded by the layout).
+ *
+ * Sections: Class Insights narrative + quality trend badge, Theme Frequency bar chart,
+ * Theme Evolution timeline (per session).
+ */
 'use client'
 
 import { useEffect, useState } from 'react'

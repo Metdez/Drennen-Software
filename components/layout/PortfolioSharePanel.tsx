@@ -1,11 +1,36 @@
 'use client'
 
+/**
+ * @file PortfolioSharePanel.tsx
+ * Panel for managing a professor's public portfolio share link and its visibility config.
+ *
+ * Rendered by: app/(app)/account/page.tsx (anchored as `#portfolio`)
+ * Reads: SemesterContext (for the semester scope selector)
+ * Calls: GET/POST/PATCH/DELETE /api/portfolio
+ *
+ * Features:
+ * - On mount: fetches current portfolio state (exists, enabled, shareUrl, config).
+ * - Create: POST generates a new portfolio share token.
+ * - Toggle: PATCH enables/disables the share link without revoking the token.
+ * - Config update: PATCH persists scope (all semesters vs. specific) and
+ *   section visibility (student profiles, semester reports) immediately on change.
+ * - Regenerate: DELETE revokes the current token and issues a new one (two-step confirm).
+ * - Copy: writes the share URL to the clipboard; shows transient "Copied!" feedback.
+ */
+
 import { useEffect, useState, useCallback } from 'react'
 import { useSemesterContext } from '@/components/semester/SemesterContext'
 import { BRAND, ROUTES } from '@/lib/constants'
 import type { PortfolioConfig } from '@/types'
 import { DEFAULT_PORTFOLIO_CONFIG } from '@/types/portfolio'
 
+/**
+ * Self-contained panel that lets professors create, configure, toggle, and revoke
+ * their public portfolio share link.
+ *
+ * Uses `DEFAULT_PORTFOLIO_CONFIG` as the baseline; partial server configs are merged
+ * over it so new config keys added later don't silently drop to `undefined`.
+ */
 export function PortfolioSharePanel() {
   const { semesters } = useSemesterContext()
 
@@ -17,7 +42,13 @@ export function PortfolioSharePanel() {
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
+  /**
+   * Loads the current portfolio share state from the server.
+   * Merges the stored config over DEFAULT_PORTFOLIO_CONFIG so any missing keys
+   * are filled in with safe defaults rather than being undefined.
+   */
   const fetchState = useCallback(async () => {
     try {
       const res = await fetch(ROUTES.API_PORTFOLIO)
@@ -26,6 +57,7 @@ export function PortfolioSharePanel() {
       setExists(data.exists)
       if (data.exists) {
         setEnabled(data.enabled)
+        // Spread over defaults so keys added in future schema updates don't vanish
         setConfig({ ...DEFAULT_PORTFOLIO_CONFIG, ...data.config })
         setShareUrl(`${window.location.origin}/portfolio/${data.shareToken}`)
       }
@@ -40,8 +72,10 @@ export function PortfolioSharePanel() {
     fetchState()
   }, [fetchState])
 
+  /** Creates a new portfolio share token with the current config. Calls POST /api/portfolio. */
   async function handleCreate() {
     setBusy(true)
+    setError(null)
     try {
       const res = await fetch(ROUTES.API_PORTFOLIO, {
         method: 'POST',
@@ -55,14 +89,19 @@ export function PortfolioSharePanel() {
       setShareUrl(data.shareUrl)
       setConfig(data.config)
     } catch {
-      alert('Failed to create portfolio link.')
+      setError('Failed to create portfolio link.')
     } finally {
       setBusy(false)
     }
   }
 
+  /**
+   * Enables or disables the share link without revoking the token.
+   * Calls PATCH /api/portfolio with `{ enabled }`.
+   */
   async function handleToggle(newEnabled: boolean) {
     setBusy(true)
+    setError(null)
     try {
       const res = await fetch(ROUTES.API_PORTFOLIO, {
         method: 'PATCH',
@@ -73,16 +112,22 @@ export function PortfolioSharePanel() {
       const data = await res.json()
       setEnabled(data.enabled)
     } catch {
-      alert('Failed to update sharing.')
+      setError('Failed to update sharing.')
     } finally {
       setBusy(false)
     }
   }
 
+  /**
+   * Updates local config state immediately (optimistic) and, if the portfolio already
+   * exists, persists the change via PATCH /api/portfolio with `{ config: newConfig }`.
+   * If the portfolio hasn't been created yet, the config is buffered locally until creation.
+   */
   async function handleUpdateConfig(newConfig: PortfolioConfig) {
     setConfig(newConfig)
     if (!exists) return
     setBusy(true)
+    setError(null)
     try {
       const res = await fetch(ROUTES.API_PORTFOLIO, {
         method: 'PATCH',
@@ -91,27 +136,34 @@ export function PortfolioSharePanel() {
       })
       if (!res.ok) throw new Error()
     } catch {
-      alert('Failed to update config.')
+      setError('Failed to update config.')
     } finally {
       setBusy(false)
     }
   }
 
+  /**
+   * Revokes the current share token and issues a new one.
+   * Calls DELETE /api/portfolio. The previous URL becomes invalid immediately.
+   * Requires a two-step confirmation (`confirmRegen` state) to prevent accidents.
+   */
   async function handleRegenerate() {
     setBusy(true)
     setConfirmRegen(false)
+    setError(null)
     try {
       const res = await fetch(ROUTES.API_PORTFOLIO, { method: 'DELETE' })
       if (!res.ok) throw new Error()
       const data = await res.json()
       setShareUrl(data.shareUrl)
     } catch {
-      alert('Failed to regenerate link.')
+      setError('Failed to regenerate link.')
     } finally {
       setBusy(false)
     }
   }
 
+  /** Writes the share URL to the clipboard and shows transient "Copied!" feedback for 2 s. */
   async function handleCopy() {
     if (!shareUrl) return
     try {
@@ -248,6 +300,10 @@ export function PortfolioSharePanel() {
           </div>
         </div>
       </div>
+
+      {error && (
+        <p className="text-xs text-red-400 font-[family-name:var(--font-dm-sans)] mb-3">{error}</p>
+      )}
 
       {/* Create / Link section */}
       {!exists ? (

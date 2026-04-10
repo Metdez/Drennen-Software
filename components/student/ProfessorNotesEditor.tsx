@@ -1,14 +1,49 @@
 'use client'
 
+/**
+ * ProfessorNotesEditor — CRUD note cards for a single student with optimistic UI.
+ *
+ * Fetches existing notes on mount, lets professors add new notes (Cmd+Enter to submit),
+ * delete notes (optimistic — reverts on error), and toggle follow-up flags (optimistic).
+ *
+ * Rendered by: components/student/StudentGrowthTab.tsx, components/student/StudentProfileTab.tsx
+ * Calls: GET /api/roster/[studentName]/notes
+ *        POST /api/roster/[studentName]/notes
+ *        DELETE /api/roster/[studentName]/notes (with ?noteId= query param)
+ *        PATCH /api/roster/[studentName]/notes (toggle flagForFollowup)
+ */
+
 import { useEffect, useState, useCallback } from 'react'
 import { Card } from '@/components/ui/Card'
 import { ROUTES } from '@/lib/constants'
 import type { ProfessorNote } from '@/types'
 
+/**
+ * Defines the shape of the properties accepted by the ProfessorNotesEditor component.
+ *
+ * It ensures type safety and clarity for the component, explicitly stating the required input for its functionality.
+ *
+ * Currently, it only requires the `studentName` to identify which student's notes are to be managed and displayed.
+ */
 interface Props {
   studentName: string
 }
 
+/**
+ * A React functional component that provides an interface for professors to view, add, delete, and flag notes for a specific student.
+ *
+ * It is used to centralize and streamline the management of pedagogical notes for individual students, enhancing a professor's ability to track and follow up on student progress and interactions.
+ *
+ * Key implementation details include:
+ * -   Manages state for notes, loading status, new note text, and saving operations using React's `useState` hook.
+ * -   The `fetchNotes` function is memoized with `useCallback` to prevent unnecessary re-creations and is used within `useEffect` to load notes on component mount.
+ * -   Interacts with a backend API (defined by `ROUTES.API_STUDENT_NOTES`) for CRUD operations (GET, POST, DELETE, PATCH) on professor notes.
+ * -   Implements optimistic UI updates for `handleDelete` and `handleToggleFlag` to provide immediate user feedback, with error recovery by re-fetching notes.
+ * -   Displays a loading skeleton while notes are being fetched.
+ * -   Notes can be flagged for follow-up, which applies distinct styling.
+ * -   Allows adding new notes via a `textarea`, supporting `Cmd/Ctrl + Enter` for submission.
+ * -   Utilizes the `Card` component for consistent UI presentation.
+ */
 export function ProfessorNotesEditor({ studentName }: Props) {
   const [notes, setNotes] = useState<ProfessorNote[]>([])
   const [loading, setLoading] = useState(true)

@@ -1,12 +1,43 @@
+/**
+ * ComparisonHeader — Side-by-side session identity header for the compare page.
+ *
+ * Displays the two sessions being compared with speaker names, dates, and file
+ * counts separated by a styled "VS" divider. Session A is right-aligned,
+ * Session B is left-aligned.
+ *
+ * Rendered by: app/(app)/compare/page.tsx,
+ *              app/(public)/shared/compare/[token]/page.tsx
+ */
 'use client'
 
 import type { SessionSummary } from '@/types'
 
+/**
+ * Props for ComparisonHeader.
+ * @prop sessionA - Left session (BRAND.ORANGE accented).
+ * @prop sessionB - Right session (BRAND.PURPLE accented).
+ */
+/**
+ * What it does
+ * Defines the shape of the props object expected by the ComparisonHeader component.
+ * Why it is used
+ * To ensure type safety and clarity for the data passed into the ComparisonHeader component, specifically two SessionSummary objects for comparison.
+ * Important implementation details
+ * It includes `sessionA` and `sessionB`, which are of type `SessionSummary`, representing the left and right sessions being compared.
+ */
 interface ComparisonHeaderProps {
   sessionA: SessionSummary
   sessionB: SessionSummary
 }
 
+/**
+ * What it does
+ * Formats an ISO 8601 date string into a more human-readable date string.
+ * Why it is used
+ * To display session creation dates in a user-friendly format within the ComparisonHeader component, rather than raw ISO strings.
+ * Important implementation details
+ * It uses `toLocaleDateString` with the 'en-US' locale and options to display the full year, long month name, and day, e.g., "January 1, 2023".
+ */
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -15,6 +46,15 @@ function formatDate(iso: string): string {
   })
 }
 
+/**
+ * What it does
+ * Renders a header component that visually compares two session summaries, `sessionA` and `sessionB`, displaying key details for each.
+ * Why it is used
+ * To provide a clear and organized visual overview of two distinct sessions being compared, highlighting their speaker names, creation dates, and file counts with a prominent "VS" separator.
+ * Important implementation details
+ * This is a client-side component (`'use client'`). It takes two `SessionSummary` objects as props. `sessionA` is styled with an orange accent (e.g., text, background tint), while `sessionB` uses a purple accent. A vertical divider with a "VS" text separates the two session displays. It utilizes specific CSS variables for fonts (`--font-dm-sans`, `--font-playfair`) and applies Tailwind CSS classes for layout and styling.
+ */
+// Renders the branded header mirrored on the share page so viewers immediately know which sessions are being compared.
 export function ComparisonHeader({ sessionA, sessionB }: ComparisonHeaderProps) {
   return (
     <div className="flex items-center gap-4 font-[family-name:var(--font-dm-sans)]">

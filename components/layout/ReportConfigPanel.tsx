@@ -1,10 +1,31 @@
 'use client'
 
+/**
+ * @file ReportConfigPanel.tsx
+ * Modal slide-over panel for configuring and generating a semester report.
+ *
+ * Rendered by: app/(app)/analytics/page.tsx (opened via "Generate Report" button)
+ * Calls: POST /api/reports/generate
+ * Navigates to: app/(app)/reports/[id]/page.tsx on success
+ *
+ * Config options:
+ * - Report title (auto-derived from current calendar semester)
+ * - Date range (auto-populated from the earliest session in analyticsData)
+ * - Sections to include (10 checkboxes with Select All / Deselect All toggle)
+ * - Optional custom notes for the AI to factor in
+ *
+ * UX notes:
+ * - Backdrop click and Escape key both close the modal.
+ * - Body scroll is locked while the panel is open.
+ * - A full-panel generating overlay prevents interaction during the AI call.
+ */
+
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { AnalyticsData } from '@/types'
 import { ROUTES } from '@/lib/constants'
 
+/** All possible report sections; used for both the checkbox list and the POST payload. */
 const REPORT_SECTIONS = [
   { key: 'executive_summary', label: 'Executive Summary' },
   { key: 'semester_at_a_glance', label: 'Semester at a Glance' },
@@ -18,6 +39,11 @@ const REPORT_SECTIONS = [
   { key: 'appendix_roster', label: 'Appendix: Student Roster' },
 ] as const
 
+/**
+ * Derives a default report title based on the current calendar date.
+ * Mapping: Aug–Dec → Fall, Jun–Jul → Summer, Jan–May → Spring.
+ * Example output: "MGMT 305 — Fall 2026"
+ */
 function deriveDefaultTitle(): string {
   const now = new Date()
   const year = now.getFullYear()
@@ -34,6 +60,7 @@ function deriveDefaultTitle(): string {
   return `MGMT 305 — ${semester}`
 }
 
+/** Converts an ISO date string to YYYY-MM-DD format for `<input type="date">` value binding. */
 function formatDateForInput(dateStr: string): string {
   try {
     const d = new Date(dateStr)
@@ -43,16 +70,32 @@ function formatDateForInput(dateStr: string): string {
   }
 }
 
+/** Returns today's date as a YYYY-MM-DD string for the end-date default. */
 function todayString(): string {
   return new Date().toISOString().split('T')[0]
 }
 
 interface ReportConfigPanelProps {
+  /** Whether the modal is currently visible. Returning `false` renders nothing. */
   isOpen: boolean
+  /** Called when the user closes the modal (backdrop click, Escape, or Cancel button). */
   onClose: () => void
+  /**
+   * Analytics data used to auto-populate the start-date field from the earliest session.
+   * Pass `null` when data is still loading; the date field will simply be left empty.
+   */
   analyticsData: AnalyticsData | null
 }
 
+/**
+ * Full-screen modal for composing and triggering semester report generation.
+ *
+ * Side effects:
+ * - Keyboard: listens for Escape when open; removed on close.
+ * - Scroll lock: sets `document.body.style.overflow = 'hidden'` while open.
+ * - Auto-populates the start date from the earliest session in `analyticsData`.
+ * - On success: navigates to the generated report page via `router.push`.
+ */
 export function ReportConfigPanel({ isOpen, onClose, analyticsData }: ReportConfigPanelProps) {
   const router = useRouter()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -99,12 +142,14 @@ export function ReportConfigPanel({ isOpen, onClose, analyticsData }: ReportConf
     }
   }, [isOpen])
 
+  /** Toggles a single report section in/out of the `includedSections` list. */
   function toggleSection(key: string) {
     setIncludedSections(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     )
   }
 
+  /** Selects all sections if any are unchecked; deselects all if all are currently checked. */
   function toggleAll() {
     if (includedSections.length === REPORT_SECTIONS.length) {
       setIncludedSections([])
@@ -113,6 +158,11 @@ export function ReportConfigPanel({ isOpen, onClose, analyticsData }: ReportConf
     }
   }
 
+  /**
+   * Validates the form, POSTs to /api/reports/generate, then navigates to the report page.
+   * `dateRange` is sent as null when no dates are set (the API handles semester-wide scoping).
+   * Calls: POST /api/reports/generate
+   */
   async function handleGenerate() {
     if (includedSections.length === 0) {
       setError('Select at least one section.')

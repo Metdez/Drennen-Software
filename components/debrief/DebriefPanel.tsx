@@ -1,10 +1,24 @@
 'use client'
 
+/**
+ * @file DebriefPanel.tsx
+ * Stateful facilitator debrief form with auto-save, completion handling, and Ai summary display.
+ * Captures ratings, question feedback, surprise moments, speaker feedback, student observations,
+ * follow-up topics, and private notes while syncing to the backend and showing save status.
+ */
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { parseQuestionsFromOutput } from '@/lib/parse/parseQuestions'
 import { ROUTES, BRAND } from '@/lib/constants'
 import type { SessionDebrief, QuestionFeedback, QuestionStatus, StudentObservation } from '@/types'
 
+/**
+ * Defines the shape of properties expected by the `DebriefPanel` component.
+ *
+ * 1. What it does: Specifies the required data to initialize and manage a session debrief.
+ * 2. Why it is used: Ensures type safety and provides a clear contract for the data that the `DebriefPanel` component needs to function correctly.
+ * 3. Important implementation details: Includes `sessionId` for API calls, `sessionOutput` for initial question parsing, `speakerName` and `studentNames` for context, and `initialDebrief` to pre-fill the form if an existing debrief is available.
+ */
 interface Props {
   sessionId: string
   sessionOutput: string
@@ -13,10 +27,31 @@ interface Props {
   initialDebrief: SessionDebrief | null
 }
 
+/**
+ * Represents the possible states of the debrief data saving process.
+ *
+ * 1. What it does: Describes the current status of asynchronous save operations (e.g., in progress, successful, failed).
+ * 2. Why it is used: To provide visual feedback to the user regarding the debrief's save status and to manage internal saving logic, preventing multiple simultaneous save attempts.
+ * 3. Important implementation details: It's a union type with four literal string values: 'idle' (no activity), 'saving' (save in progress), 'saved' (last save successful), and 'error' (last save failed).
+ */
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
+/**
+ * An array that provides human-readable labels for numerical session ratings.
+ *
+ * 1. What it does: Maps a numeric rating (1 through 5) to a descriptive text string.
+ * 2. Why it is used: To enhance the user interface by displaying qualitative descriptions alongside quantitative ratings, making the selection more intuitive for the user.
+ * 3. Important implementation details: The array is 1-indexed for convenience, with the first element (`RATING_LABELS[0]`) being an empty string as ratings typically start from 1.
+ */
 const RATING_LABELS = ['', 'Disappointing', 'Below Expectations', 'Solid', 'Strong', 'Exceptional']
 
+/**
+ * An array defining predefined options for categorizing the effectiveness of a question.
+ *
+ * 1. What it does: Holds configuration objects for each possible status a question can have within the debrief, including its value, display label, and associated styling (color and background).
+ * 2. Why it is used: To render a consistent set of interactive buttons or selections for users to assign a status to each question, improving the debriefing experience and data consistency.
+ * 3. Important implementation details: Each object includes `value` (typed as `QuestionStatus` enum), `label` for display, and `color` and `bg` properties for visual styling, often tied to brand guidelines (`BRAND.GREEN`, `BRAND.ORANGE`).
+ */
 const STATUS_OPTIONS: { value: QuestionStatus; label: string; color: string; bg: string }[] = [
   { value: 'home_run', label: 'Home Run', color: BRAND.GREEN, bg: 'rgba(15,107,55,0.12)' },
   { value: 'solid', label: 'Solid', color: BRAND.ORANGE, bg: 'rgba(243,111,33,0.12)' },
@@ -24,6 +59,13 @@ const STATUS_OPTIONS: { value: QuestionStatus; label: string; color: string; bg:
   { value: 'unused', label: "Didn't Use", color: 'var(--text-muted)', bg: 'rgba(128,128,128,0.04)' },
 ]
 
+/**
+ * Initializes an array of `QuestionFeedback` objects based on a raw session output and optionally merges with existing feedback.
+ *
+ * 1. What it does: Parses a string of session output to extract questions and formats them into `QuestionFeedback` objects. If existing feedback is provided, it attempts to carry over the `status` for matching questions.
+ * 2. Why it is used: To ensure the 'Questions That Landed' section is populated correctly when the `DebriefPanel` mounts, either for a new debrief or when editing an existing one, preserving user input where possible.
+ * 3. Important implementation details: It uses `parseQuestionsFromOutput` to extract questions. When merging with `existing` feedback, it creates a `statusMap` to look up and apply previous statuses based on `questionText`, defaulting to 'unused' for new or unmatched questions.
+ */
 function initQuestionsFeedback(output: string, existing?: QuestionFeedback[]): QuestionFeedback[] {
   const parsed = parseQuestionsFromOutput(output)
   if (existing && existing.length > 0) {
@@ -46,6 +88,13 @@ function initQuestionsFeedback(output: string, existing?: QuestionFeedback[]): Q
   }))
 }
 
+/**
+ * The main React functional component responsible for rendering and managing the session debrief form.
+ *
+ * 1. What it does: Provides a comprehensive user interface for facilitators to input, review, and finalize debrief details for a specific session. It includes sections for overall rating, question feedback, surprise moments, speaker feedback, student observations, follow-up topics, and private notes.
+ * 2. Why it is used: This component serves as the central hub for the debriefing process, enabling users to systematically document their observations and insights from a session, eventually leading to a complete debrief and an AI-generated summary.
+ * 3. Important implementation details: It's a client-side component (`'use client'`). It heavily uses React `useState` for managing all form fields and UI states (e.g., saving, completing). `useRef` is used for debouncing the auto-save functionality and preventing race conditions during concurrent save operations. `useCallback` ensures a stable reference for the `save` function to optimize `useEffect` dependencies. It implements debounced auto-saving to automatically persist changes to the backend. The `handleComplete` function finalizes the debrief and triggers the generation of an AI summary. All input fields are disabled if the debrief is marked as complete (`completedStatus`). Styling is managed using CSS variables and Tailwind CSS classes.
+ */
 export function DebriefPanel({ sessionId, sessionOutput, speakerName, studentNames, initialDebrief }: Props) {
   const isComplete = initialDebrief?.status === 'complete'
 
@@ -71,6 +120,7 @@ export function DebriefPanel({ sessionId, sessionOutput, speakerName, studentNam
 
   const save = useCallback(async () => {
     if (completedStatus) return
+    // Prevent overlapping saves by queueing another attempt if one is already running.
     if (savingRef.current) {
       pendingRef.current = true
       return
@@ -108,7 +158,7 @@ export function DebriefPanel({ sessionId, sessionOutput, speakerName, studentNam
     }
   }, [sessionId, overallRating, questionsFeedback, surpriseMoments, speakerFeedbackText, studentObservations, followupTopics, privateNotes, completedStatus])
 
-  // Debounced auto-save
+  // Debounced auto-save: delay 1.5s after any change and skip once the debrief is complete.
   useEffect(() => {
     if (completedStatus) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -116,6 +166,9 @@ export function DebriefPanel({ sessionId, sessionOutput, speakerName, studentNam
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [overallRating, questionsFeedback, surpriseMoments, speakerFeedbackText, studentObservations, followupTopics, privateNotes, save, completedStatus])
 
+  /**
+   * Finalizes the debrief, triggers the complete endpoint, and captures the AI summary.
+   */
   async function handleComplete() {
     if (completing || completedStatus) return
     setCompleting(true)
@@ -174,7 +227,7 @@ export function DebriefPanel({ sessionId, sessionOutput, speakerName, studentNam
     setStudentObservations(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Group questions by theme
+  // Group questions by theme for the "Questions That Landed" section cards.
   const questionsByTheme = questionsFeedback.reduce<Record<string, QuestionFeedback[]>>((acc, q) => {
     const key = q.themeTitle
     if (!acc[key]) acc[key] = []

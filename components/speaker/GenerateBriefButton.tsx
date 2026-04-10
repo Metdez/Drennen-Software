@@ -1,5 +1,23 @@
 "use client"
 
+/**
+ * @file GenerateBriefButton.tsx
+ * Action button that generates (or navigates to) a speaker brief for a session.
+ *
+ * Rendered by: app/(app)/preview/page.tsx (questions tab action bar)
+ * Calls:
+ *   - GET /api/sessions/[id]/brief — checks whether a brief already exists on mount.
+ *   - POST /api/sessions/[id]/brief — generates the brief if it doesn't exist.
+ * Navigates to: app/(app)/preview/brief?sessionId=[id] after generation.
+ *
+ * State machine:
+ * - `checking` (true on mount): button renders nothing while probing the API.
+ * - `exists=false`: renders "Speaker Brief" button. Click generates + navigates.
+ * - `exists=true`: renders "View Brief" button. Click navigates directly.
+ * - `loading`: spinner + "Generating..." label during POST.
+ * Errors surface inline below the button; `alert()` is never used.
+ */
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ROUTES } from '@/lib/constants'
@@ -17,6 +35,19 @@ const SpinnerIcon = () => (
   </svg>
 )
 
+/**
+ * Button that either generates a new speaker brief or navigates to an existing one.
+ *
+ * @param sessionId   - Session to generate or navigate to the brief for.
+ * @param speakerName - Declared in the caller's prop shape but unused here (kept for
+ *   API consistency with GeneratePortalButton).
+ *
+ * @remarks
+ * Rendered by app/(app)/preview/page.tsx. On mount it silently probes
+ * GET /api/sessions/[id]/brief to determine the button label. The button
+ * renders `null` during the initial check to avoid a flash of incorrect state.
+ */
+// Enables generating or viewing the shareable speaker brief that backs the portal preview.
 export function GenerateBriefButton({
   sessionId,
 }: {
@@ -26,8 +57,11 @@ export function GenerateBriefButton({
   const router = useRouter()
   const [exists, setExists] = useState(false)
   const [loading, setLoading] = useState(false)
+  // True while the initial existence check is in-flight; button renders null during this time.
   const [checking, setChecking] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  // On mount: probe for an existing brief to determine initial button state.
   useEffect(() => {
     async function checkBrief() {
       try {
@@ -36,7 +70,7 @@ export function GenerateBriefButton({
         const data = await res.json()
         if (data.brief) setExists(true)
       } catch {
-        // Non-critical
+        // Non-critical — fall back to showing the "Generate" state
       } finally {
         setChecking(false)
       }
@@ -44,6 +78,10 @@ export function GenerateBriefButton({
     checkBrief()
   }, [sessionId])
 
+  /**
+   * If a brief exists, navigate directly to the preview page.
+   * Otherwise, POST to generate one, then navigate on success.
+   */
   async function handleClick() {
     if (exists) {
       router.push(`${ROUTES.PREVIEW_BRIEF}?sessionId=${sessionId}`)
@@ -51,6 +89,7 @@ export function GenerateBriefButton({
     }
 
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_BRIEF(sessionId), { method: 'POST' })
       if (!res.ok) {
@@ -60,7 +99,7 @@ export function GenerateBriefButton({
       setExists(true)
       router.push(`${ROUTES.PREVIEW_BRIEF}?sessionId=${sessionId}`)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to generate speaker brief')
+      setError(err instanceof Error ? err.message : 'Failed to generate speaker brief')
     } finally {
       setLoading(false)
     }
@@ -69,18 +108,23 @@ export function GenerateBriefButton({
   if (checking) return null
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={loading}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 font-[family-name:var(--font-dm-sans)] disabled:opacity-40 disabled:cursor-not-allowed ${
-        exists
-          ? 'border border-[#0f6b37] text-[#5e9e6e] hover:bg-[rgba(15,107,55,0.1)]'
-          : 'border border-[#0f6b37] text-[#0f6b37] hover:bg-[rgba(15,107,55,0.1)]'
-      }`}
-      style={{ background: 'var(--surface)' }}
-    >
-      {loading ? <SpinnerIcon /> : <DocumentIcon />}
-      {loading ? 'Generating...' : exists ? 'View Brief' : 'Speaker Brief'}
-    </button>
+    <div className="flex flex-col items-start gap-1">
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 font-[family-name:var(--font-dm-sans)] disabled:opacity-40 disabled:cursor-not-allowed ${
+          exists
+            ? 'border border-[#0f6b37] text-[#5e9e6e] hover:bg-[rgba(15,107,55,0.1)]'
+            : 'border border-[#0f6b37] text-[#0f6b37] hover:bg-[rgba(15,107,55,0.1)]'
+        }`}
+        style={{ background: 'var(--surface)' }}
+      >
+        {loading ? <SpinnerIcon /> : <DocumentIcon />}
+        {loading ? 'Generating...' : exists ? 'View Brief' : 'Speaker Brief'}
+      </button>
+      {error && (
+        <p className="text-xs text-red-400 font-[family-name:var(--font-dm-sans)] max-w-[220px]">{error}</p>
+      )}
+    </div>
   )
 }

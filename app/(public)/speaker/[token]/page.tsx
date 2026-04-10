@@ -1,3 +1,23 @@
+/**
+ * Public speaker portal page (`/speaker/[token]`).
+ *
+ * No-auth read-only page sent to guest speakers before (and updated after) their session.
+ * Accessed via a unique share token generated when the professor publishes the portal.
+ *
+ * Sections rendered:
+ * 1. Welcome & Context (greeting, session date, student count)
+ * 2. What Students Want to Know (themes with descriptions)
+ * 3. What Students Are Asking (sample questions, if available)
+ * 4. Suggested Talking Points (numbered, with rationale)
+ * 5. Know Your Audience (narrative, sentiment bars, recurring interests)
+ * 6. What Past Speakers Found Useful (highlights from prior debriefs)
+ * 7. Post-Session Feedback (auto-published from professor's debrief; star rating + narrative)
+ *
+ * Data: `GET /api/speaker/[token]` — returns the published portal content.
+ * 404 = link revoked or not found.
+ *
+ * Helper components: SentimentBar, StarRating (inline)
+ */
 "use client"
 
 import { useEffect, useState } from 'react'

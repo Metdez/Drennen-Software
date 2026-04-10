@@ -1,8 +1,37 @@
+/**
+ * ThemeFrequencyPanel — Collapsible ranked-bar chart of theme recurrence across all sessions.
+ *
+ * Fetches theme frequency data on mount from /api/analytics/themes and renders a
+ * ranked list with proportional bars. Each entry shows the theme title, last-seen
+ * date, and total session count. The entire panel can be collapsed by clicking the
+ * header toggle.
+ *
+ * Rendered by: app/(app)/analytics/page.tsx (Theme Frequency sidebar section)
+ * Calls: GET /api/analytics/themes
+ */
 'use client'
 
 import { useEffect, useState } from 'react'
 import type { ThemeFrequency } from '@/lib/db/themes'
 
+/**
+ * Self-contained panel — no external props.
+ * Fetches its own data via /api/analytics/themes on mount.
+ */
+/**
+ * A self-contained React client component that displays the frequency of various themes. It fetches its own data from the `/api/analytics/themes` endpoint upon mounting.
+ *
+ * What it does: Renders a collapsible panel showing a list of themes, their usage counts, the last time they were seen, and a visual bar indicating their relative frequency.
+ * Why it is used: To provide users with insights into the most frequently used themes within the application, aiding in understanding user engagement or content popularity.
+ * Important implementation details:
+ * - It's a client-side component, indicated by `'use client'`.
+ * - Manages its own state for `themes` (the fetched data), `loading` (to indicate data fetching status), and `open` (to control the panel's collapsed state).
+ * - Uses the `useEffect` hook to fetch theme data asynchronously from `/api/analytics/themes` once the component mounts.
+ * - Handles loading and empty data states gracefully, displaying appropriate messages.
+ * - Calculates a `maxCount` from the most frequent theme to normalize the width of the frequency bars.
+ * - Formats the `lastSeen` date for better readability.
+ * - Styling is applied using Tailwind CSS classes and CSS variables for theming.
+ */
 export function ThemeFrequencyPanel() {
   const [themes, setThemes] = useState<ThemeFrequency[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,6 +45,7 @@ export function ThemeFrequencyPanel() {
       .finally(() => setLoading(false))
   }, [])
 
+  // Normalize every bar against the highest-count theme so relative lengths stay proportional.
   const maxCount = themes[0]?.count ?? 1
 
   return (

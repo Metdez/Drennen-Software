@@ -1,13 +1,47 @@
+/**
+ * ComparativeNarrative — AI-generated narrative + key differences + recommendations panel.
+ *
+ * Renders the Gemini-powered comparative analysis between two sessions. Shows an
+ * empty-state "Generate" button if no analysis exists yet, an animated skeleton
+ * while generating, and the full narrative once complete.
+ *
+ * Rendered by: app/(app)/compare/page.tsx (narrative tab),
+ *              app/(public)/shared/compare/[token]/page.tsx (read-only)
+ * Data source: ComparativeAnalysis type from /api/compare/analysis
+ */
 'use client'
 
 import type { ComparativeAnalysis } from '@/types'
 
+/**
+ * Props for ComparativeNarrative.
+ * @prop analysis     - AI comparative analysis; null until generated.
+ * @prop onGenerate   - Triggers the POST /api/compare/analysis call in the parent.
+ * @prop isGenerating - True while the analysis API call is in-flight; shows skeleton.
+ */
+/**
+ * Defines the shape of the properties (props) that the ComparativeNarrative component accepts.
+ * 1. It specifies the expected inputs for the component.
+ * 2. This interface is used to ensure type safety and provide clear documentation for the component's API, making it easier to understand and use.
+ * 3. Key properties include `analysis` (the AI comparative analysis, which can be `null` initially), `onGenerate` (a callback function to trigger the analysis generation), and `isGenerating` (a boolean indicating if the analysis is currently being fetched or processed).
+ */
 interface ComparativeNarrativeProps {
   analysis: ComparativeAnalysis | null
   onGenerate: () => void
   isGenerating: boolean
 }
 
+/**
+ * Color palette for key-difference dimension badges.
+ * The AI returns dimension strings like "themes", "sentiment", etc.
+ * Falls back to engagement colors for any unrecognised dimension.
+ */
+/**
+ * Stores a predefined color palette for visually representing different dimensions of key differences in the AI comparative analysis.
+ * 1. It maps specific analysis dimension strings (e.g., 'themes', 'sentiment') to unique background and text colors.
+ * 2. This is used to provide a consistent and aesthetically pleasing way to highlight and categorize key differences in the user interface, improving readability and information hierarchy.
+ * 3. It is a JavaScript object (Record) where keys are dimension names and values are objects containing `bg` (background color) and `text` (text color) properties, both as RGBA or hex color strings. A fallback color set (engagement) is provided for any dimension not explicitly listed.
+ */
 const DIMENSION_COLORS: Record<string, { bg: string; text: string }> = {
   themes: { bg: 'rgba(84,39,133,0.10)', text: '#542785' },
   sentiment: { bg: 'rgba(243,111,33,0.10)', text: '#f36f21' },
@@ -16,6 +50,13 @@ const DIMENSION_COLORS: Record<string, { bg: string; text: string }> = {
   engagement: { bg: 'rgba(168,85,247,0.10)', text: '#a855f7' },
 }
 
+/**
+ * A React functional component that renders the AI-generated comparative analysis between two sessions.
+ * 1. It displays the analysis's narrative, key differences, and recommendations in a structured format.
+ * 2. This component is used to present complex AI analysis results to the user in an understandable and interactive way. It handles different UI states including an initial state with a call to action, a loading state, and the final display of the analysis.
+ * 3. It is a client-side component ('use client'). It conditionally renders based on the `analysis` and `isGenerating` props: showing a 'Generate Analysis' button if no analysis exists, a skeleton loading state if `isGenerating` is true, and the full analysis content otherwise. It utilizes `DIMENSION_COLORS` to style key difference badges and includes a 'Powered by Gemini' footer. Styling is applied using Tailwind CSS classes and custom CSS variables.
+ */
+// Surfaces the AI narrative that appears in both the internal compare tab and the shared comparison link.
 export function ComparativeNarrative({ analysis, onGenerate, isGenerating }: ComparativeNarrativeProps) {
   if (!analysis && !isGenerating) {
     return (

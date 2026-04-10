@@ -1,3 +1,24 @@
+/**
+ * Account / subscription management page (`/account`).
+ *
+ * Displays the professor's subscription status, billing history, portfolio sharing
+ * settings, and AI system prompt editor.
+ *
+ * Subscription section:
+ * - Shows current plan status badge (Pro Active / Trial Active / Inactive)
+ * - Active subscribers see "Manage Billing" → redirects to Stripe Billing Portal
+ *   via `POST /api/stripe/portal`
+ * - Inactive users see "Upgrade to Pro" → opens `PaywallModal`
+ *
+ * Invoices: fetched from `GET /api/stripe/invoices`. Displays amount, date, status,
+ * and link to receipt PDF.
+ *
+ * Portfolio: `PortfolioSharePanel` component — creates/revokes public portfolio tokens.
+ *
+ * System Prompt: `SystemPromptEditor` component — view/create/activate custom prompt versions.
+ *
+ * Components: PaywallModal, PortfolioSharePanel, SystemPromptEditor
+ */
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -7,6 +28,11 @@ import { PortfolioSharePanel } from '@/components/layout/PortfolioSharePanel'
 import { SystemPromptEditor } from '@/components/session/SystemPromptEditor'
 import { BRAND, ROUTES } from '@/lib/constants'
 
+/**
+ * What it does: Defines the structure for an invoice object.
+ * Why it is used: To type the data received from the backend when fetching a user's billing history, ensuring data consistency and type safety.
+ * Important implementation details: It includes properties for `date`, `amount`, `status`, and `url`, where `status` and `url` are optional and can be `null`.
+ */
 interface Invoice {
   date: string
   amount: number
@@ -14,6 +40,20 @@ interface Invoice {
   url: string | null
 }
 
+/**
+ * What it does: This is the main component for the user's account page, providing a central hub for managing subscription details, viewing billing history, and configuring AI-related settings.
+ * Why it is used: To offer users a comprehensive interface for managing their account, including subscription status, a link to the Stripe customer portal, a list of past invoices, and access to the portfolio sharing and system prompt editor components.
+ * Important implementation details: 
+ * - Utilizes the `useSubscription` hook to access global subscription status and related information.
+ * - Manages local state for invoices (`invoices`, `invoicesLoading`), billing portal redirection (`portalLoading`), and the visibility of the `PaywallModal` (`showPaywall`).
+ * - The `fetchInvoices` function is a memoized callback that asynchronously fetches billing history from `ROUTES.API_STRIPE_INVOICES`.
+ * - `handleManageBilling` asynchronously calls an API endpoint to retrieve a URL for the Stripe customer portal and redirects the user.
+ * - `getStatusBadge` dynamically generates display data (label, background color, explanatory text) based on the user's current subscription status and reason.
+ * - Conditionally renders a `PaywallModal` if the user is not subscribed and attempts to access paid features or needs to upgrade.
+ * - Integrates `PortfolioSharePanel` for sharing settings and `SystemPromptEditor` for AI prompt customization.
+ * - Displays a list of invoices, including loading states and a message for when no billing history is found.
+ * - Includes utility functions `formatCurrency` and `formatDate` for consistent data presentation.
+ */
 export default function AccountPage() {
   const {
     subscriptionStatus,
