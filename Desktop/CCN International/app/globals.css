@@ -151,7 +151,7 @@ img { max-width: 100%; display: block; }
 /* -------- Scroll Video Hero -------- */
 .scroll-video-outer {
   position: relative;
-  height: 250vh;
+  height: 400vh;
 }
 .scroll-video-outer[data-reduced="true"] {
   height: 100vh;
