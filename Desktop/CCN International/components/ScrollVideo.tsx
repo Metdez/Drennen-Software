@@ -14,7 +14,8 @@ export default function ScrollVideo() {
   const imagesRef = useRef<HTMLImageElement[]>([]);
   const rafPendingRef = useRef(false);
   const currentFrameRef = useRef(0);
-  const reduceMotion = useRef(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const reduceMotionRef = useRef(false);
 
   const [loaded, setLoaded] = useState(0);
   const [allLoaded, setAllLoaded] = useState(false);
@@ -79,9 +80,9 @@ export default function ScrollVideo() {
 
   // Load frames on mount
   useEffect(() => {
-    reduceMotion.current = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const prefers = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    reduceMotionRef.current = prefers;
+    setReduceMotion(prefers);
 
     const images: HTMLImageElement[] = [];
     let cancelled = false;
@@ -138,13 +139,13 @@ export default function ScrollVideo() {
 
   // Bind scroll progress to frame drawing
   useMotionValueEvent(frameIndex, "change", (latest) => {
-    if (reduceMotion.current) return;
+    if (reduceMotionRef.current) return;
     if (!allLoaded) return;
     if (rafPendingRef.current) return;
     rafPendingRef.current = true;
     requestAnimationFrame(() => {
       rafPendingRef.current = false;
-      drawFrame(Math.round(latest));
+      drawFrame(Math.min(Math.round(latest), FRAME_COUNT - 1));
     });
   });
 
@@ -154,7 +155,7 @@ export default function ScrollVideo() {
     <div
       ref={outerRef}
       className="scroll-video-outer"
-      data-reduced={reduceMotion.current ? "true" : undefined}
+      data-reduced={reduceMotion ? "true" : undefined}
     >
       <div className="scroll-video-sticky">
         <canvas ref={canvasRef} className="scroll-video-canvas" />
