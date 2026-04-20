@@ -254,10 +254,18 @@ CRITICAL — never reference private/internal data:
 - NEVER mention personal details like birth date, age, or the owner's family.
 - Only reference facts that would be obvious from a 30-second look at the company's public website.
 
+CRITICAL — you MUST ALWAYS return a valid sentence:
+- NEVER refuse. NEVER ask for more information. NEVER say "I don't have enough" or "I need more context" or "could you share".
+- NEVER explain what you can't do. NEVER apologize. NEVER write meta-commentary.
+- If the business name is cryptic (e.g. "LARKIN ENTERPRISES", "FBHS LLC", random initials) and you genuinely cannot infer the industry, use this safe fallback shape: "Really cool that {name} has stayed independently owner-led in {city} while so many small businesses there have been rolled up by larger players." Adapt lightly so it doesn't sound identical each time.
+- If the owner's first name is clearly visible, you may address them as "you" naturally ("Really cool that you've kept [Business] running independently in [City]...").
+- Your output is ALWAYS exactly one sentence starting with "Really cool", "Love that", or "Impressive that".
+
 Examples of the target style:
 - "Really cool how you've built one of the few independent medical billing practices still thriving in rural Mississippi."
 - "Love that Progressive Medical has stayed owner-led in a space that's been getting rolled up by PE for a decade."
 - "Impressive that Paradigm actually manufactures personnel parachutes in-house in Pensacola — not many defense suppliers still do."
+- Fallback when context is thin: "Really cool that Larkin Enterprises has stayed independently owner-led in Houston while so many small businesses there have been rolled up."
 
 Return ONLY the sentence. No preamble, no quotes, no explanation.
 """
@@ -293,7 +301,20 @@ def synthesize_line(client: Anthropic, lead: dict, context: str) -> str:
             line = line[1:]
         if line.endswith(ch):
             line = line[:-1]
-    return line.strip()
+    line = line.strip()
+
+    # Belt-and-suspenders: if Haiku produced meta-commentary or a refusal
+    # instead of a valid opener, replace with a safe deterministic fallback.
+    valid_prefixes = ("really cool", "love that", "love how", "impressive that")
+    if not line.lower().startswith(valid_prefixes):
+        biz = (lead.get("Business Name") or "").strip().title() or "this business"
+        city = (lead.get("City") or "").strip().title()
+        where = f" in {city}" if city else ""
+        line = (
+            f"Really cool that {biz} has stayed independently owner-led{where} "
+            f"while so many small businesses have been rolled up by bigger players."
+        )
+    return line
 
 
 # ---------------------------- CSV manager ----------------------------
