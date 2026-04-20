@@ -57,3 +57,43 @@ class TestUnwrapDdgUrl:
 
     def test_returns_none_for_relative_non_redirect(self):
         assert p.unwrap_ddg_url("/foo/bar") is None
+
+
+import httpx
+import pytest
+import respx
+
+
+class TestFetchBusinessSite:
+    @respx.mock
+    def test_combines_homepage_and_about(self):
+        p._scrape_client = None  # reset shared client for clean mock state
+        respx.get("https://example.com/").mock(
+            return_value=httpx.Response(
+                200,
+                headers={"content-type": "text/html"},
+                text="<html><body><p>Welcome to example</p></body></html>",
+            )
+        )
+        respx.get("https://example.com/about").mock(
+            return_value=httpx.Response(
+                200,
+                headers={"content-type": "text/html"},
+                text="<html><body><p>Founded in 1994</p></body></html>",
+            )
+        )
+        respx.get("https://example.com/about-us").mock(
+            return_value=httpx.Response(404),
+        )
+        text = p.fetch_business_site("example.com")
+        assert "Welcome to example" in text
+        assert "Founded in 1994" in text
+        assert "[https://example.com]" in text
+
+    @respx.mock
+    def test_returns_empty_when_all_fail(self):
+        p._scrape_client = None
+        respx.get("https://nothing.test/").mock(return_value=httpx.Response(404))
+        respx.get("https://nothing.test/about").mock(return_value=httpx.Response(404))
+        respx.get("https://nothing.test/about-us").mock(return_value=httpx.Response(404))
+        assert p.fetch_business_site("nothing.test") == ""

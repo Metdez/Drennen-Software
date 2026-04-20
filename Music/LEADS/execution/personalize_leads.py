@@ -105,3 +105,68 @@ def unwrap_ddg_url(href: str) -> str | None:
     if href.startswith("http"):
         return href
     return None
+
+# ---------------------------- HTTP scrape ----------------------------
+
+_scrape_client: httpx.Client | None = None
+_scrape_client_lock = threading.Lock()
+
+
+def _get_client() -> httpx.Client:
+    """Module-level shared client for connection pooling."""
+    global _scrape_client
+    if _scrape_client is None:
+        with _scrape_client_lock:
+            if _scrape_client is None:
+                _scrape_client = httpx.Client(
+                    follow_redirects=True,
+                    timeout=HTTP_TIMEOUT,
+                    headers={"User-Agent": USER_AGENT},
+                )
+    return _scrape_client
+
+
+def fetch_html(url: str) -> str:
+    """Fetch a URL and return raw HTML. Returns empty string on any failure.
+
+    One retry with 0.5s backoff on transport errors or 5xx.
+    """
+    client = _get_client()
+    for attempt in (1, 2):
+        try:
+            resp = client.get(url)
+            if resp.status_code >= 500 and attempt == 1:
+                time.sleep(0.5)
+                continue
+            if resp.status_code != 200:
+                return ""
+            if "text/html" not in resp.headers.get("content-type", "").lower():
+                return ""
+            return resp.text
+        except httpx.RequestError:
+            if attempt == 1:
+                time.sleep(0.5)
+                continue
+            return ""
+    return ""
+
+
+def fetch_business_site(domain: str) -> str:
+    """Fetch homepage + /about + /about-us for a domain. Return combined cleaned text,
+    capped at MAX_CONTEXT_CHARS. Each page capped at MAX_PAGE_CHARS."""
+    chunks: list[str] = []
+    total = 0
+    for path in ("", "/about", "/about-us"):
+        if total >= MAX_CONTEXT_CHARS:
+            break
+        url = f"https://{domain}{path}"
+        html = fetch_html(url)
+        if not html:
+            continue
+        text = extract_text(html)
+        if not text:
+            continue
+        snippet = text[:MAX_PAGE_CHARS]
+        chunks.append(f"[{url}]\n{snippet}")
+        total += len(snippet)
+    return "\n\n".join(chunks)[:MAX_CONTEXT_CHARS]
