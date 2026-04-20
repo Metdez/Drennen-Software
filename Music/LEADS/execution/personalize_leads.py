@@ -191,3 +191,48 @@ def duckduckgo_search(query: str, limit: int = 5) -> list[str]:
         if len(out) >= limit:
             break
     return out
+
+
+# ---------------------------- Research waterfall ----------------------------
+
+def research_lead(lead: dict) -> tuple[str, str]:
+    """Produce (context_text, source_label) for one lead via tiered waterfall.
+
+    Tier 1: business-domain email -> scrape that domain.
+    Tier 2: DuckDuckGo search for business name + city + state, scrape first
+            non-aggregator hit.
+    Tier 3: generic template using just the CSV fields.
+    """
+    business = lead.get("Business Name", "").strip()
+    city = lead.get("City", "").strip()
+    state = lead.get("State", "").strip()
+    email = lead.get("Email", "").strip()
+
+    # Tier 1 — email domain
+    domain = email_domain(email)
+    if domain:
+        text = fetch_business_site(domain)
+        if len(text) >= MIN_CONTEXT_LEN:
+            return text, f"email-domain:{domain}"
+
+    # Tier 2 — DuckDuckGo search
+    if business:
+        query = f'"{business}" {city} {state}'.strip()
+        for url in duckduckgo_search(query):
+            if is_aggregator(url):
+                continue
+            host = urlparse(url).netloc.lower().removeprefix("www.")
+            if not host:
+                continue
+            text = fetch_business_site(host)
+            if len(text) >= MIN_CONTEXT_LEN:
+                return text, f"duckduckgo:{host}"
+
+    # Tier 3 — generic
+    generic = (
+        f"Business: {business or 'Unknown'}. "
+        f"Location: {city}, {state}. "
+        f"Monthly revenue: ${lead.get('Monthly Revenue', 'unknown')}. "
+        f"Owner: {lead.get('Owner Full Name', 'Unknown')}."
+    )
+    return generic, "fallback:generic"
