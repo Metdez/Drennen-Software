@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-CSV_PATH = ROOT / "ZackBiz Owner Leads 4-4-26 - Sheet1.csv"
+CSV_PATH = Path(os.environ.get("LEADS_CSV", ROOT / "ZackBiz Owner Leads 4-4-26 - Sheet1.csv"))
 BACKUP_PATH = CSV_PATH.with_suffix(CSV_PATH.suffix + ".bak")
 LOG_PATH = ROOT / ".tmp" / "personalize_run.log"
 
