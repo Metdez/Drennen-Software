@@ -97,3 +97,23 @@ class TestFetchBusinessSite:
         respx.get("https://nothing.test/about").mock(return_value=httpx.Response(404))
         respx.get("https://nothing.test/about-us").mock(return_value=httpx.Response(404))
         assert p.fetch_business_site("nothing.test") == ""
+
+
+class TestDuckDuckGoSearch:
+    @respx.mock
+    def test_parses_and_unwraps_results(self):
+        p._scrape_client = None
+        html = """
+        <html><body>
+          <a class="result__a" href="/l/?uddg=https%3A%2F%2Fparadigmparachute.com%2F">Paradigm</a>
+          <a class="result__a" href="/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fin%2Ffoo">LinkedIn</a>
+          <a class="other">ignored</a>
+        </body></html>
+        """
+        respx.get(url__startswith="https://html.duckduckgo.com/html/").mock(
+            return_value=httpx.Response(
+                200, headers={"content-type": "text/html"}, text=html
+            )
+        )
+        urls = p.duckduckgo_search('"Paradigm" Pensacola FL')
+        assert urls == ["https://paradigmparachute.com/", "https://www.linkedin.com/in/foo"]

@@ -170,3 +170,24 @@ def fetch_business_site(domain: str) -> str:
         chunks.append(f"[{url}]\n{snippet}")
         total += len(snippet)
     return "\n\n".join(chunks)[:MAX_CONTEXT_CHARS]
+
+
+def duckduckgo_search(query: str, limit: int = 5) -> list[str]:
+    """Return up to `limit` result URLs from DuckDuckGo HTML endpoint (no API key).
+
+    Handles DDG's `/l/?uddg=` redirect wrapping. Returns [] on any error.
+    """
+    url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+    html = fetch_html(url)
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    out: list[str] = []
+    for a in soup.select("a.result__a"):
+        href = a.get("href", "")
+        resolved = unwrap_ddg_url(href)
+        if resolved:
+            out.append(resolved)
+        if len(out) >= limit:
+            break
+    return out
