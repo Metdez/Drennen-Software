@@ -410,3 +410,120 @@ class WriterThread(threading.Thread):
                 self._flush()
             elif time.monotonic() - self._last_flush >= self.flush_every_seconds:
                 self._flush()
+
+
+# ---------------------------- Logging ----------------------------
+
+def setup_logging() -> logging.Logger:
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger("personalize")
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    fh = logging.FileHandler(LOG_PATH, encoding="utf-8")
+    fh.setFormatter(fmt)
+    logger.addHandler(fh)
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setFormatter(fmt)
+    logger.addHandler(sh)
+    return logger
+
+
+# ---------------------------- Worker ----------------------------
+
+def process_lead(
+    idx: int,
+    lead: dict,
+    client: Anthropic,
+    logger: logging.Logger,
+) -> tuple[int, str, str]:
+    """Research + synthesize one lead. Returns (idx, personalization, status).
+
+    Never raises — any exception is caught, logged, and returned as STATUS_FAILED
+    with an empty personalization so the row is retried on the next run.
+    """
+    try:
+        context, source = research_lead(lead)
+        line = synthesize_line(client, lead, context)
+        if not line:
+            logger.warning("row %d (%s): empty line from Haiku", idx, lead.get("Email"))
+            return idx, "", STATUS_FAILED
+        logger.info("row %d (%s) [%s]: %s", idx, lead.get("Email"), source, line)
+        return idx, line, STATUS_DONE
+    except Exception as exc:
+        logger.exception("row %d (%s) failed: %s", idx, lead.get("Email"), exc)
+        return idx, "", STATUS_FAILED
+
+
+# ---------------------------- Main ----------------------------
+
+def main() -> int:
+    logger = setup_logging()
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key or api_key.startswith("your_"):
+        logger.error("ANTHROPIC_API_KEY not set in .env")
+        return 1
+
+    if not CSV_PATH.exists():
+        logger.error("CSV not found: %s", CSV_PATH)
+        return 1
+
+    backup_once(CSV_PATH, BACKUP_PATH)
+    logger.info("backup: %s", BACKUP_PATH)
+
+    rows, fieldnames = load_leads(CSV_PATH)
+    fieldnames = ensure_columns(rows, fieldnames)
+    logger.info("loaded %d rows", len(rows))
+
+    # Write once up front so the new columns land on disk even if we crash
+    # before the writer thread flushes.
+    write_csv_atomic(CSV_PATH, rows, fieldnames)
+
+    pending_indices = [i for i, r in enumerate(rows) if r.get(STATUS_COL) != STATUS_DONE]
+    logger.info("pending leads to process: %d / %d", len(pending_indices), len(rows))
+    if not pending_indices:
+        logger.info("nothing to do — all leads already done")
+        return 0
+
+    q: "queue.Queue[tuple[int, str, str] | object]" = queue.Queue()
+    writer = WriterThread(rows, fieldnames, CSV_PATH, q)
+    writer.start()
+
+    client = Anthropic(api_key=api_key)
+    t0 = time.perf_counter()
+    processed = 0
+    try:
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            futures = [
+                pool.submit(process_lead, i, rows[i], client, logger)
+                for i in pending_indices
+            ]
+            for fut in as_completed(futures):
+                idx, line, status = fut.result()
+                q.put((idx, line, status))
+                processed += 1
+                if processed % 50 == 0:
+                    elapsed = time.perf_counter() - t0
+                    rate = processed / elapsed if elapsed else 0
+                    remaining = len(pending_indices) - processed
+                    eta = remaining / rate if rate else float("inf")
+                    logger.info(
+                        "progress: %d/%d (%.1f/s, ETA %.0fs)",
+                        processed, len(pending_indices), rate, eta,
+                    )
+    except KeyboardInterrupt:
+        logger.warning("KeyboardInterrupt — shutting down writer and saving progress")
+    finally:
+        q.put(WriterThread.SENTINEL)
+        writer.join(timeout=30)
+        total = time.perf_counter() - t0
+        logger.info(
+            "done: processed=%d written=%d elapsed=%.1fs",
+            processed, writer.total_written, total,
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
