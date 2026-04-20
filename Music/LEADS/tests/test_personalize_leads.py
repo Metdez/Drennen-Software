@@ -159,3 +159,52 @@ class TestBackupOnce:
         src.write_text("MUTATED")
         p.backup_once(src, bak)
         assert bak.read_text() == "original"  # still original, not overwritten
+
+
+class TestWriteCsvAtomic:
+    def test_roundtrip_preserves_rows_and_headers(self, tmp_path):
+        target = tmp_path / "out.csv"
+        rows = [
+            {"a": "1", "b": "hello", "c": "x"},
+            {"a": "2", "b": "world", "c": "y"},
+        ]
+        fieldnames = ["a", "b", "c"]
+        p.write_csv_atomic(target, rows, fieldnames)
+        assert target.exists()
+        rows_back, fn_back = p.load_leads(target)
+        assert fn_back == fieldnames
+        assert rows_back == rows
+
+    def test_temp_file_cleaned_up(self, tmp_path):
+        target = tmp_path / "out.csv"
+        p.write_csv_atomic(target, [{"a": "1"}], ["a"])
+        tmp = target.with_suffix(target.suffix + ".tmp")
+        assert not tmp.exists()
+
+
+import queue as _queue
+
+
+class TestWriterThread:
+    def test_applies_updates_and_flushes_on_sentinel(self, tmp_path):
+        csv_path = tmp_path / "leads.csv"
+        rows = [
+            {"Email": "a@b.com", "Personalization": "", "Status": "pending"},
+            {"Email": "c@d.com", "Personalization": "", "Status": "pending"},
+        ]
+        fieldnames = ["Email", "Personalization", "Status"]
+        p.write_csv_atomic(csv_path, rows, fieldnames)
+        q = _queue.Queue()
+        thread = p.WriterThread(rows, fieldnames, csv_path, q, flush_every_n=10)
+        thread.start()
+        q.put((0, "Really cool line one.", "done"))
+        q.put((1, "Love that line two.", "done"))
+        q.put(p.WriterThread.SENTINEL)
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+
+        rows_back, _ = p.load_leads(csv_path)
+        assert rows_back[0]["Personalization"] == "Really cool line one."
+        assert rows_back[0]["Status"] == "done"
+        assert rows_back[1]["Personalization"] == "Love that line two."
+        assert rows_back[1]["Status"] == "done"

@@ -335,3 +335,71 @@ def backup_once(csv_path: Path, backup_path: Path) -> None:
     """Copy csv_path to backup_path ONLY if backup doesn't already exist."""
     if not backup_path.exists():
         shutil.copy2(csv_path, backup_path)
+
+
+def write_csv_atomic(csv_path: Path, rows: list[dict], fieldnames: list[str]) -> None:
+    """Write CSV to a temp file next to target, then os.replace. Crash-safe."""
+    tmp = csv_path.with_suffix(csv_path.suffix + ".tmp")
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    os.replace(tmp, csv_path)
+
+
+class WriterThread(threading.Thread):
+    """Drains (row_index, personalization, status) updates from a queue, applies
+    them to the shared `rows` list, and flushes the CSV when enough updates have
+    accumulated or enough time has elapsed. Exits when a None sentinel is received.
+    """
+
+    SENTINEL = None
+
+    def __init__(
+        self,
+        rows: list[dict],
+        fieldnames: list[str],
+        csv_path: Path,
+        q: "queue.Queue[tuple[int, str, str] | None]",
+        flush_every_n: int = FLUSH_EVERY_N,
+        flush_every_seconds: float = FLUSH_EVERY_SECONDS,
+    ) -> None:
+        super().__init__(daemon=True, name="csv-writer")
+        self.rows = rows
+        self.fieldnames = fieldnames
+        self.csv_path = csv_path
+        self.q = q
+        self.flush_every_n = flush_every_n
+        self.flush_every_seconds = flush_every_seconds
+        self._dirty = 0
+        self._last_flush = time.monotonic()
+        self.total_written = 0
+
+    def _flush(self) -> None:
+        if self._dirty == 0:
+            return
+        write_csv_atomic(self.csv_path, self.rows, self.fieldnames)
+        self.total_written += self._dirty
+        self._dirty = 0
+        self._last_flush = time.monotonic()
+
+    def run(self) -> None:
+        while True:
+            try:
+                item = self.q.get(timeout=self.flush_every_seconds)
+            except queue.Empty:
+                self._flush()
+                continue
+
+            if item is self.SENTINEL:
+                self._flush()
+                return
+
+            idx, personalization, status = item
+            self.rows[idx][PERSONALIZATION_COL] = personalization
+            self.rows[idx][STATUS_COL] = status
+            self._dirty += 1
+            if self._dirty >= self.flush_every_n:
+                self._flush()
+            elif time.monotonic() - self._last_flush >= self.flush_every_seconds:
+                self._flush()
