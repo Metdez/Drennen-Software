@@ -353,7 +353,7 @@ class WriterThread(threading.Thread):
     accumulated or enough time has elapsed. Exits when a None sentinel is received.
     """
 
-    SENTINEL = None
+    SENTINEL: object = object()
 
     def __init__(
         self,
@@ -378,7 +378,14 @@ class WriterThread(threading.Thread):
     def _flush(self) -> None:
         if self._dirty == 0:
             return
-        write_csv_atomic(self.csv_path, self.rows, self.fieldnames)
+        try:
+            write_csv_atomic(self.csv_path, self.rows, self.fieldnames)
+        except Exception:
+            # Keep the writer alive so queue keeps draining; main will still join
+            # cleanly. Rows already in memory; next successful flush persists them.
+            logging.getLogger("personalize").exception("CSV flush failed; continuing")
+            self._last_flush = time.monotonic()
+            return
         self.total_written += self._dirty
         self._dirty = 0
         self._last_flush = time.monotonic()

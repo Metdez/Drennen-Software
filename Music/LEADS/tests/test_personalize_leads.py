@@ -208,3 +208,43 @@ class TestWriterThread:
         assert rows_back[0]["Status"] == "done"
         assert rows_back[1]["Personalization"] == "Love that line two."
         assert rows_back[1]["Status"] == "done"
+
+
+class TestWriterThreadResilience:
+    def test_flush_exception_does_not_kill_thread(self, tmp_path, monkeypatch):
+        csv_path = tmp_path / "leads.csv"
+        rows = [{"Email": "a@b.com", "Personalization": "", "Status": "pending"}]
+        fieldnames = ["Email", "Personalization", "Status"]
+        p.write_csv_atomic(csv_path, rows, fieldnames)
+
+        calls = {"n": 0}
+        real_write = p.write_csv_atomic
+
+        def flaky_write(csv_path, rows, fieldnames):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise OSError("simulated disk failure")
+            return real_write(csv_path, rows, fieldnames)
+
+        monkeypatch.setattr(p, "write_csv_atomic", flaky_write)
+
+        q = _queue.Queue()
+        thread = p.WriterThread(rows, fieldnames, csv_path, q, flush_every_n=1)
+        thread.start()
+        q.put((0, "Survived the failure.", "done"))
+        # Give the thread time to hit the exception and keep running.
+        import time as _t
+        _t.sleep(0.2)
+        assert thread.is_alive(), "writer thread must survive a flush exception"
+
+        # Second update triggers a flush_every_n=1 and retries the write.
+        q.put((0, "Second attempt.", "done"))
+        q.put(p.WriterThread.SENTINEL)
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+
+        rows_back, _ = p.load_leads(csv_path)
+        # The final row reflects the second update, not the first (second put
+        # overwrote the cell in-memory before the successful flush).
+        assert rows_back[0]["Personalization"] == "Second attempt."
+        assert rows_back[0]["Status"] == "done"
