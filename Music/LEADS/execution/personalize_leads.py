@@ -291,3 +291,47 @@ def synthesize_line(client: Anthropic, lead: dict, context: str) -> str:
         if line.endswith(ch):
             line = line[:-1]
     return line.strip()
+
+
+# ---------------------------- CSV manager ----------------------------
+
+def ensure_columns(rows: list[dict], fieldnames: list[str]) -> list[str]:
+    """Mutate `rows` and `fieldnames` in place to add Personalization + Status
+    columns if missing. Existing values preserved. Missing values default to ''
+    for Personalization and STATUS_PENDING for Status.
+
+    Returns the updated fieldnames list.
+    """
+    updated = list(fieldnames)
+    if PERSONALIZATION_COL not in updated:
+        updated.append(PERSONALIZATION_COL)
+        for row in rows:
+            row.setdefault(PERSONALIZATION_COL, "")
+    else:
+        for row in rows:
+            row.setdefault(PERSONALIZATION_COL, "")
+
+    if STATUS_COL not in updated:
+        updated.append(STATUS_COL)
+        for row in rows:
+            row.setdefault(STATUS_COL, STATUS_PENDING)
+    else:
+        for row in rows:
+            if not row.get(STATUS_COL):
+                row[STATUS_COL] = STATUS_PENDING
+    return updated
+
+
+def load_leads(csv_path: Path) -> tuple[list[dict], list[str]]:
+    """Read the CSV and return (rows, fieldnames). UTF-8 with sig stripping."""
+    with open(csv_path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+        fieldnames = list(reader.fieldnames or [])
+    return rows, fieldnames
+
+
+def backup_once(csv_path: Path, backup_path: Path) -> None:
+    """Copy csv_path to backup_path ONLY if backup doesn't already exist."""
+    if not backup_path.exists():
+        shutil.copy2(csv_path, backup_path)

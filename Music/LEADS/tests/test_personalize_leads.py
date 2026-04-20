@@ -117,3 +117,45 @@ class TestDuckDuckGoSearch:
         )
         urls = p.duckduckgo_search('"Paradigm" Pensacola FL')
         assert urls == ["https://paradigmparachute.com/", "https://www.linkedin.com/in/foo"]
+
+
+class TestEnsureColumns:
+    def test_adds_both_columns_when_absent(self):
+        rows = [{"Email": "a@b.com"}, {"Email": "c@d.com"}]
+        fieldnames = ["Email"]
+        updated = p.ensure_columns(rows, fieldnames)
+        assert updated == ["Email", "Personalization", "Status"]
+        assert all(r["Personalization"] == "" for r in rows)
+        assert all(r["Status"] == "pending" for r in rows)
+
+    def test_preserves_existing_done_status(self):
+        rows = [
+            {"Email": "a@b.com", "Personalization": "already written", "Status": "done"},
+            {"Email": "c@d.com"},
+        ]
+        fieldnames = ["Email", "Personalization", "Status"]
+        p.ensure_columns(rows, fieldnames)
+        assert rows[0]["Status"] == "done"
+        assert rows[0]["Personalization"] == "already written"
+        assert rows[1]["Status"] == "pending"
+        assert rows[1]["Personalization"] == ""
+
+    def test_adds_only_missing_column(self):
+        rows = [{"Email": "a@b.com", "Status": "done"}]
+        fieldnames = ["Email", "Status"]
+        updated = p.ensure_columns(rows, fieldnames)
+        assert updated == ["Email", "Status", "Personalization"]
+        assert rows[0]["Personalization"] == ""
+        assert rows[0]["Status"] == "done"
+
+
+class TestBackupOnce:
+    def test_creates_backup_once_then_noop(self, tmp_path):
+        src = tmp_path / "src.csv"
+        src.write_text("original")
+        bak = tmp_path / "src.csv.bak"
+        p.backup_once(src, bak)
+        assert bak.read_text() == "original"
+        src.write_text("MUTATED")
+        p.backup_once(src, bak)
+        assert bak.read_text() == "original"  # still original, not overwritten
