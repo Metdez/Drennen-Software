@@ -232,7 +232,6 @@ def research_lead(lead: dict) -> tuple[str, str]:
     generic = (
         f"Business: {business or 'Unknown'}. "
         f"Location: {city}, {state}. "
-        f"Monthly revenue: ${lead.get('Monthly Revenue', 'unknown')}. "
         f"Owner: {lead.get('Owner Full Name', 'Unknown')}."
     )
     return generic, "fallback:generic"
@@ -250,6 +249,11 @@ Rules:
 - End with an implicit contrast when natural ("rare these days", "most don't", "still thriving").
 - If the context is thin, write something honest about the business's industry + location rather than fabricating.
 
+CRITICAL — never reference private/internal data:
+- NEVER mention dollar figures, revenue, profit, funding, or any financial metric. No "$2M", no "growing to X", no revenue references of any kind.
+- NEVER mention personal details like birth date, age, or the owner's family.
+- Only reference facts that would be obvious from a 30-second look at the company's public website.
+
 Examples of the target style:
 - "Really cool how you've built one of the few independent medical billing practices still thriving in rural Mississippi."
 - "Love that Progressive Medical has stayed owner-led in a space that's been getting rolled up by PE for a decade."
@@ -266,8 +270,7 @@ def synthesize_line(client: Anthropic, lead: dict, context: str) -> str:
     user_msg = (
         f"Business: {lead.get('Business Name', '')}\n"
         f"Owner: {lead.get('Owner Full Name', '')}\n"
-        f"Location: {lead.get('City', '')}, {lead.get('State', '')}\n"
-        f"Monthly revenue: ${lead.get('Monthly Revenue', '')}\n\n"
+        f"Location: {lead.get('City', '')}, {lead.get('State', '')}\n\n"
         f"Research context:\n{context}\n\n"
         f"Write the one-sentence personalization line now."
     )
