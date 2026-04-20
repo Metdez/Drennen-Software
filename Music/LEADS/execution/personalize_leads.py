@@ -236,3 +236,58 @@ def research_lead(lead: dict) -> tuple[str, str]:
         f"Owner: {lead.get('Owner Full Name', 'Unknown')}."
     )
     return generic, "fallback:generic"
+
+
+# ---------------------------- Haiku synthesis ----------------------------
+
+STYLE_SYSTEM_PROMPT = """You write single-sentence personalization lines for cold emails to business owners.
+
+Rules:
+- Exactly ONE sentence, under 25 words.
+- Start with "Really cool", "Love that", or "Impressive that".
+- Reference ONE specific, non-obvious fact about the business (tenure, ownership model, geography, niche, product, process). Avoid generic observations.
+- Warm, observational tone. NEVER sales language, NEVER questions, NEVER a pitch.
+- End with an implicit contrast when natural ("rare these days", "most don't", "still thriving").
+- If the context is thin, write something honest about the business's industry + location rather than fabricating.
+
+Examples of the target style:
+- "Really cool how you've built one of the few independent medical billing practices still thriving in rural Mississippi."
+- "Love that Progressive Medical has stayed owner-led in a space that's been getting rolled up by PE for a decade."
+- "Impressive that Paradigm actually manufactures personnel parachutes in-house in Pensacola — not many defense suppliers still do."
+
+Return ONLY the sentence. No preamble, no quotes, no explanation.
+"""
+
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
+
+
+def synthesize_line(client: Anthropic, lead: dict, context: str) -> str:
+    """Call Haiku 4.5 once and return the cleaned one-sentence line."""
+    user_msg = (
+        f"Business: {lead.get('Business Name', '')}\n"
+        f"Owner: {lead.get('Owner Full Name', '')}\n"
+        f"Location: {lead.get('City', '')}, {lead.get('State', '')}\n"
+        f"Monthly revenue: ${lead.get('Monthly Revenue', '')}\n\n"
+        f"Research context:\n{context}\n\n"
+        f"Write the one-sentence personalization line now."
+    )
+    resp = client.messages.create(
+        model=HAIKU_MODEL,
+        max_tokens=80,
+        system=[
+            {
+                "type": "text",
+                "text": STYLE_SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+        messages=[{"role": "user", "content": user_msg}],
+    )
+    line = resp.content[0].text.strip()
+    # Strip surrounding smart or straight quotes in case Haiku wraps its output.
+    for ch in ('"', "'", "\u201c", "\u201d", "\u2018", "\u2019"):
+        if line.startswith(ch):
+            line = line[1:]
+        if line.endswith(ch):
+            line = line[:-1]
+    return line.strip()
