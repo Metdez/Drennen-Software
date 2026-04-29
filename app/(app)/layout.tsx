@@ -14,6 +14,7 @@ import { SemesterProvider } from '@/components/semester/SemesterContext'
 import { SubscriptionProvider } from '@/components/subscription/SubscriptionContext'
 import { NavHeader } from '@/components/layout/NavHeader'
 import { SubscriptionBanner } from '@/components/subscription/SubscriptionBanner'
+import { Toaster } from 'sonner'
 
 /**
  * What it does: Forces dynamic rendering for the entire page/layout.
@@ -43,6 +44,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </SemesterProvider>
       </SubscriptionProvider>
+      <Toaster
+        position="bottom-right"
+        theme="dark"
+        toastOptions={{
+          style: {
+            background: 'var(--surface-elevated)',
+            border: '1px solid var(--border-accent)',
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-dm-sans)',
+          },
+        }}
+      />
     </div>
   )
 }
