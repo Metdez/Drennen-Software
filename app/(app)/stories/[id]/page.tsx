@@ -22,6 +22,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ROUTES, BRAND } from '@/lib/constants'
+import { toast } from 'sonner'
 import type { SemesterStory, StorySection } from '@/types'
 
 /**
@@ -62,6 +63,7 @@ export default function StoryPage() {
   useEffect(() => {
     if (!params.id) {
       setError('No story ID provided')
+      toast.error('No story ID provided')
       setLoading(false)
       return
     }
@@ -85,7 +87,9 @@ export default function StoryPage() {
         }
         setStory(data.story)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load story')
+        const msg = err instanceof Error ? err.message : 'Failed to load story'
+        setError(msg)
+        toast.error(msg)
       } finally {
         setLoading(false)
       }

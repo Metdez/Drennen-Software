@@ -24,6 +24,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ROUTES } from '@/lib/constants'
+import { toast } from 'sonner'
 import { formatBriefAsText } from '@/lib/export/briefText'
 import type { SpeakerBrief, SpeakerBriefContent } from '@/types'
 
@@ -110,6 +111,7 @@ function BriefContent() {
   useEffect(() => {
     if (!sessionId) {
       setError('No session ID provided')
+      toast.error('No session ID provided')
       setLoading(false)
       return
     }
@@ -120,12 +122,15 @@ function BriefContent() {
         const data = await res.json()
         if (!data.brief) {
           setError('No speaker brief found for this session.')
+          toast.error('No speaker brief found for this session.')
           return
         }
         setBrief(data.brief)
         setEditedContent(data.brief.editedContent ?? data.brief.content)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load brief')
+        const msg = err instanceof Error ? err.message : 'Failed to load brief'
+        setError(msg)
+        toast.error(msg)
       } finally {
         setLoading(false)
       }

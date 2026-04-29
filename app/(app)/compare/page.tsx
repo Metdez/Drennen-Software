@@ -23,6 +23,7 @@ import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { ROUTES } from '@/lib/constants'
+import { toast } from 'sonner'
 import { ComparisonHeader } from '@/components/compare/ComparisonHeader'
 import { ThemeVenn } from '@/components/compare/ThemeVenn'
 import { QualityComparison } from '@/components/compare/QualityComparison'
@@ -115,7 +116,9 @@ function CompareContent() {
         setLoading(false)
       })
       .catch(err => {
-        setError(err instanceof Error ? err.message : 'Failed to load')
+        const msg = err instanceof Error ? err.message : 'Failed to load comparison data.'
+        setError(msg)
+        toast.error(msg)
         setLoading(false)
       })
   }, [idA, idB])
@@ -144,7 +147,9 @@ function CompareContent() {
         }))
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Analysis generation failed.'
       console.error('Analysis generation failed:', err)
+      toast.error(msg)
     } finally {
       setIsGenerating(false)
     }

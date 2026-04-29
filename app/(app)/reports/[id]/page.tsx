@@ -24,6 +24,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ROUTES, BRAND } from '@/lib/constants'
+import { toast } from 'sonner'
 import type { SemesterReport, ReportContent } from '@/types'
 
 import { ExecutiveSummary } from '@/components/report/ExecutiveSummary'
@@ -127,6 +128,7 @@ export default function ReportPage() {
   useEffect(() => {
     if (!params.id) {
       setError('No report ID provided')
+      toast.error('No report ID provided')
       setLoading(false)
       return
     }
@@ -150,7 +152,9 @@ export default function ReportPage() {
         }
         setReport(data.report)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load report')
+        const msg = err instanceof Error ? err.message : 'Failed to load report'
+        setError(msg)
+        toast.error(msg)
       } finally {
         setLoading(false)
       }

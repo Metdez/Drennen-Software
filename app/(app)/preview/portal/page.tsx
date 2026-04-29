@@ -27,6 +27,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ROUTES, BRAND } from '@/lib/constants'
+import { toast } from 'sonner'
 import type { SpeakerPortal, SpeakerPortalContent } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -170,6 +171,7 @@ function PortalContent() {
   useEffect(() => {
     if (!sessionId) {
       setError('No session ID provided')
+      toast.error('No session ID provided')
       setLoading(false)
       return
     }
@@ -180,12 +182,15 @@ function PortalContent() {
         const data = await res.json()
         if (!data.portal) {
           setError('No speaker portal found for this session.')
+          toast.error('No speaker portal found for this session.')
           return
         }
         setPortal(data.portal)
         setEditedContent(data.portal.editedContent ?? data.portal.content)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load portal')
+        const msg = err instanceof Error ? err.message : 'Failed to load portal'
+        setError(msg)
+        toast.error(msg)
       } finally {
         setLoading(false)
       }
