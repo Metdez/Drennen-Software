@@ -70,6 +70,7 @@ function PreviewContent() {
   const [hasStudentDebriefs, setHasStudentDebriefs] = useState(false)
   const [studentDebriefLoading, setStudentDebriefLoading] = useState(false)
   const [studentDebriefFetched, setStudentDebriefFetched] = useState(false)
+  const [studentDebriefError, setStudentDebriefError] = useState<string | null>(null)
   const [promptEditorOpen, setPromptEditorOpen] = useState(false)
   const [promptVersion, setPromptVersion] = useState<{ id: string; version: number; label: string | null } | null>(null)
 
@@ -155,16 +156,25 @@ function PreviewContent() {
   const fetchStudentDebriefs = useCallback(async () => {
     if (!sessionId) return
     setStudentDebriefLoading(true)
+    setStudentDebriefError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_STUDENT_DEBRIEFS(sessionId))
-      if (!res.ok) return
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        const msg = (body.error as string) || 'Failed to load reflections.'
+        setStudentDebriefError(msg)
+        toast.error(msg)
+        return
+      }
       const data = await res.json()
       setHasStudentDebriefs(data.hasDebriefs ?? false)
       setStudentDebriefAnalysis(data.analysis ?? null)
       setStudentDebriefFileCount(data.fileCount ?? 0)
       setStudentDebriefFetched(true)
-    } catch {
-      // non-fatal
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error loading reflections.'
+      setStudentDebriefError(msg)
+      toast.error(msg)
     } finally {
       setStudentDebriefLoading(false)
     }
@@ -513,13 +523,31 @@ function PreviewContent() {
               Loading reflections...
             </div>
           )}
-          {!studentDebriefLoading && hasStudentDebriefs && studentDebriefAnalysis && (
+          {!studentDebriefLoading && studentDebriefError && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.539-1.333-3.308 0L3.78 16.895c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)] text-center max-w-sm">
+                {studentDebriefError}
+              </p>
+              <button
+                onClick={() => { setStudentDebriefError(null); setStudentDebriefFetched(false); fetchStudentDebriefs() }}
+                className="text-sm text-[#f36f21] hover:underline font-[family-name:var(--font-dm-sans)]"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {!studentDebriefLoading && !studentDebriefError && hasStudentDebriefs && studentDebriefAnalysis && (
             <StudentReflectionsPanel
               analysis={studentDebriefAnalysis}
               fileCount={studentDebriefFileCount}
             />
           )}
-          {!studentDebriefLoading && !hasStudentDebriefs && (
+          {!studentDebriefLoading && !studentDebriefError && !hasStudentDebriefs && (
             <StudentDebriefUploadZone
               sessionId={sessionId}
               onUploadComplete={() => {
@@ -528,7 +556,7 @@ function PreviewContent() {
               }}
             />
           )}
-          {!studentDebriefLoading && hasStudentDebriefs && !studentDebriefAnalysis && (
+          {!studentDebriefLoading && !studentDebriefError && hasStudentDebriefs && !studentDebriefAnalysis && (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <div className="w-4 h-4 border-2 border-[#542785] border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
