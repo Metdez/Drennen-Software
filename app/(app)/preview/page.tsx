@@ -65,6 +65,7 @@ function PreviewContent() {
   const [hasSpeakerAnalyses, setHasSpeakerAnalyses] = useState(false)
   const [speakerAnalysisLoading, setSpeakerAnalysisLoading] = useState(false)
   const [speakerAnalysisFetched, setSpeakerAnalysisFetched] = useState(false)
+  const [speakerAnalysisError, setSpeakerAnalysisError] = useState<string | null>(null)
   const [studentDebriefAnalysis, setStudentDebriefAnalysis] = useState<StudentDebriefAnalysis | null>(null)
   const [studentDebriefFileCount, setStudentDebriefFileCount] = useState(0)
   const [hasStudentDebriefs, setHasStudentDebriefs] = useState(false)
@@ -190,16 +191,25 @@ function PreviewContent() {
   const fetchSpeakerAnalyses = useCallback(async () => {
     if (!sessionId) return
     setSpeakerAnalysisLoading(true)
+    setSpeakerAnalysisError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_SPEAKER_ANALYSES(sessionId))
-      if (!res.ok) return
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        const msg = (body.error as string) || 'Failed to load speaker analyses.'
+        setSpeakerAnalysisError(msg)
+        toast.error(msg)
+        return
+      }
       const data = await res.json()
       setHasSpeakerAnalyses(data.hasAnalyses ?? false)
       setSpeakerAnalysis(data.analysis ?? null)
       setSpeakerAnalysisFileCount(data.fileCount ?? 0)
       setSpeakerAnalysisFetched(true)
-    } catch {
-      // non-fatal
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error loading speaker analyses.'
+      setSpeakerAnalysisError(msg)
+      toast.error(msg)
     } finally {
       setSpeakerAnalysisLoading(false)
     }
@@ -580,13 +590,31 @@ function PreviewContent() {
               Loading speaker analyses...
             </div>
           )}
-          {!speakerAnalysisLoading && hasSpeakerAnalyses && speakerAnalysis && (
+          {!speakerAnalysisLoading && speakerAnalysisError && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.539-1.333-3.308 0L3.78 16.895c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)] text-center max-w-sm">
+                {speakerAnalysisError}
+              </p>
+              <button
+                onClick={() => { setSpeakerAnalysisError(null); setSpeakerAnalysisFetched(false); fetchSpeakerAnalyses() }}
+                className="text-sm text-[#f36f21] hover:underline font-[family-name:var(--font-dm-sans)]"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {!speakerAnalysisLoading && !speakerAnalysisError && hasSpeakerAnalyses && speakerAnalysis && (
             <SpeakerAnalysisPanel
               analysis={speakerAnalysis}
               fileCount={speakerAnalysisFileCount}
             />
           )}
-          {!speakerAnalysisLoading && !hasSpeakerAnalyses && (
+          {!speakerAnalysisLoading && !speakerAnalysisError && !hasSpeakerAnalyses && (
             <SpeakerAnalysisUploadZone
               sessionId={sessionId}
               onUploadComplete={() => {
@@ -595,7 +623,7 @@ function PreviewContent() {
               }}
             />
           )}
-          {!speakerAnalysisLoading && hasSpeakerAnalyses && !speakerAnalysis && (
+          {!speakerAnalysisLoading && !speakerAnalysisError && hasSpeakerAnalyses && !speakerAnalysis && (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <div className="w-4 h-4 border-2 border-[#0f6b37] border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
