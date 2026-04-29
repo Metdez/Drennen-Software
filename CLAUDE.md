@@ -369,7 +369,7 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 - **Never add UPDATE or DELETE queries for the `sessions` table.** Sessions are immutable by design.
 - **Never use `createAdminClient()` for user-scoped reads.** Use `createClient()` (cookie-based, RLS-enforced) unless you specifically need to bypass RLS for background jobs or cross-user queries.
 - **Never skip the type barrel.** All new types in `types/` must be re-exported from `types/index.ts`.
-- **Never use `alert()` for errors.** All error feedback must be inline (component `error` state rendered in the UI). API routes that call Gemini must use `extractErrorMessage()` from `lib/utils/errors.ts` in catch blocks so raw AI JSON never reaches the client.
+- **Never use `alert()` for errors.** Error feedback uses two layers: (1) inline `error` state rendered in the component UI for persistent display and retry; (2) `toast.error()` from `sonner` for transient popup notifications on async API failures. Use both together — never `alert()`. API routes that call Gemini must use `extractErrorMessage()` from `lib/utils/errors.ts` in catch blocks so raw AI JSON never reaches the client.
 
 ### Decision log
 
