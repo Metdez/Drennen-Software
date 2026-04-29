@@ -28,6 +28,7 @@ import { ProcessingView } from '@/components/session/ProcessingView'
 import { SystemPromptEditor } from '@/components/session/SystemPromptEditor'
 import { PaywallModal } from '@/components/subscription/PaywallModal'
 import { ROUTES, BRAND } from '@/lib/constants'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTempZip } from '@/lib/supabase/storage'
 import { useSemesterContext } from '@/components/semester/SemesterContext'
@@ -101,6 +102,7 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setError('Session expired — please sign in again.')
+        toast.error('Session expired — please sign in again.')
         return
       }
       const storagePath = await uploadTempZip(user.id, file)
@@ -114,6 +116,7 @@ export default function DashboardPage() {
         data = await res.json()
       } catch {
         setError('Upload failed — the file may be too large or the server timed out.')
+        toast.error('Upload failed — the file may be too large or the server timed out.')
         return
       }
 
@@ -125,7 +128,9 @@ export default function DashboardPage() {
           return
         }
         // ProcessingView watches `error` and handles its own fade-out before calling onExited
-        setError((data.error as string) || 'Failed to process files')
+        const errMsg = (data.error as string) || 'Failed to process files'
+        setError(errMsg)
+        toast.error(errMsg)
         return
       }
 
@@ -136,6 +141,7 @@ export default function DashboardPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred'
       setError(message)
+      toast.error(message)
     }
   }
 
