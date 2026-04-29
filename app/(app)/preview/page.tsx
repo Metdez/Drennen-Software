@@ -36,6 +36,7 @@ import { SpeakerAnalysisPanel } from '@/components/speaker/SpeakerAnalysisPanel'
 import { StudentDebriefUploadZone } from '@/components/speaker/StudentDebriefUploadZone'
 import { StudentReflectionsPanel } from '@/components/student/StudentReflectionsPanel'
 import { ROUTES } from '@/lib/constants'
+import { toast } from 'sonner'
 import type { Session, SessionAnalysis, SessionDebrief, StudentSpeakerAnalysis, StudentDebriefAnalysis } from '@/types'
 
 type Tab = 'questions' | 'analysis' | 'insights' | 'debrief' | 'speaker-analysis' | 'reflections'
@@ -57,6 +58,7 @@ function PreviewContent() {
   const [debrief, setDebrief] = useState<SessionDebrief | null>(null)
   const [debriefLoading, setDebriefLoading] = useState(false)
   const [debriefFetched, setDebriefFetched] = useState(false)
+  const [debriefError, setDebriefError] = useState<string | null>(null)
   const [studentNames, setStudentNames] = useState<string[]>([])
   const [speakerAnalysis, setSpeakerAnalysis] = useState<StudentSpeakerAnalysis | null>(null)
   const [speakerAnalysisFileCount, setSpeakerAnalysisFileCount] = useState(0)
@@ -127,15 +129,24 @@ function PreviewContent() {
   const fetchDebrief = useCallback(async () => {
     if (!sessionId || debriefFetched) return
     setDebriefLoading(true)
+    setDebriefError(null)
     try {
       const res = await fetch(ROUTES.API_SESSION_DEBRIEF(sessionId))
-      if (!res.ok) return
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        const msg = (body.error as string) || 'Failed to load debrief.'
+        setDebriefError(msg)
+        toast.error(msg)
+        return
+      }
       const data = await res.json()
       setDebrief(data.debrief)
       setStudentNames(data.studentNames ?? [])
       setDebriefFetched(true)
-    } catch {
-      // non-fatal
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error loading debrief.'
+      setDebriefError(msg)
+      toast.error(msg)
     } finally {
       setDebriefLoading(false)
     }
@@ -465,7 +476,25 @@ function PreviewContent() {
               Loading debrief...
             </div>
           )}
-          {!debriefLoading && output && session && (
+          {!debriefLoading && debriefError && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.539-1.333-3.308 0L3.78 16.895c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)] text-center max-w-sm">
+                {debriefError}
+              </p>
+              <button
+                onClick={() => { setDebriefError(null); fetchDebrief() }}
+                className="text-sm text-[#f36f21] hover:underline font-[family-name:var(--font-dm-sans)]"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {!debriefLoading && !debriefError && output && session && (
             <DebriefPanel
               sessionId={sessionId}
               sessionOutput={output}
