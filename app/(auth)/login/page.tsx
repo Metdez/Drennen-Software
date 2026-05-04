@@ -70,10 +70,59 @@ function LoginContent() {
           <div className="mt-4 h-px w-16 bg-[#f36f21] opacity-60" />
         </div>
 
-        {/* Bottom: tagline */}
-        <div className="text-[var(--text-muted)] text-sm font-[family-name:var(--font-dm-sans)]">
-          Synthesizing student questions into<br />moderator-ready interview sheets.
-        </div>
+        {/* Bottom: sample data callout card */}
+        <a
+          href="/mock-questions.zip"
+          download="mock-questions.zip"
+          className="group block rounded-2xl p-6 transition-all duration-200 hover:scale-[1.01]"
+          style={{
+            background: 'linear-gradient(135deg, rgba(243,111,33,0.15) 0%, rgba(243,111,33,0.05) 100%)',
+            border: '1px solid rgba(243,111,33,0.35)',
+          }}
+        >
+          {/* Top row: icon + label */}
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(243,111,33,0.2)', border: '1px solid rgba(243,111,33,0.35)' }}
+            >
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#f36f21" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="12" x2="12" y2="18" />
+                <polyline points="9 15 12 18 15 15" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-widest font-semibold font-[family-name:var(--font-dm-sans)]" style={{ color: '#f36f21' }}>
+                Try it first
+              </p>
+              <p className="text-base font-bold text-[var(--text-primary)] font-[family-name:var(--font-dm-sans)] leading-tight mt-0.5">
+                Download sample questions
+              </p>
+            </div>
+          </div>
+
+          <p className="text-sm text-[var(--text-secondary)] font-[family-name:var(--font-dm-sans)] leading-relaxed mb-4">
+            Mock student questions we made up — sign in and upload to see the full pipeline in action.
+          </p>
+
+          {/* Download CTA row */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium font-[family-name:var(--font-dm-sans)]" style={{ color: '#f36f21' }}>
+              mock-questions.zip
+            </span>
+            <div
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold font-[family-name:var(--font-dm-sans)] transition-colors duration-150 group-hover:bg-[#f36f21] group-hover:text-white"
+              style={{ background: 'rgba(243,111,33,0.15)', color: '#f36f21', border: '1px solid rgba(243,111,33,0.3)' }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              Download
+            </div>
+          </div>
+        </a>
       </div>
 
       {/* RIGHT PANEL — auth form */}
@@ -112,6 +161,32 @@ function LoginContent() {
 
             <AuthForm mode={mode} onModeChange={setMode} />
           </div>
+
+          {/* Mobile-only sample download */}
+          <a
+            href="/mock-questions.zip"
+            download="mock-questions.zip"
+            className="lg:hidden group mt-4 block rounded-2xl border border-[var(--border-accent)] p-4 hover:border-[rgba(243,111,33,0.5)] transition-all duration-200"
+            style={{ background: 'var(--surface)' }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ background: 'rgba(243,111,33,0.12)', border: '1px solid rgba(243,111,33,0.2)' }}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#f36f21" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="12" x2="12" y2="18" />
+                  <polyline points="9 15 12 18 15 15" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-primary)] font-[family-name:var(--font-dm-sans)]">Download sample data</p>
+                <p className="text-xs text-[#f36f21] font-[family-name:var(--font-dm-sans)]">mock-questions.zip</p>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
     </div>

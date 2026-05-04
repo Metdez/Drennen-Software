@@ -89,8 +89,10 @@ export default function DashboardPage() {
     }
   }, [searchParams, router])
 
-  const handleGenerate = async () => {
-    if (!speakerName || !file) return
+  const handleGenerate = async (overrideSpeaker?: string, overrideFile?: File) => {
+    const activeSpeaker = overrideSpeaker ?? speakerName
+    const activeFile = overrideFile ?? file
+    if (!activeSpeaker || !activeFile) return
 
     setIsLoading(true)
     setDone(false)
@@ -105,11 +107,11 @@ export default function DashboardPage() {
         toast.error('Session expired — please sign in again.')
         return
       }
-      const storagePath = await uploadTempZip(user.id, file)
+      const storagePath = await uploadTempZip(user.id, activeFile)
       const res = await fetch(ROUTES.API_PROCESS, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ speakerName, storagePath }),
+        body: JSON.stringify({ speakerName: activeSpeaker, storagePath }),
       })
       let data: Record<string, unknown> = {}
       try {
@@ -140,6 +142,22 @@ export default function DashboardPage() {
       setDone(true)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred'
+      setError(message)
+      toast.error(message)
+    }
+  }
+
+  const handleUseTestData = async () => {
+    try {
+      const res = await fetch('/mock-questions.zip')
+      const blob = await res.blob()
+      const testFile = new File([blob], 'mock-questions.zip', { type: 'application/zip' })
+      const testSpeaker = 'Demo Speaker'
+      setSpeakerName(testSpeaker)
+      setFile(testFile)
+      await handleGenerate(testSpeaker, testFile)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load test data'
       setError(message)
       toast.error(message)
     }
@@ -249,16 +267,42 @@ export default function DashboardPage() {
           >
             <SpeakerInput value={speakerName} onChangeAction={setSpeakerName} />
             <DropZone onFileChangeAction={setFile} />
+            <div className="pt-1 border-t border-[var(--border)]">
+              <a
+                href="/mock-questions.zip"
+                download="mock-questions.zip"
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors duration-150 font-[family-name:var(--font-dm-sans)]"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Download sample ZIP to see the expected format
+              </a>
+            </div>
           </div>
 
           {/* Generate button */}
           <button
             disabled={!speakerName || !file || isLoading}
-            onClick={handleGenerate}
+            onClick={() => handleGenerate()}
             className="animate-fade-up-delay-2 w-full py-4 rounded-xl bg-brand-orange text-white font-semibold text-base hover:bg-[#d85e18] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 font-[family-name:var(--font-dm-sans)] hover:shadow-[0_4px_20px_rgba(243,111,33,0.3)]"
           >
             Generate Question Sheet
           </button>
+
+          {/* Test data shortcut */}
+          <div className="animate-fade-up-delay-2 text-center">
+            <span className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-dm-sans)]">
+              Just exploring?{' '}
+            </span>
+            <button
+              onClick={handleUseTestData}
+              disabled={isLoading}
+              className="text-xs font-medium underline underline-offset-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150 font-[family-name:var(--font-dm-sans)]"
+            >
+              Use test data
+            </button>
+          </div>
         </>
       )}
     </div>
