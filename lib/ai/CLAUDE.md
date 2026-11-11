@@ -6,14 +6,14 @@ This folder contains every AI-powered agent, helper, and client that powers the 
 
 | Provider | Client file | Scope | Why |
 |----------|-------------|-------|-----|
-| **xAI Grok** (OpenAI-compatible API) | `client.ts` | Session generation — turns a ZIP of student submissions into the 10-section interview sheet | xAI is only used for this deterministic transformation. The call goes through the OpenAI SDK with a `baseURL` override, so it can stay in the same `client.ts` helper without touching Gemini. |
+| **OpenRouter / DeepSeek V4 Flash** (OpenAI-compatible API) | `client.ts` | Session generation — turns a ZIP of student submissions into the 10-section interview sheet | xAI is only used for this deterministic transformation. The call goes through the OpenAI SDK with a `baseURL` override, so it can stay in the same `client.ts` helper without touching Gemini. |
 | **Google Gemini** (`@google/genai`) | `geminiClient.ts` | All analysis, synthesis, report, recommendation, and SQL agents across the app | Gemini powers every other AI capability (analysis, profiles, insights, reports, SQL, speaker-facing materials). It is reused via the shared singleton so we never instantiate `GoogleGenAI` in each agent. |
 
 ### Clients in practice
 
 - **xAI session generator** (`lib/ai/client.ts`): Lazy-create an OpenAI client that points at xAI’s endpoint. Consumed only by `generateQuestionSheet()`; no other file should import OpenAI directly for session generation.
 - **Gemini client singleton** (`lib/ai/geminiClient.ts`): Exports `getGeminiClient()` and `getGeminiModel()`. Every Gemini-powered agent imports from here so that the API key check, instantiation, and model selection all live in one place. This singleton protects Next.js from crashing at build time (env vars are read lazily) and ensures we do not waste time reinitializing the SDK on every request.
-- **Why the singleton matters**: `GoogleGenAI` requires a valid API key, and any module that runs during build (e.g., Next.js) can blow up if the key is missing. `geminiClient.ts` reads the key only when an agent first asks for the client, throws a user-friendly error if both `GEMINI_API_KEY` and `GOOGLE_API_KEY` are absent, and then reuses the same instance for all agents in the server process. This differs from the xAI client, which is also lazy but exists solely for the interview-sheet pipeline and uses the OpenAI SDK with a Grok-targeted `baseURL`. Never instantiate `GoogleGenAI` outside of `geminiClient.ts`.
+- **Why the singleton matters**: The OpenRouter client requires `OPENROUTER_API_KEY`, and any module that runs during build (e.g., Next.js) can blow up if the key is missing. `geminiClient.ts` reads the key only when an agent first asks for the client, throws a user-friendly error if both `GEMINI_API_KEY` and `GOOGLE_API_KEY` are absent, and then reuses the same instance for all agents in the server process. This differs from the xAI client, which is also lazy but exists solely for the interview-sheet pipeline and uses the OpenAI SDK with a Grok-targeted `baseURL`. Never instantiate `GoogleGenAI` outside of `geminiClient.ts`.
 
 ## Agent Catalog
 
@@ -30,7 +30,7 @@ Every agent file in this folder starts with a header comment that explains what 
 
 ### Synchronous / awaited results
 
-- `client.ts` — xAI Grok interview-sheet generator (main `/api/process` pipeline).
+- `client.ts` — OpenRouter (DeepSeek Flash) interview-sheet generator (main `/api/process` pipeline).
 - `analysisAgent.ts` — Session-, theme-, and cross-session analysis endpoints that run when professors open the preview/analytics pages; the calling routes await the JSON.
 - `debriefSummary.ts` — Summarizes the professor’s debrief form right after the "Mark complete" action and returns a short narrative.
 - `sqlAgent.ts` — Natural-language to SQL flow for the analytics page; the route awaits the result to show the answer and executed query.

@@ -50,12 +50,8 @@ supabase db push     # Push migrations to remote
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-XAI_API_KEY=
-XAI_BASE_URL=          # defaults to https://api.x.ai/v1
-XAI_MODEL=             # defaults to grok-4-1-fast-reasoning
-GOOGLE_API_KEY=        # (or GEMINI_API_KEY) — used by the analytics SQL agent
-GEMINI_API_KEY=        # used by lib/ai/analysisAgent.ts for Analysis and Insights panel (theme clusters, tensions, suggestions, blind spots, sentiment)
-GEMINI_MODEL=          # defaults to gemini-3.1-flash-lite-preview
+OPENROUTER_API_KEY=    # required — OpenRouter key; powers ALL AI (session generation + every analysis agent)
+OPENROUTER_MODEL=      # defaults to deepseek/deepseek-v4-flash-0731 (DeepSeek V4 Flash)
 DATABASE_URL=          # Postgres connection string — used by the analytics SQL agent
 STRIPE_SECRET_KEY=     # Stripe secret key for server-side API calls
 STRIPE_WEBHOOK_SECRET= # Stripe webhook signing secret
@@ -72,7 +68,7 @@ This is a **Next.js 14 App Router** app for a university professor tool. Profess
 
 1. Professor uploads `speakerName` + `.zip` to `POST /api/process`
 2. `lib/parse/`: ZIP is extracted → each `.pdf`/`.docx` file parsed to text → assembled into a single structured string (student name derived from filename format `FirstName_LastName...`)
-3. `lib/ai/`: xAI (Grok) is called via the OpenAI SDK interface with `baseURL` overridden. The system prompt in `lib/ai/prompt.ts` has a strict 10-section output format with tier rankings for question quality.
+3. `lib/ai/`: DeepSeek V4 Flash is called through OpenRouter via the OpenAI SDK with `baseURL` overridden. The system prompt in `lib/ai/prompt.ts` has a strict 10-section output format with tier rankings for question quality.
 4. The generated output + metadata is saved to Supabase `sessions` table; individual student submissions are saved to `student_submissions`; parsed themes are saved to `session_themes`
 5. The API returns `sessionId` + `output`; the client stashes `output` in `sessionStorage` keyed by `session_${sessionId}` to avoid a round-trip on the preview page
 6. `/preview` renders the markdown output; professors can download as PDF (`lib/export/pdf.ts` via `@react-pdf/renderer`) or DOCX (`lib/export/docx.ts` via `docx`)
@@ -223,8 +219,8 @@ app/
 - `lib/parse/parseQuestions.ts` — `parseSections()`, `parseQuestionsFromOutput()`: shared question parser used by OutputPreview and DebriefPanel
 
 **AI agents (`lib/ai/`)**
-- `lib/ai/client.ts` — lazy OpenAI SDK client pointed at XAI_BASE_URL (session generation)
-- `lib/ai/geminiClient.ts` — `getGeminiClient()`, `getGeminiModel()`: lazy singleton for all Gemini calls
+- `lib/ai/client.ts` — session generation via the shared OpenRouter client
+- `lib/ai/geminiClient.ts` — `getOpenRouter()`, `getGeminiClient()`, `getGeminiModel()`: lazy OpenRouter singleton; `getGeminiClient().models.generateContent()` keeps the old Gemini-shaped surface so agents are unchanged
 - `lib/ai/prompt.ts` — built-in system prompt template, custom prompt interpolation, validation helpers
 - `lib/ai/analysisAgent.ts` — `runSessionAnalysis()`, `runThemeAnalysis()`: per-session deep analysis
 - `lib/ai/generateSessionAnalysis.ts` — server-side session analysis generation
@@ -322,8 +318,8 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 
 ### Dual AI systems
 
-- **xAI Grok** (via OpenAI SDK + `baseURL` override): session generation — turns student submissions into the 10-section interview sheet
-- **Google Gemini** (via `@google/genai`, singleton from `geminiClient.ts`): powers all other AI features —
+- **OpenRouter → DeepSeek V4 Flash** (OpenAI SDK + `baseURL` override): session generation — turns student submissions into the 10-section interview sheet
+- **Analysis agents** (also OpenRouter/DeepSeek, via the `getGeminiClient()` facade in `geminiClient.ts`; names are historical): powers all other AI features —
   - `analysisAgent.ts`: per-session analysis (theme clusters, tensions, suggestions, blind spots, sentiment); also powers theme deep-dive via `runThemeAnalysis()`
   - `classInsights.ts`: cross-session class analysis, fire-and-forget after each session save and debrief completion
   - `debriefSummary.ts`: post-session debrief summary, generated when professor marks debrief complete
@@ -363,7 +359,7 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 
 ### Anti-patterns (do NOT do these)
 
-- **Never create a new `GoogleGenAI` instance directly.** Import `getGeminiClient()` from `lib/ai/geminiClient.ts`. The lazy singleton pattern avoids build-time crashes and keeps configuration in one place.
+- **Never create a new AI SDK client directly.** Import `getGeminiClient()` from `lib/ai/geminiClient.ts`. The lazy singleton pattern avoids build-time crashes and keeps configuration in one place.
 - **Never hardcode hex color values.** Use `BRAND.ORANGE`, `BRAND.PURPLE`, `BRAND.GREEN` from `lib/constants`.
 - **Never import from `lib/constants/routes.ts` (or other sub-files) directly.** Import from `lib/constants` (the barrel) — e.g., `import { ROUTES } from '@/lib/constants'`.
 - **Never add UPDATE or DELETE queries for the `sessions` table.** Sessions are immutable by design.
@@ -375,7 +371,7 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 
 | Decision | Rationale |
 |----------|-----------|
-| Two AI providers (xAI + Gemini) | xAI Grok excels at long-form synthesis (the 10-section interview sheet). Gemini is faster and cheaper for analysis, profiles, and summaries. Keeping them separate avoids vendor lock-in. |
+| Single AI provider: OpenRouter (DeepSeek V4 Flash) | Replaced xAI Grok + Google Gemini (Nov 2026; Gemini key was invalid, Grok slow at ~39s/session). One key, one model env var (`OPENROUTER_MODEL`), reasoning disabled for speed; session generation dropped to ~4s. `getGeminiClient()` kept as a Gemini-shaped facade so the 17 agents didn't change. |
 | Sessions are immutable | The AI output is a point-in-time artifact. Professors reference and share it. Mutations would break shared links and debrief references. |
 | Fire-and-forget AI jobs | Class insights, student profiles, and tier classification run async after session upload. The user doesn't wait for them; they appear on subsequent page loads. |
 | Stripe webhooks as source of truth | Client-side subscription state is a cache. Webhook events (`customer.subscription.*`, `invoice.*`) drive all real status changes in the `profiles` table. |

@@ -18,7 +18,7 @@
  * Uses: lib/ai/prompt.ts (system prompt construction)
  */
 
-import OpenAI from 'openai'
+import { getOpenRouter, getGeminiModel } from './geminiClient'
 import { buildCustomSystemPrompt, buildSystemPrompt, buildUserMessage } from './prompt'
 
 // Lazy initialization — avoids crash at build time when env vars are absent
@@ -27,7 +27,6 @@ import { buildCustomSystemPrompt, buildSystemPrompt, buildUserMessage } from './
  * Why it is used: It's used for lazy initialization of the AI client, preventing a crash at build time if environment variables for the AI service are not yet present. It also ensures that only a single instance of the client is created and reused across the application.
  * Important implementation details: It's initialized to `null` and only instantiated when `getClient()` is called for the first time, ensuring a lazy-loaded singleton pattern.
  */
-let xai: OpenAI | null = null
 
 /**
  * Returns the shared xAI OpenAI-compatible client, creating it on first call.
@@ -44,15 +43,7 @@ let xai: OpenAI | null = null
  * Why it is used: It provides a centralized and lazy-initialized way to access the AI client. This prevents repeated instantiation, manages resource efficiently, and aligns with a singleton pattern for the AI service connection.
  * Important implementation details: It checks if `xai` is `null`. If so, it creates a new `OpenAI` instance using `process.env.XAI_API_KEY` (required) and `process.env.XAI_BASE_URL` (optional, defaults to 'https://api.x.ai/v1'). The client is module-scoped (`xai`) and reused across requests.
  */
-function getClient(): OpenAI {
-  if (!xai) {
-    xai = new OpenAI({
-      apiKey: process.env.XAI_API_KEY,
-      baseURL: process.env.XAI_BASE_URL ?? 'https://api.x.ai/v1',
-    })
-  }
-  return xai
-}
+const getClient = getOpenRouter
 
 /** Shape returned by `generateQuestionSheet`. */
 /**
@@ -107,15 +98,17 @@ export async function generateQuestionSheet(
 
   try {
     const completion = await getClient().chat.completions.create({
-      model: process.env.XAI_MODEL ?? 'grok-4-1-fast-reasoning',
+      model: getGeminiModel(),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      max_tokens: 4000,
+      max_tokens: 8000,
       // Low temperature: we want consistent, structured output, not creative variation
       temperature: 0.3,
-    })
+      // OpenRouter-specific: no chain-of-thought, for speed
+      reasoning: { enabled: false },
+    } as Parameters<ReturnType<typeof getClient>['chat']['completions']['create']>[0] & { stream?: false })
 
     const output = completion.choices[0]?.message?.content
     if (!output) throw new Error('AI returned empty response')
