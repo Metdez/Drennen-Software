@@ -169,6 +169,7 @@ function buildSqlPrompt(question: string): string {
 Generate a single, read-only SQL SELECT query that answers this question:
 "${question}"
 
+Do NOT filter by user_id and never use CURRENT_USER, SESSION_USER or auth.uid() — there is no per-user filter here.
 Respond with ONLY the raw SQL query — no markdown fences, no explanation, no trailing semicolon.`
 }
 

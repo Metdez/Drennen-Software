@@ -18,7 +18,7 @@
  * Uses: lib/ai/prompt.ts (system prompt construction)
  */
 
-import { getOpenRouter, getGeminiModel } from './geminiClient'
+import { getOpenRouter, getGeminiModel, OPENROUTER_FAST } from './geminiClient'
 import { buildCustomSystemPrompt, buildSystemPrompt, buildUserMessage } from './prompt'
 
 // Lazy initialization — avoids crash at build time when env vars are absent
@@ -106,8 +106,7 @@ export async function generateQuestionSheet(
       max_tokens: 8000,
       // Low temperature: we want consistent, structured output, not creative variation
       temperature: 0.3,
-      // OpenRouter-specific: no chain-of-thought, for speed
-      reasoning: { enabled: false },
+      ...OPENROUTER_FAST,
     } as Parameters<ReturnType<typeof getClient>['chat']['completions']['create']>[0] & { stream?: false })
 
     const output = completion.choices[0]?.message?.content

@@ -17,6 +17,9 @@ import OpenAI from 'openai'
 
 export const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash-0731'
 
+/** OpenRouter-specific request params: no chain-of-thought, and route to the highest-throughput provider. */
+export const OPENROUTER_FAST = { reasoning: { enabled: false }, provider: { sort: 'throughput' } } as const
+
 let openrouter: OpenAI | null = null
 
 /** Lazy singleton OpenRouter client (OpenAI SDK with baseURL override). Used by session generation too. */
@@ -48,8 +51,7 @@ export function getGeminiClient() {
           model,
           messages,
           ...(config?.responseMimeType === 'application/json' && { response_format: { type: 'json_object' as const } }),
-          // OpenRouter-specific: skip chain-of-thought for speed; these tasks are extraction/summaries
-          reasoning: { enabled: false },
+          ...OPENROUTER_FAST,
         } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming)
 
         return { text: completion.choices[0]?.message?.content ?? '' }
