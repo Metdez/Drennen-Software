@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       question = `Only consider sessions where semester_id = '${semesterId}'. ${question}`
     }
 
-    const { answer, sql } = await runAnalyticsQuery(question)
+    const { answer, sql } = await runAnalyticsQuery(question, user.id)
     return NextResponse.json({ answer, sql })
 
   } catch (err) {

@@ -314,7 +314,7 @@ The `profiles` table also stores Stripe subscription fields: `stripe_customer_id
 
 The built-in interview-sheet prompt stays in `lib/ai/prompt.ts`. When `sessions.prompt_version_id` is `NULL`, that built-in default prompt was used for generation.
 
-The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL agent to run read-only SELECT queries bypassing RLS. It validates queries server-side before executing them.
+The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL agent to run read-only SELECT queries bypassing RLS. It validates queries server-side before executing them. Because it bypasses RLS, `runAnalyticsQuery(question, userId)` prompts the model to scope to `sessions.user_id` and rejects any generated SQL that lacks the user's id literal (string check, not airtight; a DB-level RLS-enforcing function is the proper fix).
 
 ### Dual AI systems
 

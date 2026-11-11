@@ -163,13 +163,13 @@ Rules:
  * Why it is used: To precisely instruct Gemini on its task. It ensures the AI receives all necessary context (database schema, specific rules) and is explicitly directed to return only the raw SQL query, without any additional markdown formatting, explanations, or trailing semicolons. This simplifies post-processing of the AI's output.
  * Important implementation details: It prepends the `SCHEMA_CONTEXT` variable to provide the AI with the foundational knowledge of the database structure and associated rules. The prompt explicitly specifies that the AI should "Generate a single, read-only SQL SELECT query" and "Respond with ONLY the raw SQL query — no markdown fences, no explanation, no trailing semicolon" to ensure clean output.
  */
-function buildSqlPrompt(question: string): string {
+function buildSqlPrompt(question: string, userId: string): string {
   return `${SCHEMA_CONTEXT}
 
 Generate a single, read-only SQL SELECT query that answers this question:
 "${question}"
 
-Do NOT filter by user_id and never use CURRENT_USER, SESSION_USER or auth.uid() — there is no per-user filter here.
+Only semesters and sessions have a user_id column. You MUST restrict every query to this professor: always include sessions.user_id = '${userId}' (literal UUID), and reach student_submissions / session_themes by JOINing sessions on session_id. Never read a table without that restriction. Never use CURRENT_USER, SESSION_USER or auth.uid().
 Respond with ONLY the raw SQL query — no markdown fences, no explanation, no trailing semicolon.`
 }
 
@@ -267,14 +267,14 @@ export interface AnalyticsResult {
  * 4.  **Answer generation**: Gemini is used again (via `buildAnswerPrompt`) to convert the raw database result rows into a professor-friendly, plain-English response.
  * The function returns an `AnalyticsResult` object containing both the `answer` and the `sql` for UI display. It also includes error handling for database failures and robust post-processing of Gemini's SQL output to ensure a clean query string.
  */
-export async function runAnalyticsQuery(question: string): Promise<AnalyticsResult> {
+export async function runAnalyticsQuery(question: string, userId: string): Promise<AnalyticsResult> {
   const ai = getGeminiClient()
   const model = getGeminiModel()
 
   // Step 1: generate SQL
   const sqlResponse = await ai.models.generateContent({
     model,
-    contents: buildSqlPrompt(question),
+    contents: buildSqlPrompt(question, userId),
     config: { systemInstruction: 'You are an expert PostgreSQL query writer. Output only raw SQL.' },
   })
 
@@ -288,6 +288,9 @@ export async function runAnalyticsQuery(question: string): Promise<AnalyticsResu
 
   // Step 2: validate read-only (client-side guard; DB RPC also validates)
   assertReadOnly(sql)
+  // Tenant guard: the RPC bypasses RLS, so refuse any query that doesn't carry this user's id.
+  // shortcut: string check, not airtight against a crafted question; upgrade to a DB-level RLS-enforcing function.
+  if (!sql.includes(userId)) throw new Error('Generated query was not scoped to your account. Please rephrase.')
 
   // Step 3: execute via Supabase RPC (SECURITY DEFINER function, also validates SELECT-only)
   const supabase = createAdminClient()
