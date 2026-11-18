@@ -1,7 +1,7 @@
 /**
  * Login page (`/login`).
  *
- * Route group: `(auth)` — no NavHeader or subscription context.
+ * Route group: `(auth)` — no NavHeader.
  * Auth: unauthenticated only; authenticated users are redirected to
  * `/dashboard` by the root `app/page.tsx` before reaching this page.
  *

@@ -11,8 +11,7 @@
 
 /**
  * Minimal representation of the currently authenticated professor.
- * Derived from the Supabase auth session; does not contain subscription or
- * profile data (see `SubscriptionProfile` in subscription.ts for those fields).
+ * Derived from the Supabase auth session.
  */
 /**
  * Defines the structure for an authenticated user within the application.

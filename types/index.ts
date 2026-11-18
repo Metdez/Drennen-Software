@@ -17,7 +17,7 @@
  *   Speaker features     → speaker_brief, speaker_portal
  *   Semesters & reports  → semester, report, story
  *   Cross-session work   → comparison
- *   Sharing & access     → subscription, portfolio, system_prompt
+ *   Sharing & access     → portfolio, system_prompt
  */
 export * from './session'
 export * from './user'
@@ -33,7 +33,6 @@ export * from './semester'
 export * from './comparison'
 export * from './tier'
 export * from './report'
-export * from './subscription'
 export * from './portfolio'
 export * from './speaker_portal'
 export * from './student_debrief'

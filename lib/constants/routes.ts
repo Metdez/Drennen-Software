@@ -78,11 +78,6 @@ export const ROUTES = {
   API_SEMESTERS_COMPARE: '/api/semesters/compare',
   API_ROSTER: '/api/roster',
   ACCOUNT: '/account',
-  API_SUBSCRIPTION: '/api/subscription',
-  API_STRIPE_CHECKOUT: '/api/stripe/checkout',
-  API_STRIPE_WEBHOOK: '/api/stripe/webhook',
-  API_STRIPE_PORTAL: '/api/stripe/portal',
-  API_STRIPE_INVOICES: '/api/stripe/invoices',
   // Speaker portal
   PREVIEW_PORTAL: '/preview/portal',
   API_SESSION_PORTAL: (id: string) => `/api/sessions/${id}/portal`,

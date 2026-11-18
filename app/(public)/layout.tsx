@@ -5,7 +5,7 @@
  * shared comparisons, speaker portals, and portfolio sub-pages.
  *
  * Auth: none required. Access control is entirely token-based — the token
- * in the URL is the only gate. No NavHeader, no SubscriptionProvider.
+ * in the URL is the only gate. No NavHeader.
  *
  * The `(public)` route group itself applies no `force-dynamic` directive
  * because each child page is already a Client Component that fetches on
