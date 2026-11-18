@@ -74,7 +74,7 @@ The application is a Next.js App Router project with three primary route groups:
 - `app/(public)` contains token-based public views that do not require login.
 - `app/api` contains route handlers for processing, analytics, sharing, reports, stories, portfolios, and system prompts.
 
-Authentication and route protection are handled by Supabase SSR middleware. User-scoped reads and writes use the cookie-backed Supabase client with RLS enforced. Controlled server-side jobs, and storage operations use the service role client.
+Authentication and route protection are handled by Supabase SSR middleware. User-scoped reads and writes use the cookie-backed Supabase client with RLS enforced. Controlled server-side jobs and storage operations use the service role client.
 
 ```mermaid
 flowchart TB
