@@ -11,21 +11,17 @@
  * and wants to see how the same submissions are synthesised differently.
  *
  * Pipeline (mirrors /api/process):
- *   1. Check subscription access (same gate as /api/process)
- *   2. Load original student submissions from DB (no ZIP re-upload needed)
- *   3. Resolve the currently active custom prompt (or built-in default)
- *   4. Call xAI Grok to generate a fresh question sheet
- *   5. Insert a NEW session row (new UUID; original is immutable)
- *   6. Insert student submissions + parsed themes for the new session
- *   7. Fire-and-forget: class insights, session analysis, student profiles,
+ *   1. Load original student submissions from DB (no ZIP re-upload needed)
+ *   2. Resolve the currently active custom prompt (or built-in default)
+ *   3. Call xAI Grok to generate a fresh question sheet
+ *   4. Insert a NEW session row (new UUID; original is immutable)
+ *   5. Insert student submissions + parsed themes for the new session
+ *   6. Fire-and-forget: class insights, session analysis, student profiles,
  *      tier classification
  *
  * Auth:        Required — 401 if not logged in; 404 if session belongs to
  *              another user.
- * Subscription: Gated by checkSubscriptionAccess(); free-session count is
- *              decremented when access.reason === 'free_session'.
- * DB calls:    getCurrentUser(), checkSubscriptionAccess(), decrementFreeSession(),
- *              getSessionById(), getSubmissionsBySession(), getActivePrompt(),
+ * DB calls:    getCurrentUser(), getSessionById(), getSubmissionsBySession(), getActivePrompt(),
  *              insertSession(), insertStudentSubmissions(), insertSessionThemes()
  * AI calls:    generateQuestionSheet() — xAI Grok (synchronous; user waits)
  *              generateClassInsights() — Gemini (fire-and-forget)
@@ -43,7 +39,6 @@ import { classifyAndStoreTiers } from '@/lib/ai/tierClassifier'
 import { getActivePrompt } from '@/lib/db/systemPrompts'
 import { insertSession, insertSessionThemes, insertStudentSubmissions, getSessionById } from '@/lib/db/sessions'
 import { getSubmissionsBySession } from '@/lib/db/studentSubmissions'
-import { checkSubscriptionAccess, decrementFreeSession } from '@/lib/db/subscription'
 import { getCurrentUser } from '@/lib/db/users'
 import { formatSubmissionsForAi, type ParsedSubmission } from '@/lib/parse/builder'
 import { parseThemesFromOutput } from '@/lib/parse/parseThemes'
@@ -61,7 +56,7 @@ export const dynamic = 'force-dynamic'
  * 1. What it does: This function orchestrates the re-analysis of student submissions from a previously processed session. It fetches the original submissions, applies the current AI analysis pipeline, creates a *new* session record with the updated AI output, and triggers several asynchronous background tasks for further insights and profiling.
  * 2. Why it is used: Allows users to re-evaluate a set of student submissions, potentially with updated AI models, system prompts, or new features, without needing to re-upload the original files. This provides flexibility for refining analyses or applying new capabilities to historical data.
  * 3. Important implementation details:
- *    - **Authentication and Authorization:** Verifies the current user's identity and checks their subscription access (`canGenerate`). Handles unauthorized access (401) and subscription requirements (403), including decrementing free session counts if applicable.
+ *    - **Authentication and Authorization:** Verifies the current user's identity. Handles unauthorized access (401).
  *    - **Session and Submission Retrieval:** Fetches the `originalSession` and its `submissionRows` using the `params.id`. It validates that the session exists and belongs to the current user (404), and that submissions are available (400).
  *    - **Data Preparation:** Transforms raw `submissionRows` into `ParsedSubmission` objects and then formats them into a single text string (`text`) suitable for AI processing.
  *    - **AI Processing:** Calls `generateQuestionSheet` with the original speaker name, formatted submission text, and the active system prompt (if any) to obtain the new AI analysis `output`.
@@ -69,7 +64,7 @@ export const dynamic = 'force-dynamic'
  *    - **Parallel Database Inserts:** Asynchronously inserts the original `submissions` (linked to the new session) and `parsedThemes` extracted from the AI `output` into the database using `Promise.all` for efficiency. Includes error logging for these operations.
  *    - **Asynchronous Background Tasks:** Triggers several non-blocking AI-related tasks (`generateClassInsights`, `generateAndCacheSessionAnalysis`, `generateStudentProfiles`, `classifyAndStoreTiers`) using `.catch()` to log errors but not halt the main request flow. These tasks run in the background to enrich data and create further insights.
  *    - **Response:** Upon successful re-processing, returns a JSON object containing the `sessionId` of the *new* session, its `output`, and `fileCount`.
- *    - **Error Handling:** Implements comprehensive `try...catch` blocks to handle various errors, returning appropriate HTTP status codes (e.g., 401, 403, 404, 400, 500) and error messages.
+ *    - **Error Handling:** Implements comprehensive `try...catch` blocks to handle various errors, returning appropriate HTTP status codes (e.g., 401, 404, 400, 500) and error messages.
  */
 export async function POST(
   _request: Request,
@@ -79,14 +74,6 @@ export async function POST(
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const access = await checkSubscriptionAccess(user.id)
-    if (!access.canGenerate) {
-      return NextResponse.json(
-        { error: 'subscription_required', reason: access.reason },
-        { status: 403 }
-      )
     }
 
     const originalSession = await getSessionById(params.id)
@@ -124,10 +111,6 @@ export async function POST(
       semesterId: originalSession.semesterId,
       promptVersionId: activePrompt?.id ?? null,
     })
-
-    if (access.reason === 'free_session') {
-      await decrementFreeSession(user.id)
-    }
 
     const parsedThemes = parseThemesFromOutput(output)
 
