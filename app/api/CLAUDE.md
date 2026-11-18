@@ -12,7 +12,6 @@ API routes are the server boundary between the React client and:
 - **Supabase** (auth, database, storage)
 - **xAI Grok** (session generation — `lib/ai/client.ts`)
 - **Google Gemini** (all other AI features — `lib/ai/geminiClient.ts`)
-- **Stripe** (subscription and billing)
 
 All handlers must be stateless and idempotent where possible. Business logic
 belongs in `lib/`, not inside route handlers.
@@ -75,7 +74,7 @@ import { extractErrorMessage } from '@/lib/utils/errors'
 
 - **400** — missing required fields, invalid IDs, empty arrays
 - **401** — unauthenticated (missing or expired session)
-- **403** — authenticated but not authorized (e.g. subscription gate)
+- **403** — authenticated but not authorized
 - **404** — resource not found or ownership check failed
 - **422** — semantic validation failure (e.g. prompt too short, limit reached)
 - **500** — unexpected server / AI error
@@ -125,7 +124,7 @@ depend on per-request cookies for auth.
 
 ### `process/`
 The core pipeline. See `app/api/process/route.ts` for the full orchestration
-doc. Gated by `checkSubscriptionAccess()`. Most complex route in the codebase.
+doc. Any signed-in professor can generate sessions. Most complex route in the codebase.
 
 ### `analytics/`
 | Route | Handler | Purpose |
@@ -192,8 +191,6 @@ the service-role client (bypasses RLS). Development/demo use only.
 - `portfolio/` — public portfolio share tokens and configurable section reads
 - `shared/` — public session and comparison share reads and downloads
 - `speaker/` — public speaker portal reads
-- `stripe/` — checkout, billing portal, invoice listing, and webhook handler
-- `subscription/` — current user's subscription access status
 
 ---
 

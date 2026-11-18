@@ -9,7 +9,6 @@ This directory holds the reusable building blocks below the route layer.
 - `export/` — PDF/DOCX and text export builders.
 - `parse/` — ZIP and document parsing pipeline.
 - `supabase/` — client creation and temp-storage helpers.
-- `stripe/` — Stripe SDK singleton.
 - `constants/` — shared route, brand, AI, and validation constants.
 - `utils/` — formatting, transforms, and error normalization.
 

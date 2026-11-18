@@ -53,11 +53,6 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENROUTER_API_KEY=    # required — OpenRouter key; powers ALL AI (session generation + every analysis agent)
 OPENROUTER_MODEL=      # defaults to deepseek/deepseek-v4-flash-0731 (DeepSeek V4 Flash)
 DATABASE_URL=          # Postgres connection string — used by the analytics SQL agent
-STRIPE_SECRET_KEY=     # Stripe secret key for server-side API calls
-STRIPE_WEBHOOK_SECRET= # Stripe webhook signing secret
-STRIPE_PRICE_MONTHLY=  # Stripe Price ID for monthly subscription plan
-STRIPE_PRICE_ANNUAL=   # Stripe Price ID for annual subscription plan
-NEXT_PUBLIC_SITE_URL=  # Production base URL (e.g. https://yourdomain.com) — REQUIRED in prod; used as redirect base for Stripe checkout and billing portal. Falls back to localhost:3000 if missing.
 ```
 
 ## Architecture
@@ -96,7 +91,7 @@ app/
     roster/                    → all students list with participation rates
     roster/[studentName]/      → per-student profile (3 tabs: Profile, Growth, Submissions)
     semesters/                 → semester management (create, archive, assign sessions)
-    account/                   → subscription & billing management
+    account/                   → portfolio sharing & system prompt editor
   (public)/                    → public layout (no auth required)
     portfolio/[token]/         → public portfolio landing page
     portfolio/[token]/analytics/ → public portfolio analytics
@@ -168,11 +163,6 @@ app/
     shared/[token]/download/   → shared session download (GET)
     shared/compare/[token]/    → fetch shared comparison (GET)
     speaker/[token]/           → fetch speaker portal (GET)
-    subscription/              → current user's subscription access status (GET)
-    stripe/checkout/           → create Stripe Checkout session (POST)
-    stripe/webhook/            → handle Stripe webhook events (POST)
-    stripe/portal/             → create Stripe Billing Portal session (POST)
-    stripe/invoices/           → list user's Stripe invoices (GET)
 ```
 
 ### Library layout
@@ -196,7 +186,6 @@ app/
 - `lib/db/semesters.ts` — `getSemestersByUser()`, `getActiveSemester()`, `getSemesterById()`, `insertSemester()`, `updateSemester()`, `archiveAndCreateSemester()`, `assignSessionsToSemester()`, `getUnassignedSessions()`
 - `lib/db/semesterComparison.ts` — `getSemesterComparisonData()`: cross-semester cohort comparison
 - `lib/db/themes.ts` — `getThemeFrequency()`, `getRecentThemeTitles()`
-- `lib/db/subscription.ts` — `checkSubscriptionAccess()`, `decrementFreeSession()`, `getSubscriptionProfile()`, `updateStripeCustomerId()`, `updateSubscriptionFromWebhook()`
 - `lib/db/sessionAnalyses.ts` — CRUD for per-session Gemini analysis results
 - `lib/db/sessionShares.ts` — create/fetch session share tokens
 - `lib/db/savedComparisons.ts` — CRUD for saved session comparison shares
@@ -255,7 +244,6 @@ app/
 - `lib/utils/transforms.ts` — `rowToSession()`, `rowToSessionSummary()`, `rowToDebrief()` (snake_case → camelCase)
 - `lib/utils/format.ts` — `formatStudentName()`, `formatDate()`, `formatFileCount()`, `slugifySpeakerName()`
 - `lib/utils/errors.ts` — `extractErrorMessage()`: sanitizes raw AI/Gemini error JSON into human-readable strings; use in API route catch blocks
-- `lib/stripe/index.ts` — Stripe SDK lazy singleton (`apiVersion: '2026-03-25.dahlia'`)
 - `lib/constants/` — barrel at `index.ts` re-exports from:
   - `routes.ts` — `ROUTES` object with all route paths (static and dynamic)
   - `brand.ts` — `BRAND` colors (`ORANGE`, `PURPLE`, `GREEN`), `APP_NAME`
@@ -264,7 +252,7 @@ app/
 
 ### Database
 
-All tables use RLS. Sessions are **immutable** — no UPDATE or DELETE policies exist by design. New users can self-signup with a 3-day free trial. Signups must be enabled in the Supabase Dashboard (Authentication > Providers > Email).
+All tables use RLS. Sessions are **immutable** — no UPDATE or DELETE policies exist by design. New users can self-signup; any signed-in professor can generate sessions. Signups must be enabled in the Supabase Dashboard (Authentication > Providers > Email).
 
 **Core tables**
 
@@ -310,7 +298,8 @@ All tables use RLS. Sessions are **immutable** — no UPDATE or DELETE policies 
 | `semester_stories` | Generated semester narrative stories (5-section structure) |
 | `portfolio_shares` | Portfolio share tokens with configurable section visibility |
 
-The `profiles` table also stores Stripe subscription fields: `stripe_customer_id`, `subscription_status`, `stripe_subscription_id`, `subscription_price_id`, `subscription_current_period_end`, `trial_ends_at`, `free_sessions_remaining`. The `decrement_free_session` SQL function atomically decrements free sessions.
+
+The `profiles` table holds only `id` and `email` (billing columns dropped in `20261118000000_remove_subscription_fields.sql`). Any signed-in professor can generate sessions.
 
 The built-in interview-sheet prompt stays in `lib/ai/prompt.ts`. When `sessions.prompt_version_id` is `NULL`, that built-in default prompt was used for generation.
 
@@ -348,7 +337,6 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 - Session generation resolves the professor's active custom prompt at request time; if none is active, the built-in default prompt is used
 - `sessionStorage` cache keys on `/preview`: `session_${sessionId}` (AI output), `overlap_${sessionId}` (overlapping themes JSON array), `analysis_${sessionId}` (per-session Gemini analysis JSON)
 - `/preview` has four tabs: `questions` (markdown output), `analysis` (AnalysisPanelLeft — theme clusters + tensions), `insights` (AnalysisPanelRight — suggestions, blind spots, sentiment), `debrief` (DebriefPanel — post-session capture with auto-save)
-- Subscription is managed via Stripe. Session generation (`/api/process`) is gated by `checkSubscriptionAccess()`. Existing users get 1 free session; new users get a 3-day trial. The `SubscriptionContext` provides client-side access to subscription state. Stripe webhooks are the source of truth for subscription status changes.
 - Semesters are optional groupings for sessions. Each professor can have one `active` semester at a time; others are `archived`. New sessions created via `/api/process` are automatically assigned to the active semester if one exists. Sessions with `semester_id = NULL` are unassigned and can be bulk-assigned from `/semesters`.
 - Public sharing uses token-based URLs under `(public)/`. Session shares, comparison shares, speaker portals, and portfolios each generate unique tokens. No auth required for public routes.
 - Portfolios are configurable — professors choose which sections (analytics, roster, reports, sessions) to expose via `PortfolioConfig`.
@@ -374,7 +362,6 @@ The `execute_analytics_query` SQL function (SECURITY DEFINER) is used by the SQL
 | Single AI provider: OpenRouter (DeepSeek V4 Flash) | Replaced xAI Grok + Google Gemini (Nov 2026; Gemini key was invalid, Grok slow at ~39s/session). One key, one model env var (`OPENROUTER_MODEL`), reasoning disabled for speed; session generation dropped to ~4s. `getGeminiClient()` kept as a Gemini-shaped facade so the 17 agents didn't change. |
 | Sessions are immutable | The AI output is a point-in-time artifact. Professors reference and share it. Mutations would break shared links and debrief references. |
 | Fire-and-forget AI jobs | Class insights, student profiles, and tier classification run async after session upload. The user doesn't wait for them; they appear on subsequent page loads. |
-| Stripe webhooks as source of truth | Client-side subscription state is a cache. Webhook events (`customer.subscription.*`, `invoice.*`) drive all real status changes in the `profiles` table. |
 | `sessionStorage` caching on `/preview` | Avoids redundant API calls when switching tabs. Data is already in memory from the initial load. |
 | Token-based public sharing | Allows professors to share sessions, comparisons, speaker portals, and portfolios without requiring recipients to have accounts. Each share type has its own token namespace. |
 | Built-in prompt in code, custom prompts in DB | The default interview-sheet instructions stay version-controlled in `lib/ai/prompt.ts`, while professor overrides are saved as immutable versions in `custom_system_prompts`. `sessions.prompt_version_id = NULL` cleanly represents "default prompt used." |
@@ -406,7 +393,6 @@ Key directories have their own CLAUDE.md with local conventions:
 - `lib/parse/CLAUDE.md` — ZIP → text parsing pipeline and output parsers
 - `lib/supabase/CLAUDE.md` — browser/server/storage client split
 - `lib/utils/CLAUDE.md` — formatting, transforms, and error normalization
-- `lib/stripe/CLAUDE.md` — Stripe singleton and server-only usage
 - `components/CLAUDE.md` — directory structure, brand colors, component patterns
 - `app/CLAUDE.md` — app router shell, route groups, and page/route conventions
 - `app/api/CLAUDE.md` — route handler conventions, auth/RLS, and response rules

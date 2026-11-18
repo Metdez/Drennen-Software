@@ -24,7 +24,6 @@ This directory holds all Supabase access modes and temp-storage utilities used b
 - **Use for:**
   - Storage operations in routes where the user's session cookie is not available (e.g. `storage.server.ts`)
   - Background / fire-and-forget AI jobs that fan out across multiple users (class insights, student profiles)
-  - Webhook handlers (Stripe) that update rows not owned by any single request user
 - **NEVER use for:** regular user-scoped reads. Bypassing RLS can expose other users' data.
 - **Import from:** `@/lib/supabase/server`
 

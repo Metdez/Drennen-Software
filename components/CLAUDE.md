@@ -12,7 +12,6 @@ Components are organized by feature domain:
 | `speaker/` | Speaker briefs, portals, analysis uploads |
 | `debrief/` | Post-session debrief capture |
 | `semester/` | Semester context, selection, management |
-| `subscription/` | Paywall, billing banners, subscription context |
 | `layout/` | Navigation, auth forms, config panels |
 | `report/` | Semester report sections (ExecutiveSummary, ThemeEvolution, etc.) |
 | `compare/` | Session comparison components |
@@ -91,7 +90,7 @@ Add inline `//` comments for:
 ```
 // Rendered by: app/(app)/...
 // Calls: /api/...
-// Reads: SemesterContext / SubscriptionContext / PortfolioContext
+// Reads: SemesterContext / PortfolioContext
 ```
 
 ## Subdirectory Reference

@@ -32,7 +32,6 @@ Key capabilities:
 - Manage semesters, assign sessions, compare cohorts, and generate semester-level reports.
 - Publish token-based public views for shared sessions, semester comparisons, speaker portals, and teaching portfolios.
 - Analyze post-session student reflections and formal speaker-analysis essays.
-- Use Stripe subscriptions, free-session access checks, Checkout, invoices, webhooks, and billing portal flows.
 - Customize system prompts and rerun session generation with saved prompt versions.
 
 ## Core Workflows
@@ -73,7 +72,7 @@ The application is a Next.js App Router project with three primary route groups:
 - `app/(auth)` contains login and auth-facing screens.
 - `app/(app)` contains authenticated professor workflows.
 - `app/(public)` contains token-based public views that do not require login.
-- `app/api` contains route handlers for processing, analytics, sharing, Stripe, reports, stories, portfolios, and system prompts.
+- `app/api` contains route handlers for processing, analytics, sharing, reports, stories, portfolios, and system prompts.
 
 Authentication and route protection are handled by Supabase SSR middleware. User-scoped reads and writes use the cookie-backed Supabase client with RLS enforced. Controlled server-side jobs, storage operations, and webhooks use the service role client.
 
@@ -85,7 +84,6 @@ flowchart TB
     API --> Storage
     API --> XAI[xAI Grok via OpenAI SDK]
     API --> Gemini[Google Gemini Agents]
-    API --> Stripe[Stripe Billing]
     Public[Token-based public pages] --> API
 ```
 
@@ -103,7 +101,6 @@ flowchart TB
 | Parsing | `unzipper`, `pdf-parse`, `mammoth`, HTML parsing |
 | Exports | `@react-pdf/renderer`, `docx` |
 | Charts | Recharts |
-| Payments | Stripe Checkout, Billing Portal, invoices, webhooks |
 | Hosting | Vercel |
 
 ## Project Structure
@@ -125,7 +122,6 @@ components/
   session/                Upload, processing, preview, sharing
   speaker/                Speaker brief and portal components
   student/                Roster, profiles, notes, growth intelligence
-  subscription/           Paywall, subscription context, banners
   ui/                     Shared primitives
 lib/
   ai/                     xAI and Gemini agents
@@ -133,7 +129,6 @@ lib/
   db/                     Supabase data access layer
   export/                 PDF, DOCX, text export helpers
   parse/                  Canvas ZIP, PDF, DOCX, HTML parsing
-  stripe/                 Stripe client factory
   supabase/               Browser, server, admin, and storage clients
   utils/                  Formatting, transforms, errors
 supabase/
@@ -151,7 +146,6 @@ types/                    Shared TypeScript domain types
 - Supabase CLI and a Supabase project
 - xAI API key
 - Google Gemini API key
-- Stripe account for billing flows
 - Vercel account for production deployment
 
 ### Local Setup
@@ -175,7 +169,7 @@ types/                    Shared TypeScript domain types
    cp .env.example .env.local
    ```
 
-4. Fill in `.env.local` with Supabase, xAI, Gemini, Stripe, and database values.
+4. Fill in `.env.local` with Supabase, xAI, Gemini, and database values.
 
 5. Apply database migrations.
 
@@ -209,12 +203,7 @@ The repository includes [.env.example](.env.example). Keep real secrets in `.env
 | `XAI_MODEL` | No | xAI model; defaults in code to `grok-4-1-fast-reasoning` |
 | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Yes | Gemini API key for analytics, profiles, reports, stories, and portals |
 | `GEMINI_MODEL` | No | Gemini model override |
-| `STRIPE_SECRET_KEY` | Yes for billing | Server-only Stripe API key |
-| `STRIPE_WEBHOOK_SECRET` | Yes for billing | Stripe webhook signing secret |
-| `STRIPE_PRICE_MONTHLY` | Yes for billing | Monthly subscription price ID |
-| `STRIPE_PRICE_ANNUAL` | Yes for billing | Annual subscription price ID |
 | `DATABASE_URL` | Yes for SQL agent | Direct Postgres connection string used by analytics SQL tooling |
-| `NEXT_PUBLIC_SITE_URL` | Recommended | Public site origin for checkout and billing redirects |
 
 ## Database and Storage
 
@@ -285,8 +274,7 @@ Deployment checklist:
 4. Configure Supabase Auth redirect URLs for the deployed domain.
 5. Apply Supabase migrations to the production project.
 6. Create the `temp-uploads` storage bucket and policies if they are not already present.
-7. Configure Stripe webhook delivery to `/api/stripe/webhook`.
-8. Run a production smoke test with a small Canvas ZIP.
+7. Run a production smoke test with a small Canvas ZIP.
 
 ## Operational Notes
 
@@ -294,4 +282,4 @@ Deployment checklist:
 - Public session, comparison, portfolio, and speaker portal views use revocable token-based access.
 - The primary `/api/process` request returns after the main question sheet is generated. Several Gemini jobs continue in the background and may populate analytics shortly afterward.
 - The Supabase admin client bypasses RLS and should stay limited to storage operations, background jobs, and trusted webhook flows.
-- `.env.local` is intentionally ignored. Never commit real API keys, service role keys, Stripe secrets, or database credentials.
+- `.env.local` is intentionally ignored. Never commit real API keys, service role keys, or database credentials.

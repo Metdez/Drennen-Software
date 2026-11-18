@@ -65,17 +65,10 @@ Security measures:
 
 Called from: `POST /api/analytics/query`
 
-### `decrement_free_session(user_id UUID) → VOID`
-**File:** `20260401000007_add_subscription_fields.sql`
-**Role:** SECURITY DEFINER
-**Purpose:** Atomically decrements `profiles.free_sessions_remaining` for a user, but only if it is currently above 0. Prevents race conditions where two concurrent session generations could both decrement below zero.
-
-Called from: `lib/db/subscription.ts` → `decrementFreeSession()` inside `POST /api/process`.
-
 ### `handle_new_user() → TRIGGER`
-**File:** `20260401000007_add_subscription_fields.sql`
+**File:** `20261118000000_remove_subscription_fields.sql` (reset)
 **Role:** SECURITY DEFINER (trigger function on `auth.users`)
-**Purpose:** Fires after a new user signs up. Creates a row in `public.profiles` with a 3-day trial window (`trial_ends_at = now() + interval '3 days'`) and `free_sessions_remaining = 0`. Uses `ON CONFLICT DO NOTHING` so it is safe if the profile was created manually.
+**Purpose:** Fires after a new user signs up. Creates a row in `public.profiles` with `(id, email)` only. Uses `ON CONFLICT DO NOTHING` so it is safe if the profile was created manually.
 
 ## Storage Bucket
 
@@ -112,10 +105,11 @@ Called from: `lib/db/subscription.ts` → `decrementFreeSession()` inside `POST 
 | `20260401000004_create_session_tier_data.sql` | `session_tier_data` table |
 | `20260401000005_create_semester_reports.sql` | `semester_reports` table |
 | `20260401000006_create_saved_comparisons.sql` | `saved_comparisons` table |
-| `20260401000007_add_subscription_fields.sql` | Stripe fields on `profiles`, `decrement_free_session`, `handle_new_user` trigger |
+| `20260401000007_add_subscription_fields.sql` | Added Stripe fields on `profiles`, `decrement_free_session`, `handle_new_user` trigger (superseded) |
 | `20260402000000_create_student_debrief_submissions.sql` | `student_debrief_submissions` table |
 | `20260402000001_create_student_debrief_analyses.sql` | `student_debrief_analyses` table |
 | `20260402000002_create_student_speaker_analysis_submissions.sql` | `student_speaker_analysis_submissions` table |
+| `20261118000000_remove_subscription_fields.sql` | Drops billing columns on `profiles` and `decrement_free_session`; resets `handle_new_user` to insert `(id, email)` |
 | `20260402000003_create_student_speaker_analyses.sql` | `student_speaker_analyses` table |
 | `20260402000004_create_session_syntheses.sql` | `session_syntheses` table |
 | `20260403000000_create_portfolio_shares.sql` | `portfolio_shares` table + token RLS |
@@ -138,5 +132,4 @@ Called from: `lib/db/subscription.ts` → `decrementFreeSession()` inside `POST 
 
 - Supabase clients: `lib/supabase/server.ts`, `lib/supabase/client.ts`, `lib/supabase/storage.ts`
 - DB query layer: `lib/db/` (see `lib/db/CLAUDE.md`)
-- Subscription logic (uses SQL functions): `lib/db/subscription.ts`
 - Analytics SQL agent (uses `execute_analytics_query`): `lib/ai/sqlAgent.ts`

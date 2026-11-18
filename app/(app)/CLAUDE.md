@@ -1,6 +1,6 @@
 # app/(app)/ — Protected Professor Experience
 
-This route group is mounted only for signed-in users and shares the authenticated app shell (NavHeader, SemesterContext, SubscriptionContext).
+This route group is mounted only for signed-in users and shares the authenticated app shell (NavHeader, SemesterContext).
 
 ## Purpose
 
@@ -18,7 +18,7 @@ Client-component pages fetch data via API routes that enforce RLS via the cookie
 
 | Route | Page File | Purpose | Key Components | Rendering |
 |-------|-----------|---------|----------------|-----------|
-| `/dashboard` | `dashboard/page.tsx` | Upload form — ZIP upload + AI generation trigger | SpeakerInput, DropZone, ProcessingView, SystemPromptEditor, PaywallModal | Client |
+| `/dashboard` | `dashboard/page.tsx` | Upload form — ZIP upload + AI generation trigger | SpeakerInput, DropZone, ProcessingView, SystemPromptEditor | Client |
 | `/preview` | `preview/page.tsx` | Session output viewer with 6 tabs (Questions, Analysis, Insights, Debrief, Reflections, Speaker Analysis) | OutputPreview, AnalysisPanelLeft, AnalysisPanelRight, DebriefPanel, SpeakerAnalysisPanel, StudentReflectionsPanel | Client |
 | `/preview/brief` | `preview/brief/page.tsx` | Speaker prep brief preview, inline editing, PDF/text export | SectionCard (inline), GenerateBriefButton | Client |
 | `/preview/portal` | `preview/portal/page.tsx` | Speaker portal preview, inline editing, publish/unpublish | SectionCard (inline), GeneratePortalButton | Client |
@@ -33,7 +33,7 @@ Client-component pages fetch data via API routes that enforce RLS via the cookie
 | `/reports/[id]` | `reports/[id]/page.tsx` | Semester report viewer with TOC and up to 10 section components | ExecutiveSummary, SemesterGlance, SessionSummaries, ThemeEvolution, StudentEngagement, StudentGrowth, QuestionQuality, BlindSpots, SpeakerEffectiveness, AppendixRoster | Client |
 | `/stories/[id]` | `stories/[id]/page.tsx` | Semester narrative story viewer with inline section editing | (inline layout) | Client |
 | `/semesters` | `semesters/page.tsx` | Semester management — create, edit, archive, generate story, assign sessions | SemesterManageModal, AssignSessionsModal | Client |
-| `/account` | `account/page.tsx` | Subscription status, billing invoices, portfolio sharing, system prompt editor | PaywallModal, PortfolioSharePanel, SystemPromptEditor | Client |
+| `/account` | `account/page.tsx` | Portfolio sharing, system prompt editor | PortfolioSharePanel, SystemPromptEditor | Client |
 
 ## Key Conventions
 
@@ -41,7 +41,6 @@ Client-component pages fetch data via API routes that enforce RLS via the cookie
 - **sessionStorage caching:** The `/preview` page caches session output (`session_${sessionId}`), overlapping themes (`overlap_${sessionId}`), and analysis results (`analysis_${sessionId}`) in `sessionStorage` to avoid redundant API calls when switching tabs. The `/compare` page caches comparison data under `comparison_${sortedIds}`. The `/preview/theme` page caches per-theme analysis under `theme_${sessionId}_${encodedTheme}`.
 - **Lazy data loading:** The debrief, student reflections, and speaker analysis tabs on `/preview` only fetch their data on the first tab selection — `debriefFetched`, `studentDebriefFetched`, and `speakerAnalysisFetched` guard flags prevent redundant fetches.
 - **Export pattern:** PDF and DOCX exports are triggered by programmatic `<a>` element clicks against download API routes that return blobs. The download routes handle the actual rendering.
-- **Subscription gating:** The `/dashboard` page reads from `SubscriptionContext` and renders `PaywallModal` when `canGenerate` is false. The `/account` page also reads subscription state for the billing status card.
 - **Server vs Client pages:** Most pages are client components that fetch data via API routes. Server component pages (`/analytics/theme`, `/roster/[studentName]`) call DB functions directly, benefiting from server-side rendering and faster initial loads.
 
 ## Data Flow Summary

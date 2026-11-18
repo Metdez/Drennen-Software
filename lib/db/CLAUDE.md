@@ -47,7 +47,6 @@ The `sessions` table has **no UPDATE or DELETE policies** by design. Sessions ar
 | `semesters.ts` | `getSemestersByUser()`, `getActiveSemester()`, `getSemesterById()`, `insertSemester()`, `updateSemester()`, `archiveAndCreateSemester()`, `assignSessionsToSemester()`, `getUnassignedSessions()` | `semesters`, `sessions` | `createClient()` — RLS enforced | `app/api/semesters/**` |
 | `semesterComparison.ts` | `getSemesterComparisonData()` | `cohort_comparisons` | `createAdminClient()` — bypass | `app/api/semesters/compare/route.ts` |
 | `savedComparisons.ts` | saved session-pair comparison CRUD | `saved_comparisons` | `createAdminClient()` — bypass | `app/api/compare/**` |
-| `subscription.ts` | `checkSubscriptionAccess()`, `decrementFreeSession()`, `getSubscriptionProfile()`, `updateStripeCustomerId()`, `updateSubscriptionFromWebhook()` | `profiles` | `createAdminClient()` — bypass (webhook & Stripe flows) | `app/api/process`, `app/api/stripe/**`, `app/api/subscription/route.ts` |
 | `reports.ts` | report CRUD | `semester_reports` | `createAdminClient()` — bypass | `app/api/reports/**` |
 | `stories.ts` | story CRUD | `semester_stories` | `createAdminClient()` — bypass | `app/api/stories/**` |
 | `speakerBriefs.ts` | speaker brief CRUD | `speaker_briefs` | `createAdminClient()` — bypass | `app/api/sessions/[id]/brief/**` |
