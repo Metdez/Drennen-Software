@@ -5,18 +5,15 @@
  * upload a Canvas ZIP of student submissions, and trigger the AI pipeline.
  *
  * Key behaviors:
- * - Checks subscription access via `SubscriptionContext`; shows `PaywallModal` if blocked.
  * - On submit: uploads ZIP to Supabase Storage via `uploadTempZip`, then POSTs to
  *   `/api/process` with the resulting `storagePath`.
  * - On success: caches AI output and overlapping themes in `sessionStorage`, then
  *   navigates to `/preview?sessionId=...`.
- * - Handles post-Stripe-checkout redirect (`?checkout=success&session_id=`) by
- *   verifying with `/api/stripe/checkout` and refreshing subscription state.
  * - Handles first-signup welcome banner via `?welcome=true` query param.
  * - Renders `ProcessingView` during generation (animated progress indicator).
  * - Renders `SystemPromptEditor` so professors can preview / switch prompt versions.
  *
- * Components: SpeakerInput, DropZone, ProcessingView, SystemPromptEditor, PaywallModal
+ * Components: SpeakerInput, DropZone, ProcessingView, SystemPromptEditor
  */
 'use client'
 
@@ -26,20 +23,16 @@ import { SpeakerInput } from '@/components/session/SpeakerInput'
 import { DropZone } from '@/components/session/DropZone'
 import { ProcessingView } from '@/components/session/ProcessingView'
 import { SystemPromptEditor } from '@/components/session/SystemPromptEditor'
-import { PaywallModal } from '@/components/subscription/PaywallModal'
 import { ROUTES, BRAND } from '@/lib/constants'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTempZip } from '@/lib/supabase/storage'
 import { useSemesterContext } from '@/components/semester/SemesterContext'
-import { useSubscription } from '@/components/subscription/SubscriptionContext'
 
 export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { activeSemester } = useSemesterContext()
-  const { canGenerate, reason, isLoading: subscriptionLoading, refreshSubscription } = useSubscription()
-  const [checkoutSuccess, setCheckoutSuccess] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const [speakerName, setSpeakerName] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -48,36 +41,6 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   // Holds the session ID from API response until the completion animation fires
   const pendingSessionIdRef = useRef<string | null>(null)
-
-  // Handle post-checkout redirect — verify with Stripe and sync DB
-  useEffect(() => {
-    if (searchParams.get('checkout') === 'success') {
-      const sessionId = searchParams.get('session_id')
-
-      async function verifyCheckout() {
-        if (sessionId) {
-          try {
-            await fetch(`/api/stripe/checkout?session_id=${sessionId}`)
-          } catch {
-            // Verification failed — webhook may still handle it
-          }
-        }
-        await refreshSubscription()
-        setCheckoutSuccess(true)
-      }
-
-      verifyCheckout()
-
-      // Clean up URL
-      const url = new URL(window.location.href)
-      url.searchParams.delete('checkout')
-      url.searchParams.delete('session_id')
-      router.replace(url.pathname + url.search, { scroll: false })
-      // Auto-dismiss after 5 seconds
-      const timer = setTimeout(() => setCheckoutSuccess(false), 5000)
-      return () => clearTimeout(timer)
-    }
-  }, [searchParams, refreshSubscription, router])
 
   // Handle post-signup welcome
   useEffect(() => {
@@ -123,12 +86,6 @@ export default function DashboardPage() {
       }
 
       if (!res.ok) {
-        if (data.error === 'subscription_required') {
-          // Subscription expired between page load and submit — refresh and show paywall
-          refreshSubscription()
-          setError('Your subscription is required to generate sessions. Please subscribe to continue.')
-          return
-        }
         // ProcessingView watches `error` and handles its own fade-out before calling onExited
         const errMsg = (data.error as string) || 'Failed to process files'
         setError(errMsg)
@@ -177,10 +134,6 @@ export default function DashboardPage() {
     setError(null)
   }, [])
 
-  if (!subscriptionLoading && !canGenerate) {
-    return <PaywallModal reason={reason} onClose={() => router.push(ROUTES.HISTORY)} />
-  }
-
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-8">
       {isLoading ? (
@@ -193,20 +146,6 @@ export default function DashboardPage() {
         />
       ) : (
         <>
-          {/* Checkout success banner */}
-          {checkoutSuccess && (
-            <div
-              className="animate-fade-up p-4 rounded-lg text-sm font-[family-name:var(--font-dm-sans)]"
-              style={{
-                background: 'rgba(15, 107, 55, 0.12)',
-                border: '1px solid rgba(15, 107, 55, 0.25)',
-                color: '#4ade80',
-              }}
-            >
-              Subscription activated! You&apos;re all set to generate sessions.
-            </div>
-          )}
-
           {/* Welcome card for first-time signups */}
           {showWelcome && (
             <div
