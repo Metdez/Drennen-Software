@@ -159,7 +159,7 @@ export default function DashboardPage() {
                 Welcome to MGMT 305!
               </h3>
               <p style={{ color: 'var(--text-secondary)' }}>
-                Your 3-day free trial is active. Upload your first Canvas ZIP to generate a question sheet.
+                Upload your first Canvas ZIP to generate a question sheet.
               </p>
               <button
                 onClick={() => setShowWelcome(false)}
