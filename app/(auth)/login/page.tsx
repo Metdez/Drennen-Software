@@ -146,12 +146,7 @@ function LoginContent() {
             <h2 className="font-[family-name:var(--font-playfair)] text-xl font-semibold mb-1 text-[var(--text-primary)]">
               {mode === 'signin' ? 'Welcome back' : 'Create your account'}
             </h2>
-            {mode === 'signup' && (
-              <p className="text-sm text-[var(--text-secondary)] mb-5 font-[family-name:var(--font-dm-sans)]">
-                Start with a 3-day free trial. No credit card required.
-              </p>
-            )}
-            {mode === 'signin' && <div className="mb-5" />}
+            <div className="mb-5" />
 
             {callbackError && (
               <div className="mb-4 p-3 rounded-lg bg-[rgba(220,38,38,0.1)] border border-[rgba(220,38,38,0.25)] text-red-400 text-sm font-[family-name:var(--font-dm-sans)]">
