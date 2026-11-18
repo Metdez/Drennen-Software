@@ -109,7 +109,6 @@ Called from: `POST /api/analytics/query`
 | `20260402000000_create_student_debrief_submissions.sql` | `student_debrief_submissions` table |
 | `20260402000001_create_student_debrief_analyses.sql` | `student_debrief_analyses` table |
 | `20260402000002_create_student_speaker_analysis_submissions.sql` | `student_speaker_analysis_submissions` table |
-| `20261118000000_remove_subscription_fields.sql` | Drops billing columns on `profiles` and `decrement_free_session`; resets `handle_new_user` to insert `(id, email)` |
 | `20260402000003_create_student_speaker_analyses.sql` | `student_speaker_analyses` table |
 | `20260402000004_create_session_syntheses.sql` | `session_syntheses` table |
 | `20260403000000_create_portfolio_shares.sql` | `portfolio_shares` table + token RLS |
@@ -119,6 +118,7 @@ Called from: `POST /api/analytics/query`
 | `20260404000001_create_professor_student_notes.sql` | `professor_student_notes` table |
 | `20260406000000_create_custom_system_prompts.sql` | `custom_system_prompts` table |
 | `20260406000001_add_prompt_version_to_sessions.sql` | `sessions.prompt_version_id` FK |
+| `20261118000000_remove_subscription_fields.sql` | Drops billing columns on `profiles` and `decrement_free_session`; resets `handle_new_user` to insert `(id, email)` |
 
 ## Anti-patterns
 

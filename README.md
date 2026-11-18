@@ -74,7 +74,7 @@ The application is a Next.js App Router project with three primary route groups:
 - `app/(public)` contains token-based public views that do not require login.
 - `app/api` contains route handlers for processing, analytics, sharing, reports, stories, portfolios, and system prompts.
 
-Authentication and route protection are handled by Supabase SSR middleware. User-scoped reads and writes use the cookie-backed Supabase client with RLS enforced. Controlled server-side jobs, storage operations, and webhooks use the service role client.
+Authentication and route protection are handled by Supabase SSR middleware. User-scoped reads and writes use the cookie-backed Supabase client with RLS enforced. Controlled server-side jobs, and storage operations use the service role client.
 
 ```mermaid
 flowchart TB
@@ -281,5 +281,5 @@ Deployment checklist:
 - Authenticated professor routes are protected by `middleware.ts`.
 - Public session, comparison, portfolio, and speaker portal views use revocable token-based access.
 - The primary `/api/process` request returns after the main question sheet is generated. Several Gemini jobs continue in the background and may populate analytics shortly afterward.
-- The Supabase admin client bypasses RLS and should stay limited to storage operations, background jobs, and trusted webhook flows.
+- The Supabase admin client bypasses RLS and should stay limited to storage operations and background jobs.
 - `.env.local` is intentionally ignored. Never commit real API keys, service role keys, or database credentials.

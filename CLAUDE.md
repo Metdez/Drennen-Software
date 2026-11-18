@@ -298,8 +298,7 @@ All tables use RLS. Sessions are **immutable** — no UPDATE or DELETE policies 
 | `semester_stories` | Generated semester narrative stories (5-section structure) |
 | `portfolio_shares` | Portfolio share tokens with configurable section visibility |
 
-
-The `profiles` table holds only `id` and `email` (billing columns dropped in `20261118000000_remove_subscription_fields.sql`). Any signed-in professor can generate sessions.
+The `profiles` table holds `id`, `email` and `created_at` (billing columns dropped in `20261118000000_remove_subscription_fields.sql`). Any signed-in professor can generate sessions.
 
 The built-in interview-sheet prompt stays in `lib/ai/prompt.ts`. When `sessions.prompt_version_id` is `NULL`, that built-in default prompt was used for generation.
 
